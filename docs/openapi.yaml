@@ -1,0 +1,371 @@
+openapi: 3.0.3
+info:
+  title: Payments Processing API
+  description: >
+    REST API for managing the full lifecycle of financial payments —
+    creation, validation, transmission, completion/failure — with a
+    complete audit trail of status transitions.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+tags:
+  - name: Payments
+    description: Create, retrieve, and track payments
+
+paths:
+  /payments:
+    post:
+      tags: [Payments]
+      summary: Create a new payment
+      operationId: createPayment
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema:
+            type: string
+          description: Client-generated key to detect duplicate submissions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment created (final status reflected in body after auto-progression)
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '200':
+          description: Idempotency-Key matched an existing payment — returning it, no new resource created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    get:
+      tags: [Payments]
+      summary: List / search / filter payments
+      operationId: listPayments
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/PaymentStatus'
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Matches against reference or payment ID (partial match)
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - in: query
+          name: sort
+          schema:
+            type: string
+            default: createdAt,desc
+      responses:
+        '200':
+          description: Paginated list of payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentPage'
+
+  /payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get a payment by ID
+      operationId: getPaymentById
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Payment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /payments/{id}/history:
+    get:
+      tags: [Payments]
+      summary: Get full status-transition audit trail for a payment
+      operationId: getPaymentHistory
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Ordered list of status transitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentHistoryResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /payments/{id}/validate:
+    post:
+      tags: [Payments]
+      summary: Explicitly trigger CREATED -> VALIDATED transition
+      operationId: validatePayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Transition attempted (payment now VALIDATED or FAILED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Illegal transition attempted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Concurrent modification conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /payments/{id}/send:
+    post:
+      tags: [Payments]
+      summary: Explicitly trigger VALIDATED -> SENT transition
+      operationId: sendPayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Transition attempted (payment now SENT or FAILED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Illegal transition attempted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Concurrent modification conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /payments/{id}/complete:
+    post:
+      tags: [Payments]
+      summary: Explicitly trigger SENT -> COMPLETED transition
+      operationId: completePayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Transition attempted (payment now COMPLETED or FAILED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Illegal transition attempted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Concurrent modification conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+components:
+  parameters:
+    PaymentId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    PaymentStatus:
+      type: string
+      enum: [CREATED, VALIDATED, SENT, COMPLETED, FAILED]
+
+    CreatePaymentRequest:
+      type: object
+      required: [amount, currency, sourceAccount, destinationAccount]
+      properties:
+        amount:
+          type: number
+          format: double
+          example: 250.00
+          minimum: 0.01
+          maximum: 1000000
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: USD
+        sourceAccount:
+          type: string
+          minLength: 8
+          maxLength: 20
+          example: ACC1000001
+        destinationAccount:
+          type: string
+          minLength: 8
+          maxLength: 20
+          example: ACC2000002
+        reference:
+          type: string
+          maxLength: 255
+          nullable: true
+          example: "Invoice #4471"
+
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        sourceAccount:
+          type: string
+        destinationAccount:
+          type: string
+        reference:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentHistoryResponse:
+      type: object
+      properties:
+        previousStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+          nullable: true
+        newStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        triggeredBy:
+          type: string
+          example: SYSTEM
+        occurredAt:
+          type: string
+          format: date-time
+
+    PaymentPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentResponse'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    ApiError:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          example: INVALID_AMOUNT
+        message:
+          type: string
+          example: Amount must be greater than 0
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+          example: /api/v1/payments
+
