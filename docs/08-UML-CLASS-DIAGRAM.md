@@ -2,7 +2,7 @@
 
 Related: `05-ARCHITECTURE.md`, `06-DESIGN-PATTERNS.md`. Rendered in Mermaid (view in GitHub/most Markdown previewers, or paste into mermaid.live).
 
-## 1. Full Class Diagram
+## 1. Full Class Diagr am
 
 ```mermaid
 classDiagram
