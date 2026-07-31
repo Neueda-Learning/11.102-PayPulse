@@ -3,202 +3,479 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PayPulse — UML Diagrams</title>
+  <title>PayPulse — Technical Diagrams</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f1117; color: #e6edf3; min-height: 100vh; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    header {
-      background: linear-gradient(135deg, #1a1f2e 0%, #161b27 100%);
-      border-bottom: 1px solid #30363d;
-      padding: 22px 40px;
-      display: flex; align-items: center; gap: 18px;
-      position: sticky; top: 0; z-index: 100;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    }
-    header .logo { font-size: 2rem; }
-    header h1 {
-      font-size: 1.6rem; font-weight: 700;
-      background: linear-gradient(90deg, #58a6ff, #bc8cff);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    header p { font-size: 0.82rem; color: #8b949e; margin-top: 2px; }
-
-    nav {
-      background: #161b27; border-bottom: 1px solid #21262d;
-      padding: 0 40px; display: flex; gap: 2px; overflow-x: auto;
-    }
-    nav button {
-      background: none; border: none; color: #8b949e; font-size: 0.9rem;
-      padding: 13px 16px; cursor: pointer; border-bottom: 3px solid transparent;
-      transition: all 0.2s; white-space: nowrap; font-family: inherit;
-    }
-    nav button:hover { color: #e6edf3; }
-    nav button.active { color: #58a6ff; border-bottom-color: #58a6ff; font-weight: 600; }
-
-    main { padding: 28px 40px; max-width: 1400px; margin: 0 auto; }
-    .section { display: none; }
-    .section.active { display: block; }
-    .section-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
-    .section-desc { font-size: 0.88rem; color: #8b949e; margin-bottom: 22px; line-height: 1.6; }
-
-    .diagram-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-
-    .diagram-card {
-      background: #161b27; border: 1px solid #21262d; border-radius: 12px; overflow: hidden;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .diagram-card:hover { border-color: #388bfd55; box-shadow: 0 0 0 3px #388bfd15; }
-
-    .card-header {
-      padding: 13px 22px; background: #1c2130; border-bottom: 1px solid #21262d;
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    }
-    .badge {
-      background: #388bfd22; color: #58a6ff; font-size: 0.7rem; font-weight: 700;
-      padding: 3px 10px; border-radius: 20px; text-transform: uppercase;
-      letter-spacing: 0.05em; flex-shrink: 0;
-    }
-    .badge.green  { background: #2ea04322; color: #3fb950; }
-    .badge.yellow { background: #d2992222; color: #d29922; }
-    .badge.red    { background: #f8514922; color: #f85149; }
-    .badge.purple { background: #bc8cff22; color: #bc8cff; }
-
-    .card-header h3 { font-size: 0.96rem; font-weight: 600; color: #e6edf3; }
-    .card-header .note { margin-left: auto; font-size: 0.78rem; color: #8b949e; }
-
-    .card-body { padding: 24px; overflow-x: auto; background: #0d1117; }
-    .card-body .mermaid { display: flex; justify-content: center; min-height: 40px; }
-
-    /* Tables */
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    th, td { padding: 10px 14px; border: 1px solid #21262d; text-align: center; }
-    th { background: #1c2130; color: #8b949e; font-weight: 600; }
-    td { color: #e6edf3; }
-    td:first-child { font-weight: 700; color: #58a6ff; text-align: left; }
-
-    /* Q&A */
-    .qa-list { display: flex; flex-direction: column; gap: 14px; }
-    .qa-item { background: #161b27; border: 1px solid #21262d; border-radius: 10px; overflow: hidden; }
-    .qa-item-header { padding: 13px 20px; background: #1c2130; border-bottom: 1px solid #21262d; display: flex; align-items: flex-start; gap: 12px; }
-    .qa-num { font-size: 0.75rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; white-space: nowrap; margin-top: 2px; flex-shrink: 0; }
-    .qa-item-header h4 { font-size: 0.94rem; color: #e6edf3; line-height: 1.5; }
-    .qa-body { padding: 14px 20px; }
-    .qa-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; font-size: 0.87rem; line-height: 1.6; }
-    .qa-row:last-child { margin-bottom: 0; }
-    .qa-label { font-weight: 700; font-size: 0.72rem; padding: 2px 9px; border-radius: 4px; white-space: nowrap; margin-top: 2px; flex-shrink: 0; }
-    .qa-label.default { background: #58a6ff22; color: #58a6ff; }
-    .qa-label.why { background: #bc8cff22; color: #bc8cff; }
-    .qa-row p { color: #c9d1d9; }
-
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
-
-    /* ── Theme variables ── */
     :root {
-      --bg: #0f1117;
-      --surface: #161b27;
-      --surface2: #1c2130;
-      --border: #21262d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --text-body: #c9d1d9;
-      --card-body: #0d1117;
-      --header-bg1: #1a1f2e;
-      --header-bg2: #161b27;
+      --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'SF Mono', 'Consolas', 'Fira Code', monospace;
+      --bg:           #f8f9fb;
+      --surface:      #ffffff;
+      --surface-alt:  #f3f4f6;
+      --border:       #e5e7eb;
+      --border-soft:  #f0f1f3;
+      --text-primary:   #111827;
+      --text-secondary: #4b5563;
+      --text-muted:     #9ca3af;
+      --accent:       #1d4ed8;
+      --accent-light: #eff6ff;
+      --accent-mid:   #bfdbfe;
+      --green:        #15803d;
+      --green-light:  #f0fdf4;
+      --green-mid:    #bbf7d0;
+      --amber:        #b45309;
+      --amber-light:  #fffbeb;
+      --amber-mid:    #fde68a;
+      --red:          #b91c1c;
+      --red-light:    #fef2f2;
+      --red-mid:      #fecaca;
+      --purple:       #6d28d9;
+      --purple-light: #f5f3ff;
+      --purple-mid:   #ddd6fe;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow:    0 1px 3px rgba(0,0,0,0.07), 0 1px 8px rgba(0,0,0,0.04);
+      --radius: 8px;
+      --radius-lg: 12px;
     }
-    body.light {
-      --bg: #f6f8fa;
-      --surface: #ffffff;
-      --surface2: #f0f2f5;
-      --border: #d0d7de;
-      --text: #1f2328;
-      --text-muted: #57606a;
-      --text-body: #3d444d;
-      --card-body: #f6f8fa;
-      --header-bg1: #0969da;
-      --header-bg2: #0550ae;
+    body.dark {
+      --bg:           #0d1117;
+      --surface:      #161b27;
+      --surface-alt:  #1c2130;
+      --border:       #2d3548;
+      --border-soft:  #242a38;
+      --text-primary:   #f0f6fc;
+      --text-secondary: #8b949e;
+      --text-muted:     #484f58;
+      --accent:       #58a6ff;
+      --accent-light: #0d2045;
+      --accent-mid:   #1d4070;
+      --green:        #3fb950;
+      --green-light:  #071f0e;
+      --green-mid:    #0e3318;
+      --amber:        #d29922;
+      --amber-light:  #1c1200;
+      --amber-mid:    #332200;
+      --red:          #f85149;
+      --red-light:    #1f0a09;
+      --red-mid:      #3b1212;
+      --purple:       #bc8cff;
+      --purple-light: #1a0e2e;
+      --purple-mid:   #3b2560;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow:    0 1px 3px rgba(0,0,0,0.4);
     }
 
-    body { background: var(--bg); color: var(--text); }
-    header { background: linear-gradient(135deg, var(--header-bg1) 0%, var(--header-bg2) 100%); }
-    nav { background: var(--surface); border-bottom-color: var(--border); }
-    nav button { color: var(--text-muted); }
-    nav button:hover { color: var(--text); }
-    nav button.active { color: #58a6ff; border-bottom-color: #58a6ff; }
-    body.light nav button.active { color: #0969da; border-bottom-color: #0969da; }
-    .diagram-card { background: var(--surface); border-color: var(--border); }
-    .card-header { background: var(--surface2); border-bottom-color: var(--border); }
-    .card-header h3 { color: var(--text); }
-    .card-header .note { color: var(--text-muted); }
-    .card-body { background: var(--card-body); }
-    .section-desc { color: var(--text-muted); }
-    th { background: var(--surface2); color: var(--text-muted); }
-    th, td { border-color: var(--border); }
-    td { color: var(--text); }
-    .qa-item { background: var(--surface); border-color: var(--border); }
-    .qa-item-header { background: var(--surface2); border-bottom-color: var(--border); }
-    .qa-item-header h4 { color: var(--text); }
-    .qa-row p { color: var(--text-body); }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
 
-    /* Theme toggle button */
-    .theme-btn {
-      margin-left: auto;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #fff;
-      font-size: 0.82rem;
-      padding: 7px 16px;
-      border-radius: 20px;
-      cursor: pointer;
+    /* ── Top bar ── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-family: inherit;
-      white-space: nowrap;
-      transition: background 0.2s;
+      height: 56px;
+      gap: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: var(--shadow-sm);
     }
-    .theme-btn:hover { background: rgba(255,255,255,0.22); }
-    body.light .theme-btn { background: rgba(0,0,0,0.12); border-color: rgba(0,0,0,0.2); color: #fff; }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+    .logo-mark {
+      width: 30px; height: 30px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 0.88rem; font-weight: 700; flex-shrink: 0;
+    }
+    .topbar-brand span { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
+    .topbar-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+    .topbar-subtitle { font-size: 0.82rem; color: var(--text-muted); }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .meta-tag {
+      font-size: 0.75rem; font-weight: 500; color: var(--text-secondary);
+      background: var(--surface-alt); border: 1px solid var(--border);
+      padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+    }
+    .btn-ghost {
+      font-size: 0.78rem; font-weight: 500; color: var(--text-secondary);
+      background: none; border: 1px solid var(--border);
+      padding: 5px 14px; border-radius: 6px; cursor: pointer;
+      font-family: var(--font); transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-ghost:hover { background: var(--surface-alt); color: var(--text-primary); }
+
+    /* ── Nav ── */
+    .nav-tabs {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      display: flex;
+      overflow-x: auto;
+    }
+    .nav-tabs button {
+      background: none; border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      font-size: 0.85rem; font-weight: 500;
+      padding: 12px 18px; cursor: pointer;
+      white-space: nowrap; font-family: var(--font);
+      transition: all 0.15s; letter-spacing: -0.01em;
+    }
+    .nav-tabs button:hover { color: var(--text-primary); }
+    .nav-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    /* ── Layout ── */
+    main { padding: 32px 40px; max-width: 1300px; margin: 0 auto; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .page-header { margin-bottom: 26px; }
+    .page-header h2 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 4px; }
+    .page-header p { font-size: 0.88rem; color: var(--text-secondary); }
+    .diagram-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+    .card-head {
+      padding: 12px 22px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .card-head h3 { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+    .card-head .head-note { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); }
+    .card-body { padding: 24px; overflow-x: auto; }
+    .card-body.dark-bg { background: var(--bg); }
+    .card-body .mermaid { display: flex; justify-content: center; }
+
+    /* ── Sequence badges ── */
+    .seq-badge {
+      display: inline-flex; align-items: center;
+      font-size: 0.68rem; font-weight: 700;
+      padding: 2px 9px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0;
+    }
+    .sb-default { background: var(--accent-light);  color: var(--accent);  border: 1px solid var(--accent-mid); }
+    .sb-green   { background: var(--green-light);   color: var(--green);   border: 1px solid var(--green-mid); }
+    .sb-amber   { background: var(--amber-light);   color: var(--amber);   border: 1px solid var(--amber-mid); }
+    .sb-red     { background: var(--red-light);     color: var(--red);     border: 1px solid var(--red-mid); }
+    .sb-purple  { background: var(--purple-light);  color: var(--purple);  border: 1px solid var(--purple-mid); }
+
+    /* ── Data tables ── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .data-table th {
+      background: var(--surface-alt); color: var(--text-muted);
+      font-weight: 600; font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: 0.06em; padding: 9px 14px;
+      border-bottom: 1px solid var(--border); text-align: left;
+    }
+    .data-table td {
+      padding: 9px 14px; border-bottom: 1px solid var(--border-soft);
+      color: var(--text-primary); vertical-align: top; line-height: 1.5;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--surface-alt); }
+    .data-table td.muted { color: var(--text-secondary); font-size: 0.82rem; }
+    .data-table td code {
+      font-family: var(--mono); font-size: 0.78rem;
+      background: var(--surface-alt); padding: 1px 6px;
+      border-radius: 4px; border: 1px solid var(--border);
+    }
+
+    /* ── Status badges (inline) ── */
+    .badge {
+      display: inline-flex; align-items: center;
+      font-size: 0.7rem; font-weight: 600; padding: 2px 9px;
+      border-radius: 4px; letter-spacing: 0.03em;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    .badge-blue   { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-mid); }
+    .badge-green  { background: var(--green-light);  color: var(--green);  border: 1px solid var(--green-mid); }
+    .badge-amber  { background: var(--amber-light);  color: var(--amber);  border: 1px solid var(--amber-mid); }
+    .badge-red    { background: var(--red-light);    color: var(--red);    border: 1px solid var(--red-mid); }
+    .badge-purple { background: var(--purple-light); color: var(--purple); border: 1px solid var(--purple-mid); }
+
+    /* ── Pure HTML/CSS State Machine ── */
+    .sm-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding: 8px 0;
+    }
+    .sm-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      position: relative;
+    }
+    .sm-state {
+      border-radius: 50px;
+      padding: 10px 22px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.03em;
+      border: 2px solid transparent;
+      min-width: 110px;
+      white-space: nowrap;
+    }
+    .sm-state.sm-start {
+      background: var(--accent-light); color: var(--accent); border-color: var(--accent-mid);
+    }
+    .sm-state.sm-green {
+      background: var(--green-light); color: var(--green); border-color: var(--green-mid);
+    }
+    .sm-state.sm-amber {
+      background: var(--amber-light); color: var(--amber); border-color: var(--amber-mid);
+    }
+    .sm-state.sm-completed {
+      background: var(--green-light); color: var(--green); border-color: var(--green);
+      border-width: 2px; box-shadow: 0 0 0 3px var(--green-mid);
+    }
+    .sm-state.sm-failed {
+      background: var(--red-light); color: var(--red); border-color: var(--red);
+      border-width: 2px;
+    }
+    .sm-state.sm-terminal {
+      position: relative;
+    }
+    .sm-state.sm-terminal::after {
+      content: 'terminal';
+      position: absolute;
+      bottom: -18px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.6rem; font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    /* Arrow between states */
+    .sm-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      gap: 1px;
+    }
+    .sm-arrow-line {
+      width: 32px; height: 2px;
+      background: var(--border);
+      position: relative;
+    }
+    .sm-arrow-line::after {
+      content: '';
+      position: absolute;
+      right: -1px; top: -4px;
+      width: 0; height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 7px solid var(--border);
+    }
+    .sm-arrow-label {
+      font-size: 0.62rem; color: var(--text-muted);
+      font-weight: 500; white-space: nowrap;
+    }
+    /* Vertical arrow */
+    .sm-v-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 32px;
+      gap: 0;
+    }
+    .sm-v-line {
+      width: 2px; flex: 1;
+      background: var(--border);
+      position: relative;
+    }
+    .sm-v-line::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: -4px;
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid var(--border);
+    }
+    /* Fail drop lines */
+    .sm-fail-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 0 16px;
+    }
+    .sm-fail-line {
+      width: 2px; height: 22px;
+      background: var(--red-mid);
+    }
+    .sm-fail-arrow-line {
+      width: 2px; height: 18px;
+      background: var(--red-mid);
+      position: relative;
+    }
+    .sm-fail-arrow-line::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: -4px;
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid var(--red-mid);
+    }
+    .sm-fail-label {
+      font-size: 0.6rem; color: var(--red);
+      font-weight: 600; letter-spacing: 0.04em;
+    }
+
+    /* ── Pure HTML/CSS ER Diagram ── */
+    .er-diagram {
+      display: flex; align-items: flex-start; gap: 0; justify-content: center; flex-wrap: wrap;
+    }
+    .er-table {
+      border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden;
+      min-width: 400px; box-shadow: var(--shadow); flex-shrink: 0;
+    }
+    .er-table-head {
+      background: var(--accent-light); border-bottom: 1.5px solid var(--accent-mid);
+      padding: 11px 16px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .er-table-name {
+      font-size: 0.8rem; font-weight: 700; color: var(--accent);
+      letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--mono);
+    }
+    .er-table-tag { font-size: 0.68rem; color: var(--text-muted); font-style: italic; }
+    .er-table-body { background: var(--surface); }
+    .er-row {
+      display: grid; grid-template-columns: 76px 1fr 36px 1fr;
+      align-items: center; padding: 6px 14px;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 0.79rem; transition: background 0.1s;
+    }
+    .er-row:last-child { border-bottom: none; }
+    .er-row:hover { background: var(--surface-alt); }
+    .er-pk { background: color-mix(in srgb, var(--accent-light) 35%, var(--surface)); }
+    .er-fk { background: color-mix(in srgb, var(--green-light) 35%, var(--surface)); }
+    .er-type { font-size: 0.67rem; font-weight: 600; color: var(--text-muted); font-family: var(--mono); }
+    .er-col { font-size: 0.8rem; font-weight: 500; color: var(--text-primary); font-family: var(--mono); padding: 0 8px; }
+    .er-key {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.58rem; font-weight: 800; letter-spacing: 0.04em;
+      padding: 1px 5px; border-radius: 3px; text-transform: uppercase; width: 26px;
+    }
+    .er-key-pk { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-mid); }
+    .er-key-fk { background: var(--green-light);  color: var(--green);  border: 1px solid var(--green-mid); }
+    .er-key-uq { background: var(--amber-light);  color: var(--amber);  border: 1px solid var(--amber-mid); }
+    .er-key-opt{ background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--border); }
+    .er-desc { font-size: 0.77rem; color: var(--text-secondary); padding-left: 10px; line-height: 1.35; }
+    .er-connector {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 0 14px; min-width: 80px; align-self: stretch; gap: 6px;
+    }
+    .er-connector-line { display: flex; align-items: center; width: 100%; gap: 4px; }
+    .er-rel-line { flex: 1; height: 2px; background: var(--border); position: relative; }
+    .er-rel-line::before, .er-rel-line::after {
+      content: ''; position: absolute; top: 50%; transform: translateY(-50%);
+      width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted);
+    }
+    .er-rel-line::before { left: -3px; }
+    .er-rel-line::after  { right: -3px; }
+    .er-rel-label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+    .er-rel-desc { font-size: 0.7rem; color: var(--text-muted); text-align: center; line-height: 1.4; font-style: italic; }
+    .er-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-soft); }
+    .er-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--text-secondary); }
+    @media (max-width: 960px) {
+      .er-diagram { flex-direction: column; align-items: center; }
+      .er-connector { flex-direction: row; padding: 10px 0; min-width: unset; width: 100%; max-width: 400px; }
+    }
+
+    /* ── Q&A ── */
+    .qa-list { display: flex; flex-direction: column; gap: 12px; }
+    .qa-card { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); box-shadow: var(--shadow-sm); }
+    .qa-head { padding: 13px 20px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: flex-start; gap: 14px; background: var(--surface-alt); }
+    .qa-idx { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.08em; flex-shrink: 0; padding-top: 3px; }
+    .qa-head h4 { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); line-height: 1.5; flex: 1; }
+    .qa-body { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+    .qa-row { display: flex; gap: 10px; font-size: 0.84rem; line-height: 1.6; align-items: flex-start; }
+    .qa-label { flex-shrink: 0; font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 2px 8px; border-radius: 4px; margin-top: 3px; }
+    .ql-default { background: var(--accent-light); color: var(--accent); }
+    .ql-why     { background: var(--purple-light); color: var(--purple); }
+    .qa-row p   { color: var(--text-secondary); }
+
+    /* ── Priority strip ── */
+    .priority-strip {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+      padding: 12px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .priority-strip span { font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
+    .ps-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">💳</div>
-  <div>
-    <h1>PayPulse — System Diagrams</h1>
-    <p>Interactive visualization · Class · Sequence · State · Entity · Questions</p>
+<header class="topbar">
+  <a class="topbar-brand" href="#">
+    <div class="logo-mark">P</div>
+    <span>PayPulse</span>
+  </a>
+  <div class="topbar-divider"></div>
+  <span class="topbar-subtitle">Technical Diagrams — Architecture &amp; Design Reference</span>
+  <div class="topbar-right">
+    <span class="meta-tag">Team reference</span>
+    <button class="btn-ghost" onclick="toggleTheme()" id="themeBtn">Dark mode</button>
   </div>
-  <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙 Dark</button>
 </header>
 
-<nav>
-  <button class="active" onclick="showTab('class',this)">📐 Class Diagram</button>
-  <button onclick="showTab('sequence',this)">🔁 Sequence Diagrams</button>
-  <button onclick="showTab('state',this)">🔀 State Machine</button>
-  <button onclick="showTab('entity',this)">🗄️ Entity Diagram</button>
-  <button onclick="showTab('questions',this)">❓ Questions</button>
+<nav class="nav-tabs">
+  <button class="active" onclick="showTab('class',this)">Class Diagram</button>
+  <button onclick="showTab('sequence',this)">Sequence Diagrams</button>
+  <button onclick="showTab('state',this)">State Machine</button>
+  <button onclick="showTab('entity',this)">Entity Diagram</button>
+  <button onclick="showTab('questions',this)">Open Questions</button>
 </nav>
 
 <main>
 
-  <!-- ══════ CLASS DIAGRAM ══════ -->
+  <!-- ══════════════════ CLASS DIAGRAM ══════════════════ -->
   <div class="section active" id="tab-class">
-    <div class="section-title">📐 Class Diagram</div>
-    <div class="section-desc">Full system class structure across all layers: API, Business Logic, Domain entities, and Data Access.</div>
-    <div class="diagram-grid">
-      <div class="diagram-card">
-        <div class="card-header">
-          <span class="badge">Class</span>
-          <h3>Full System Class Diagram</h3>
-          <span class="note">PayPulse v1</span>
-        </div>
-        <div class="card-body">
-          <div class="mermaid">
+    <div class="page-header">
+      <h2>Class Diagram</h2>
+      <p>Full system class structure — API layer, business logic, domain entities, and data access.</p>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h3>Full System Class Diagram</h3>
+        <span class="head-note">PayPulse v1 · all layers</span>
+      </div>
+      <div class="card-body dark-bg">
+        <div class="mermaid">
 classDiagram
     direction TB
 
@@ -207,10 +484,10 @@ classDiagram
         +create(CreatePaymentRequest) ResponseEntity
         +getById(UUID) ResponseEntity
         +list(PaymentStatus) ResponseEntity
-        +getHistory(UUID id) ResponseEntity
-        +validatePayment(UUID id) ResponseEntity
-        +sendPayment(UUID id) ResponseEntity
-        +completePayment(UUID id) ResponseEntity
+        +getHistory(UUID) ResponseEntity
+        +validatePayment(UUID) ResponseEntity
+        +sendPayment(UUID) ResponseEntity
+        +completePayment(UUID) ResponseEntity
     }
     class CreatePaymentRequest {
         +BigDecimal amount
@@ -290,31 +567,11 @@ classDiagram
         +send(Payment) TransitionResult
         +complete(Payment) TransitionResult
     }
-    class CreatedState {
-        +validate(Payment, ValidationChain) TransitionResult
-        +send(Payment) TransitionResult
-        +complete(Payment) TransitionResult
-    }
-    class ValidatedState {
-        +validate(Payment, ValidationChain) TransitionResult
-        +send(Payment) TransitionResult
-        +complete(Payment) TransitionResult
-    }
-    class SentState {
-        +validate(Payment, ValidationChain) TransitionResult
-        +send(Payment) TransitionResult
-        +complete(Payment) TransitionResult
-    }
-    class CompletedState {
-        +validate(Payment, ValidationChain) TransitionResult
-        +send(Payment) TransitionResult
-        +complete(Payment) TransitionResult
-    }
-    class FailedState {
-        +validate(Payment, ValidationChain) TransitionResult
-        +send(Payment) TransitionResult
-        +complete(Payment) TransitionResult
-    }
+    class CreatedState { +validate(Payment, ValidationChain) TransitionResult }
+    class ValidatedState { +send(Payment) TransitionResult }
+    class SentState { +complete(Payment) TransitionResult }
+    class CompletedState { +validate(Payment, ValidationChain) TransitionResult }
+    class FailedState { +validate(Payment, ValidationChain) TransitionResult }
     class TransitionResult {
         +PaymentStatus newStatus
         +String errorCode
@@ -329,16 +586,9 @@ classDiagram
         interface
         +validate(Payment) Optional
     }
-    class AmountValidator {
-        +validate(Payment) Optional
-    }
-    class CurrencyValidator {
-        -Set supportedCurrencies
-        +validate(Payment) Optional
-    }
-    class AccountValidator {
-        +validate(Payment) Optional
-    }
+    class AmountValidator { +validate(Payment) Optional }
+    class CurrencyValidator { +validate(Payment) Optional }
+    class AccountValidator { +validate(Payment) Optional }
     class ValidationError {
         +String errorCode
         +String message
@@ -352,7 +602,6 @@ classDiagram
         +String reference
         +PaymentStatus status
         +String errorCode
-        +String errorMessage
         +String idempotencyKey
         +Instant createdAt
         +Instant updatedAt
@@ -364,7 +613,6 @@ classDiagram
         +PaymentStatus previousStatus
         +PaymentStatus newStatus
         +String errorCode
-        +String errorMessage
         +String triggeredBy
         +Instant occurredAt
     }
@@ -393,55 +641,49 @@ classDiagram
     PaymentController ..> PaymentResponse
     PaymentController ..> PaymentHistoryResponse
     GlobalExceptionHandler ..> ApiError
-
     PaymentService --> PaymentRepository
     PaymentService --> PaymentStatusHistoryRepository
     PaymentService --> IdempotencyService
     PaymentService --> StatusTransitionEngine
     PaymentService --> PaymentMapper
-
     IdempotencyService --> PaymentRepository
-
     StatusTransitionEngine --> PaymentState
     StatusTransitionEngine --> ValidationChain
     StatusTransitionEngine --> PaymentStatusHistoryRepository
     StatusTransitionEngine ..> TransitionResult
-
     PaymentState <|.. CreatedState
     PaymentState <|.. ValidatedState
     PaymentState <|.. SentState
     PaymentState <|.. CompletedState
     PaymentState <|.. FailedState
-
     ValidationChain --> PaymentValidator
     PaymentValidator <|.. AmountValidator
     PaymentValidator <|.. CurrencyValidator
     PaymentValidator <|.. AccountValidator
     ValidationChain ..> ValidationError
-
     PaymentMapper ..> Payment
     PaymentMapper ..> PaymentStatusHistory
-
     Payment --> PaymentStatus
     PaymentStatusHistory --> PaymentStatus
     PaymentRepository ..> Payment
     PaymentStatusHistoryRepository ..> PaymentStatusHistory
     Payment "1" --> "0..*" PaymentStatusHistory : has history
-          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ══════ SEQUENCE DIAGRAMS ══════ -->
+  <!-- ══════════════════ SEQUENCE DIAGRAMS ══════════════════ -->
   <div class="section" id="tab-sequence">
-    <div class="section-title">🔁 Sequence Diagrams</div>
-    <div class="section-desc">Step-by-step message flows for all 7 key payment scenarios — happy paths, failure cases, and edge cases.</div>
+    <div class="page-header">
+      <h2>Sequence Diagrams</h2>
+      <p>Step-by-step message flows for all 7 key payment scenarios — happy paths, failure cases, and edge cases.</p>
+    </div>
     <div class="diagram-grid">
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge green">Seq 1</span><h3>Create Payment — Happy Path (auto-progresses to COMPLETED)</h3></div>
-        <div class="card-body"><div class="mermaid">
+      <div class="card">
+        <div class="card-head"><span class="seq-badge sb-green">Seq 1</span><h3>Create Payment — Happy Path (auto-progresses to COMPLETED)</h3></div>
+        <div class="card-body dark-bg"><div class="mermaid">
 sequenceDiagram
     actor Client
     participant Ctrl as PaymentController
@@ -451,7 +693,6 @@ sequenceDiagram
     participant Engine as StatusTransitionEngine
     participant HistRepo as HistoryRepository
     participant Mapper as PaymentMapper
-
     Client->>Ctrl: POST /payments body + Idempotency-Key
     Ctrl->>Ctrl: Bean validation
     Ctrl->>Svc: createPayment(request)
@@ -486,9 +727,9 @@ sequenceDiagram
         </div></div>
       </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge yellow">Seq 2</span><h3>Create Payment — Duplicate Idempotency Key</h3></div>
-        <div class="card-body"><div class="mermaid">
+      <div class="card">
+        <div class="card-head"><span class="seq-badge sb-amber">Seq 2</span><h3>Create Payment — Duplicate Idempotency Key</h3></div>
+        <div class="card-body dark-bg"><div class="mermaid">
 sequenceDiagram
     actor Client
     participant Ctrl as PaymentController
@@ -496,7 +737,6 @@ sequenceDiagram
     participant Idem as IdempotencyService
     participant Repo as PaymentRepository
     participant Mapper as PaymentMapper
-
     Client->>Ctrl: POST /payments same Idempotency-Key
     Ctrl->>Svc: createPayment(request)
     Svc->>Idem: findExisting(idempotencyKey)
@@ -511,9 +751,9 @@ sequenceDiagram
         </div></div>
       </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge red">Seq 3</span><h3>Failure Path — Validation Fails (CREATED to FAILED)</h3></div>
-        <div class="card-body"><div class="mermaid">
+      <div class="card">
+        <div class="card-head"><span class="seq-badge sb-red">Seq 3</span><h3>Failure Path — Validation Fails (CREATED to FAILED)</h3></div>
+        <div class="card-body dark-bg"><div class="mermaid">
 sequenceDiagram
     actor Client
     participant Ctrl as PaymentController
@@ -522,7 +762,6 @@ sequenceDiagram
     participant Engine as StatusTransitionEngine
     participant Chain as ValidationChain
     participant HistRepo as HistoryRepository
-
     Client->>Ctrl: POST /payments unsupported currency XYZ
     Ctrl->>Svc: createPayment(request)
     Svc->>Repo: save payment status CREATED
@@ -530,7 +769,7 @@ sequenceDiagram
     Svc->>Engine: validate(payment)
     Engine->>Chain: runAll(payment)
     Chain-->>Engine: ValidationError INVALID_CURRENCY
-    Engine->>Repo: save payment status FAILED errorCode INVALID_CURRENCY
+    Engine->>Repo: save payment status FAILED
     Engine->>HistRepo: save history CREATED to FAILED
     Engine-->>Svc: payment FAILED
     Svc-->>Ctrl: payment FAILED
@@ -538,9 +777,9 @@ sequenceDiagram
         </div></div>
       </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge red">Seq 4</span><h3>Failure Path — Simulated Network Error at SENT stage</h3></div>
-        <div class="card-body"><div class="mermaid">
+      <div class="card">
+        <div class="card-head"><span class="seq-badge sb-red">Seq 4</span><h3>Failure Path — Simulated Network Error at SENT stage</h3></div>
+        <div class="card-body dark-bg"><div class="mermaid">
 sequenceDiagram
     actor Client
     participant Ctrl as PaymentController
@@ -548,7 +787,6 @@ sequenceDiagram
     participant Engine as StatusTransitionEngine
     participant Repo as PaymentRepository
     participant HistRepo as HistoryRepository
-
     Client->>Ctrl: POST /payments/{id}/send
     Ctrl->>Svc: triggerSend(id)
     Svc->>Repo: findById(id)
@@ -563,9 +801,9 @@ sequenceDiagram
         </div></div>
       </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge red">Seq 5</span><h3>Illegal Transition Attempt (Rejected)</h3></div>
-        <div class="card-body"><div class="mermaid">
+      <div class="card">
+        <div class="card-head"><span class="seq-badge sb-red">Seq 5</span><h3>Illegal Transition Attempt (Rejected)</h3></div>
+        <div class="card-body dark-bg"><div class="mermaid">
 sequenceDiagram
     actor Client
     participant Ctrl as PaymentController
@@ -573,7 +811,6 @@ sequenceDiagram
     participant Repo as PaymentRepository
     participant Engine as StatusTransitionEngine
     participant State as CompletedState
-
     Client->>Ctrl: POST /payments/{id}/validate payment is COMPLETED
     Ctrl->>Svc: triggerValidate(id)
     Svc->>Repo: findById(id)
@@ -587,9 +824,9 @@ sequenceDiagram
         </div></div>
       </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge">Seq 6</span><h3>Get Payment Details + History (Read Path)</h3></div>
-        <div class="card-body"><div class="mermaid">
+      <div class="card">
+        <div class="card-head"><span class="seq-badge sb-default">Seq 6</span><h3>Get Payment Details + History (Read Path)</h3></div>
+        <div class="card-body dark-bg"><div class="mermaid">
 sequenceDiagram
     actor Client
     participant Ctrl as PaymentController
@@ -597,7 +834,6 @@ sequenceDiagram
     participant Repo as PaymentRepository
     participant HistRepo as HistoryRepository
     participant Mapper as PaymentMapper
-
     Client->>Ctrl: GET /payments/{id}
     Ctrl->>Svc: getById(id)
     Svc->>Repo: findById(id)
@@ -624,16 +860,15 @@ sequenceDiagram
         </div></div>
       </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge">Seq 7</span><h3>List / Search / Filter Payments</h3></div>
-        <div class="card-body"><div class="mermaid">
+      <div class="card">
+        <div class="card-head"><span class="seq-badge sb-default">Seq 7</span><h3>List / Search / Filter Payments</h3></div>
+        <div class="card-body dark-bg"><div class="mermaid">
 sequenceDiagram
     actor Client
     participant Ctrl as PaymentController
     participant Svc as PaymentService
     participant Repo as PaymentRepository
     participant Mapper as PaymentMapper
-
     Client->>Ctrl: GET /payments?status=FAILED&page=0&size=20
     Ctrl->>Svc: list(FAILED, pageable)
     Svc->>Repo: findByStatus(FAILED, pageable)
@@ -648,271 +883,340 @@ sequenceDiagram
     </div>
   </div>
 
-  <!-- ══════ STATE DIAGRAM ══════ -->
+  <!-- ══════════════════ STATE MACHINE ══════════════════ -->
   <div class="section" id="tab-state">
-    <div class="section-title">🔀 Payment State Machine</div>
-    <div class="section-desc">All valid payment states and the transitions driven by validate / send / complete operations.</div>
-    <div class="diagram-grid">
+    <div class="page-header">
+      <h2>Payment State Machine</h2>
+      <p>All valid payment states, the transitions between them, and terminal states. No transition ever goes backwards.</p>
+    </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge purple">State</span><h3>Payment Status State Diagram</h3></div>
-        <div class="card-body"><div class="mermaid">
-stateDiagram-v2
-    [*] --> CREATED : POST /payments
+    <div class="card">
+      <div class="card-head"><h3>State diagram — payment lifecycle</h3><span class="head-note">Pure HTML/CSS</span></div>
+      <div class="card-body" style="padding:36px 24px 28px;">
 
-    CREATED --> VALIDATED : validate() succeeds
-    CREATED --> FAILED : validate() fails
+        <div class="sm-diagram">
 
-    VALIDATED --> SENT : send() succeeds
-    VALIDATED --> FAILED : send() fails NETWORK_ERROR
+          <!-- Row 1: [*] → CREATED -->
+          <div class="sm-row" style="gap:8px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:var(--text-primary);flex-shrink:0;"></div>
+            <div class="sm-arrow"><div class="sm-arrow-line"></div><div class="sm-arrow-label">POST /payments</div></div>
+            <div class="sm-state sm-start">CREATED</div>
+          </div>
 
-    SENT --> COMPLETED : complete() succeeds
-    SENT --> FAILED : complete() fails PROCESSING_ERROR
+          <!-- Arrow down from CREATED -->
+          <div style="display:flex;align-items:flex-start;gap:60px;margin:4px 0;">
+            <!-- left branch to FAILED -->
+            <div style="display:flex;flex-direction:column;align-items:center;margin-top:6px;">
+              <div class="sm-fail-line"></div>
+              <div class="sm-fail-label" style="font-size:0.6rem;color:var(--text-muted);transform:rotate(-90deg);white-space:nowrap;margin:6px -6px;">validate() fails</div>
+            </div>
+            <!-- right arrow continues down -->
+            <div class="sm-v-arrow"><div class="sm-v-line"></div></div>
+            <div style="width:60px;"></div>
+          </div>
 
-    COMPLETED --> [*]
-    FAILED --> [*]
+          <!-- Row 2: VALIDATED -->
+          <div class="sm-row" style="gap:8px;">
+            <div class="sm-state sm-failed" style="position:relative;margin-right:12px;">
+              FAILED
+              <span style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:0.58rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap;">terminal</span>
+            </div>
+            <div style="width:40px;"></div>
+            <div class="sm-state sm-green">VALIDATED</div>
+          </div>
 
-    note right of COMPLETED
-        Terminal state.
-        No transitions out.
-    end note
+          <!-- Arrow down from VALIDATED -->
+          <div style="display:flex;align-items:flex-start;gap:0;margin:4px 0;margin-left:126px;">
+            <div class="sm-v-arrow"><div class="sm-v-line"></div></div>
+          </div>
 
-    note right of FAILED
-        Terminal state.
-        Reachable from CREATED,
-        VALIDATED, or SENT.
-    end note
-        </div></div>
-      </div>
+          <!-- Row 3: SENT -->
+          <div class="sm-row" style="margin-left:60px;">
+            <div class="sm-state sm-amber">SENT</div>
+          </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge">Table</span><h3>Transition Table (authoritative)</h3></div>
-        <div class="card-body" style="padding:24px;">
-          <table>
-            <thead><tr><th>From \ To</th><th>CREATED</th><th>VALIDATED</th><th>SENT</th><th>COMPLETED</th><th>FAILED</th></tr></thead>
-            <tbody>
-              <tr><td>CREATED</td><td>❌</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td></tr>
-              <tr><td>VALIDATED</td><td>❌</td><td>❌</td><td>✅</td><td>❌</td><td>✅</td></tr>
-              <tr><td>SENT</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
-              <tr><td>COMPLETED</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌ terminal</td></tr>
-              <tr><td>FAILED</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌ terminal</td></tr>
-            </tbody>
-          </table>
-          <p style="font-size:0.82rem;color:#8b949e;margin-top:14px;">
-            Any ❌ transition at runtime → <code style="color:#f97316;background:#f9731611;padding:2px 6px;border-radius:4px;">InvalidStatusTransitionException</code> → <strong>400 INVALID_STATUS_TRANSITION</strong>
-          </p>
+          <!-- Arrow down from SENT -->
+          <div style="display:flex;align-items:flex-start;gap:0;margin:4px 0;margin-left:126px;">
+            <div class="sm-v-arrow"><div class="sm-v-line"></div></div>
+          </div>
+
+          <!-- Row 4: COMPLETED -->
+          <div class="sm-row" style="margin-left:60px;">
+            <div class="sm-state sm-completed" style="position:relative;">
+              COMPLETED
+              <span style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:0.58rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap;">terminal</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Transition notes -->
+        <div style="margin-top:28px;padding:14px 18px;background:var(--surface-alt);border:1px solid var(--border-soft);border-radius:var(--radius);font-size:0.82rem;color:var(--text-secondary);line-height:1.65;">
+          <strong style="color:var(--text-primary);">FAILED</strong> is reachable from <strong>CREATED</strong> (validate() fails),
+          <strong>VALIDATED</strong> (send() fails — NETWORK_ERROR), and <strong>SENT</strong> (complete() fails — PROCESSING_ERROR).
+          Any illegal transition attempt throws <code style="font-family:var(--mono);font-size:0.78rem;background:var(--surface);padding:1px 6px;border-radius:4px;border:1px solid var(--border);">InvalidStatusTransitionException</code> → <strong>400</strong>.
         </div>
       </div>
+    </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge">Mapping</span><h3>State Pattern Class Mapping</h3></div>
-        <div class="card-body" style="padding:24px;">
-          <table>
-            <thead><tr><th>State (enum)</th><th>Class</th><th>Legal outgoing transitions</th></tr></thead>
-            <tbody>
-              <tr><td>CREATED</td><td>CreatedState</td><td>VALIDATED (validate success), FAILED (validate failure)</td></tr>
-              <tr><td>VALIDATED</td><td>ValidatedState</td><td>SENT (send success), FAILED (send failure)</td></tr>
-              <tr><td>SENT</td><td>SentState</td><td>COMPLETED (complete success), FAILED (complete failure)</td></tr>
-              <tr><td>COMPLETED</td><td>CompletedState</td><td>none — all methods throw illegal transition</td></tr>
-              <tr><td>FAILED</td><td>FailedState</td><td>none — all methods throw illegal transition</td></tr>
-            </tbody>
-          </table>
-        </div>
+    <div class="card">
+      <div class="card-head"><h3>Transition table — authoritative</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>From \ To</th>
+              <th style="text-align:center;">CREATED</th>
+              <th style="text-align:center;">VALIDATED</th>
+              <th style="text-align:center;">SENT</th>
+              <th style="text-align:center;">COMPLETED</th>
+              <th style="text-align:center;">FAILED</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>CREATED</strong></td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;"><span class="badge badge-green">✓</span></td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;"><span class="badge badge-red">✓</span></td></tr>
+            <tr><td><strong>VALIDATED</strong></td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;"><span class="badge badge-green">✓</span></td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;"><span class="badge badge-red">✓</span></td></tr>
+            <tr><td><strong>SENT</strong></td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;"><span class="badge badge-green">✓</span></td><td style="text-align:center;"><span class="badge badge-red">✓</span></td></tr>
+            <tr><td><strong>COMPLETED</strong></td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌ terminal</td></tr>
+            <tr><td><strong>FAILED</strong></td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌</td><td style="text-align:center;" class="muted">❌ terminal</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>State pattern class mapping</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Status (enum)</th><th>Class</th><th>Legal outgoing transitions</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge badge-blue">CREATED</span></td><td><code>CreatedState</code></td><td class="muted">→ VALIDATED (validate success) &nbsp;·&nbsp; → FAILED (validate failure)</td></tr>
+            <tr><td><span class="badge badge-green">VALIDATED</span></td><td><code>ValidatedState</code></td><td class="muted">→ SENT (send success) &nbsp;·&nbsp; → FAILED (send failure)</td></tr>
+            <tr><td><span class="badge badge-amber">SENT</span></td><td><code>SentState</code></td><td class="muted">→ COMPLETED (complete success) &nbsp;·&nbsp; → FAILED (complete failure)</td></tr>
+            <tr><td><span class="badge badge-green">COMPLETED</span></td><td><code>CompletedState</code></td><td class="muted">None — all methods throw illegal transition</td></tr>
+            <tr><td><span class="badge badge-red">FAILED</span></td><td><code>FailedState</code></td><td class="muted">None — all methods throw illegal transition</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 
-  <!-- ══════ ENTITY DIAGRAM ══════ -->
+  <!-- ══════════════════ ENTITY DIAGRAM ══════════════════ -->
   <div class="section" id="tab-entity">
-    <div class="section-title">🗄️ Entity Relationship Diagram</div>
-    <div class="section-desc">Database schema — tables, columns, data types, primary keys, foreign keys, and cardinality relationships.</div>
-    <div class="diagram-grid">
+    <div class="page-header">
+      <h2>Entity Relationship Diagram</h2>
+      <p>Database schema — tables, columns, data types, primary keys, foreign keys, and relationships.</p>
+    </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge purple">ER</span><h3>Payment System — Entity Relationship Diagram</h3><span class="note">JPA / PostgreSQL</span></div>
-        <div class="card-body"><div class="mermaid">
-erDiagram
-    PAYMENT {
-        UUID id PK
-        DECIMAL amount
-        VARCHAR currency
-        VARCHAR source_account
-        VARCHAR destination_account
-        VARCHAR reference
-        VARCHAR status
-        VARCHAR error_code
-        VARCHAR error_message
-        VARCHAR idempotency_key
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-        BIGINT version
-    }
-    PAYMENT_STATUS_HISTORY {
-        UUID id PK
-        UUID payment_id FK
-        VARCHAR previous_status
-        VARCHAR new_status
-        VARCHAR error_code
-        VARCHAR error_message
-        VARCHAR triggered_by
-        TIMESTAMP occurred_at
-    }
-    PAYMENT ||--o{ PAYMENT_STATUS_HISTORY : "has history"
-        </div></div>
+    <div class="card">
+      <div class="card-head">
+        <h3>PAYMENT &amp; PAYMENT_STATUS_HISTORY</h3>
+        <span class="head-note">One payment · many history entries · JPA / MySQL</span>
       </div>
+      <div class="card-body" style="padding:28px 24px;">
+        <div class="er-diagram">
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge purple">Enum</span><h3>PaymentStatus Enum Values</h3></div>
-        <div class="card-body" style="padding:24px;">
-          <table>
-            <thead><tr><th>Value</th><th>Meaning</th><th>Terminal?</th><th>Set by</th></tr></thead>
-            <tbody>
-              <tr><td style="color:#3fb950">CREATED</td><td style="text-align:left">Payment record created, awaiting validation</td><td>❌</td><td>PaymentService.createPayment()</td></tr>
-              <tr><td style="color:#58a6ff">VALIDATED</td><td style="text-align:left">All validators passed (amount, currency, account)</td><td>❌</td><td>StatusTransitionEngine.validate()</td></tr>
-              <tr><td style="color:#d29922">SENT</td><td style="text-align:left">Payment transmitted to processing network</td><td>❌</td><td>StatusTransitionEngine.send()</td></tr>
-              <tr><td style="color:#bc8cff">COMPLETED</td><td style="text-align:left">Processing confirmed, payment settled</td><td>✅</td><td>StatusTransitionEngine.complete()</td></tr>
-              <tr><td style="color:#f85149">FAILED</td><td style="text-align:left">Validation or transmission error occurred</td><td>✅</td><td>StatusTransitionEngine (any stage)</td></tr>
-            </tbody>
-          </table>
+          <div class="er-table">
+            <div class="er-table-head">
+              <span class="er-table-name">PAYMENT</span>
+              <span class="er-table-tag">main record</span>
+            </div>
+            <div class="er-table-body">
+              <div class="er-row er-pk"><span class="er-type">UUID</span><span class="er-col">id</span><span class="er-key er-key-pk">PK</span><span class="er-desc">Unique payment identifier</span></div>
+              <div class="er-row"><span class="er-type">DECIMAL</span><span class="er-col">amount</span><span class="er-key"></span><span class="er-desc">Money value &gt; 0, max 1,000,000</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">currency</span><span class="er-key"></span><span class="er-desc">USD / EUR / GBP</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">source_account</span><span class="er-key"></span><span class="er-desc">Paying account (format-validated)</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">destination_account</span><span class="er-key"></span><span class="er-desc">Receiving account, must differ from source</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">reference</span><span class="er-key er-key-opt">OPT</span><span class="er-desc">Optional description</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">status</span><span class="er-key"></span><span class="er-desc">CREATED · VALIDATED · SENT · COMPLETED · FAILED</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">error_code</span><span class="er-key er-key-opt">OPT</span><span class="er-desc">Set only when FAILED</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">error_message</span><span class="er-key er-key-opt">OPT</span><span class="er-desc">Human-readable failure reason</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">idempotency_key</span><span class="er-key er-key-uq">UQ</span><span class="er-desc">Duplicate-submission guard</span></div>
+              <div class="er-row"><span class="er-type">TIMESTAMP</span><span class="er-col">created_at</span><span class="er-key"></span><span class="er-desc">When submitted</span></div>
+              <div class="er-row"><span class="er-type">TIMESTAMP</span><span class="er-col">updated_at</span><span class="er-key"></span><span class="er-desc">Last status change</span></div>
+              <div class="er-row"><span class="er-type">BIGINT</span><span class="er-col">version</span><span class="er-key"></span><span class="er-desc">Optimistic locking</span></div>
+            </div>
+          </div>
+
+          <div class="er-connector">
+            <div class="er-connector-line">
+              <div class="er-rel-label">1</div>
+              <div class="er-rel-line"></div>
+              <div class="er-rel-label">0..*</div>
+            </div>
+            <div class="er-rel-desc">has<br>history</div>
+          </div>
+
+          <div class="er-table">
+            <div class="er-table-head" style="background:var(--green-light);border-bottom-color:var(--green-mid);">
+              <span class="er-table-name" style="color:var(--green);">PAYMENT_STATUS_HISTORY</span>
+              <span class="er-table-tag">audit trail</span>
+            </div>
+            <div class="er-table-body">
+              <div class="er-row er-pk"><span class="er-type">UUID</span><span class="er-col">id</span><span class="er-key er-key-pk">PK</span><span class="er-desc">Unique history entry</span></div>
+              <div class="er-row er-fk"><span class="er-type">UUID</span><span class="er-col">payment_id</span><span class="er-key er-key-fk">FK</span><span class="er-desc">Links to PAYMENT.id</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">previous_status</span><span class="er-key er-key-opt">OPT</span><span class="er-desc">Status before this change (null on first entry)</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">new_status</span><span class="er-key"></span><span class="er-desc">Status after this change</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">error_code</span><span class="er-key er-key-opt">OPT</span><span class="er-desc">Failure reason if transition failed</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">error_message</span><span class="er-key er-key-opt">OPT</span><span class="er-desc">Human-readable failure description</span></div>
+              <div class="er-row"><span class="er-type">VARCHAR</span><span class="er-col">triggered_by</span><span class="er-key"></span><span class="er-desc">Always "SYSTEM"</span></div>
+              <div class="er-row"><span class="er-type">TIMESTAMP</span><span class="er-col">occurred_at</span><span class="er-key"></span><span class="er-desc">Exact time of this transition</span></div>
+            </div>
+          </div>
+
+        </div>
+        <div class="er-legend">
+          <div class="er-legend-item"><span class="er-key er-key-pk">PK</span> Primary key</div>
+          <div class="er-legend-item"><span class="er-key er-key-fk">FK</span> Foreign key</div>
+          <div class="er-legend-item"><span class="er-key er-key-uq">UQ</span> Unique constraint</div>
+          <div class="er-legend-item"><span class="er-key er-key-opt">OPT</span> Optional / nullable</div>
         </div>
       </div>
+    </div>
 
-      <div class="diagram-card">
-        <div class="card-header"><span class="badge purple">Index</span><h3>Database Indexes &amp; Constraints</h3></div>
-        <div class="card-body" style="padding:24px;">
-          <table>
-            <thead><tr><th>Table</th><th>Column(s)</th><th>Type</th><th>Purpose</th></tr></thead>
-            <tbody>
-              <tr><td>PAYMENT</td><td>id</td><td>PRIMARY KEY</td><td>Unique payment identity (UUID)</td></tr>
-              <tr><td>PAYMENT</td><td>idempotency_key</td><td>UNIQUE INDEX</td><td>Idempotent submission guard</td></tr>
-              <tr><td>PAYMENT</td><td>status</td><td>INDEX</td><td>Fast filter by status in list queries</td></tr>
-              <tr><td>PAYMENT</td><td>created_at</td><td>INDEX</td><td>Default sort — newest first</td></tr>
-              <tr><td>PAYMENT</td><td>reference</td><td>INDEX</td><td>Search by reference (partial match)</td></tr>
-              <tr><td>PAYMENT_STATUS_HISTORY</td><td>id</td><td>PRIMARY KEY</td><td>Unique history row identity</td></tr>
-              <tr><td>PAYMENT_STATUS_HISTORY</td><td>payment_id</td><td>FK + INDEX</td><td>Join to PAYMENT + timeline queries</td></tr>
-              <tr><td>PAYMENT_STATUS_HISTORY</td><td>occurred_at</td><td>INDEX</td><td>Timeline ordering within a payment</td></tr>
-            </tbody>
-          </table>
-        </div>
+    <div class="card">
+      <div class="card-head"><h3>PaymentStatus — enum values</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Value</th><th>Meaning</th><th style="text-align:center;">Terminal?</th><th>Set by</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge badge-blue">CREATED</span></td><td>Payment recorded, awaiting validation</td><td style="text-align:center;" class="muted">No</td><td class="muted">PaymentService.createPayment()</td></tr>
+            <tr><td><span class="badge badge-green">VALIDATED</span></td><td>All validators passed (amount, currency, account)</td><td style="text-align:center;" class="muted">No</td><td class="muted">StatusTransitionEngine.validate()</td></tr>
+            <tr><td><span class="badge badge-amber">SENT</span></td><td>Payment transmitted to processing network</td><td style="text-align:center;" class="muted">No</td><td class="muted">StatusTransitionEngine.send()</td></tr>
+            <tr><td><span class="badge badge-green">COMPLETED</span></td><td>Processing confirmed, payment settled</td><td style="text-align:center;"><span class="badge badge-green">Yes</span></td><td class="muted">StatusTransitionEngine.complete()</td></tr>
+            <tr><td><span class="badge badge-red">FAILED</span></td><td>Validation or transmission error occurred</td><td style="text-align:center;"><span class="badge badge-red">Yes</span></td><td class="muted">StatusTransitionEngine (any stage)</td></tr>
+          </tbody>
+        </table>
       </div>
+    </div>
 
+    <div class="card">
+      <div class="card-head"><h3>Database indexes &amp; constraints</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Table</th><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td class="muted">PAYMENT</td><td><code>id</code></td><td class="muted">PRIMARY KEY</td><td>Unique payment identity (UUID)</td></tr>
+            <tr><td class="muted">PAYMENT</td><td><code>idempotency_key</code></td><td class="muted">UNIQUE INDEX</td><td>Idempotent submission guard</td></tr>
+            <tr><td class="muted">PAYMENT</td><td><code>status</code></td><td class="muted">INDEX</td><td>Fast filter by status in list queries</td></tr>
+            <tr><td class="muted">PAYMENT</td><td><code>created_at</code></td><td class="muted">INDEX</td><td>Default sort — newest first</td></tr>
+            <tr><td class="muted">PAYMENT</td><td><code>reference</code></td><td class="muted">INDEX</td><td>Search by reference (partial match)</td></tr>
+            <tr><td class="muted">PAYMENT_STATUS_HISTORY</td><td><code>id</code></td><td class="muted">PRIMARY KEY</td><td>Unique history entry</td></tr>
+            <tr><td class="muted">PAYMENT_STATUS_HISTORY</td><td><code>payment_id</code></td><td class="muted">FK + INDEX</td><td>Join to PAYMENT + timeline queries</td></tr>
+            <tr><td class="muted">PAYMENT_STATUS_HISTORY</td><td><code>occurred_at</code></td><td class="muted">INDEX</td><td>Timeline ordering within a payment</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- ══════ QUESTIONS ══════ -->
+  <!-- ══════════════════ QUESTIONS ══════════════════ -->
   <div class="section" id="tab-questions">
-    <div class="section-title">❓ Clarification Questions</div>
-    <div class="section-desc">Open questions for the instructor / customer. Each shows the working default assumption and why it matters. Bring to the next check-in and log answers in <code style="color:#58a6ff;background:#58a6ff11;padding:2px 6px;border-radius:4px;">02-MEMORY.md</code>.</div>
+    <div class="page-header">
+      <h2>Open Questions</h2>
+      <p>For the instructor / customer check-in. Each has a working default assumption so development is not blocked. Log every answer in <code style="font-family:var(--mono);font-size:0.8rem;background:var(--surface-alt);padding:1px 6px;border-radius:4px;border:1px solid var(--border);">02-MEMORY.md</code>.</p>
+    </div>
 
-    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-      <span style="background:#f8514922;color:#f85149;padding:5px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;">🔴 3 High Priority</span>
-      <span style="background:#d2992222;color:#d29922;padding:5px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;">🟡 4 Medium Priority</span>
-      <span style="background:#2ea04322;color:#3fb950;padding:5px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;">🟢 3 Lower Priority</span>
+    <div class="priority-strip">
+      <span><span class="ps-dot" style="background:var(--red);"></span>High priority — affects core design</span>
+      <span style="margin-left:16px;"><span class="ps-dot" style="background:var(--amber);"></span>Medium priority — affects scope or UX</span>
+      <span style="margin-left:16px;"><span class="ps-dot" style="background:var(--green);"></span>Lower priority — good default in place</span>
     </div>
 
     <div class="qa-list">
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#f8514922;color:#f85149;">Q1 🔴</span>
-          <h4>Idempotent duplicate submission — if a client submits the same Idempotency-Key twice, should we (a) return the existing payment with 200 OK, or (b) reject with 409 Conflict + DUPLICATE_PAYMENT?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 01 &nbsp;<span class="badge badge-red">High</span></span>
+          <h4>Duplicate idempotency key — return the existing payment with 200 OK, or reject with 409 Conflict + DUPLICATE_PAYMENT?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>Option (a) — return 200 + existing payment (MEM-006). Brief Appendix B lists DUPLICATE_PAYMENT → 409, but the Considerations section asks the question explicitly — ambiguous by design.</p></div>
-          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Changes the API contract and frontend retry logic. Needs early confirmation to avoid a retrofit.</p></div>
+          <div class="qa-row"><span class="qa-label ql-default">Default</span><p>Return 200 + existing payment (MEM-006). Brief Appendix B lists DUPLICATE_PAYMENT → 409, but the Considerations section frames it as an open question.</p></div>
+          <div class="qa-row"><span class="qa-label ql-why">Why it matters</span><p>Changes the API contract and frontend retry logic. Needs confirmation early.</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#f8514922;color:#f85149;">Q2 🔴</span>
-          <h4>Auto-progression vs. explicit lifecycle — should a payment auto-progress CREATED → VALIDATED → SENT → COMPLETED immediately after creation, or require an explicit API call per transition?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 02 &nbsp;<span class="badge badge-red">High</span></span>
+          <h4>Auto-progression vs. explicit lifecycle — auto-progress CREATED → VALIDATED → SENT → COMPLETED, or require an explicit API call per transition?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>Both — auto-progress for the main demo flow, and also expose explicit /validate, /send, /complete endpoints for testing and manual control (MEM-007).</p></div>
-          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Affects demo realism and how much of the retry/error-handling story is visible to the user during the presentation.</p></div>
+          <div class="qa-row"><span class="qa-label ql-default">Default</span><p>Both — auto-progress for the main demo flow, and also expose explicit /validate, /send, /complete endpoints (MEM-007).</p></div>
+          <div class="qa-row"><span class="qa-label ql-why">Why it matters</span><p>Affects demo realism and how much of the retry / error-handling story is visible during the presentation.</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#f8514922;color:#f85149;">Q3 🔴</span>
-          <h4>Account existence validation — must source/destination accounts exist in a registry table, or is format-only validation (regex) sufficient?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 03 &nbsp;<span class="badge badge-red">High</span></span>
+          <h4>Account existence validation — must accounts exist in a registry table, or is format-only validation (regex) sufficient?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>Format-only — no separate Account entity in core scope (SRS A-2).</p></div>
-          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>If real account existence is required, we need a seed accounts table and an INVALID_ACCOUNT check path — a data-model change best made early.</p></div>
+          <div class="qa-row"><span class="qa-label ql-default">Default</span><p>Format-only — no separate Account entity in core scope (SRS A-2).</p></div>
+          <div class="qa-row"><span class="qa-label ql-why">Why it matters</span><p>If real account existence is required, we need a seed accounts table and an INVALID_ACCOUNT check path — best decided early.</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q4 🟡</span>
-          <h4>Realistic delay vs. instant — should validation/processing simulate a visible delay, or resolve synchronously within the same HTTP request?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 04 &nbsp;<span class="badge badge-amber">Medium</span></span>
+          <h4>Processing speed — should the lifecycle complete instantly (synchronous), or with a visible step-by-step delay?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>Synchronous/instant for Sprint 1; can add artificial delay + polling in Sprint 2 for demo realism.</p></div>
-          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Determines whether the frontend needs polling / websockets or just a single request-response cycle.</p></div>
+          <div class="qa-row"><span class="qa-label ql-default">Default</span><p>Synchronous / instant for Sprint 1. Artificial delay + polling can be added in Sprint 2 for demo realism.</p></div>
+          <div class="qa-row"><span class="qa-label ql-why">Why it matters</span><p>Determines whether the frontend needs polling / websockets or a single request-response cycle.</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q5 🟡</span>
-          <h4>Supported currencies — is a small hardcoded list (USD, EUR, GBP) sufficient, or do you expect a broader ISO 4217 configurable set?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 05 &nbsp;<span class="badge badge-amber">Medium</span></span>
+          <h4>Supported currencies — small fixed list (USD, EUR, GBP), a custom list, or full ISO 4217?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>Small hardcoded/config-driven list (SRS A-6).</p></div>
+          <div class="qa-row"><span class="qa-label ql-default">Default</span><p>Small hardcoded list: USD, EUR, GBP (SRS A-6). Easy to extend.</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q6 🟡</span>
-          <h4>Failure simulation strategy — random (10% chance), deterministic triggers (magic account/amount), or configurable via an admin endpoint?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 06 &nbsp;<span class="badge badge-amber">Medium</span></span>
+          <h4>Failure simulation — deterministic triggers (reserved test account always fails), random chance, or both?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>Deterministic triggers for reliable test/demo (a reserved test account always fails) PLUS a small random chance for realism — gives both reliable test cases and a live-demo surprise element.</p></div>
+          <div class="qa-row"><span class="qa-label ql-default">Default</span><p>Deterministic triggers for reliable demo (reserved account always fails) + small random chance for realism.</p></div>
+          <div class="qa-row"><span class="qa-label ql-why">Why it matters</span><p>Deterministic triggers make failure scenarios reproducible during the live presentation.</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q7 🟡</span>
-          <h4>Search behavior — exact-match or partial/fuzzy match on reference? Case-sensitive?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 07 &nbsp;<span class="badge badge-amber">Medium</span></span>
+          <h4>Search — partial/case-insensitive match on reference, or exact match only?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>Partial, case-insensitive match on reference; exact match on id (UUID).</p></div>
+          <div class="qa-row"><span class="qa-label ql-default">Default</span><p>Partial, case-insensitive match on reference; exact match on id (UUID).</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#2ea04322;color:#3fb950;">Q8 🟢</span>
-          <h4>Pagination defaults — any preference on default page size or sort order for the payment list?</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 08 &nbsp;<span class="badge badge-green">Lower</span></span>
+          <h4>Preferred stretch feature if core finishes early — cancellation, analytics, concurrency demo, or other?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label default">Default</span><p>size=20, sorted by createdAt DESC (newest first).</p></div>
+          <div class="qa-row"><span class="qa-label ql-why">Why it matters</span><p>Guides Sprint 3 work in the final 1–2 days rather than guessing.</p></div>
         </div>
       </div>
 
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#2ea04322;color:#3fb950;">Q9 🟢</span>
-          <h4>Which Appendix E advanced feature would most impress? (concurrency demo, reporting/analytics, payment cancellation, or other)</h4>
+      <div class="qa-card">
+        <div class="qa-head">
+          <span class="qa-idx">Q 09 &nbsp;<span class="badge badge-green">Lower</span></span>
+          <h4>Presentation focus — mostly product demo, mostly technical deep-dive, or an equal mix?</h4>
         </div>
         <div class="qa-body">
-          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Helps prioritize Sprint 3 stretch work in the final 1-2 days rather than guessing.</p></div>
-        </div>
-      </div>
-
-      <div class="qa-item">
-        <div class="qa-item-header">
-          <span class="qa-num" style="background:#2ea04322;color:#3fb950;">Q10 🟢</span>
-          <h4>Presentation emphasis — technical (design patterns / architecture) or product-demo style (user-facing flow), given the audience may include non-technical stakeholders?</h4>
-        </div>
-        <div class="qa-body">
-          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Shapes how we structure the live demo and any slides accompanying it.</p></div>
+          <div class="qa-row"><span class="qa-label ql-why">Why it matters</span><p>Shapes how we structure the live demo and how long we spend on architecture vs. user journey walkthrough.</p></div>
         </div>
       </div>
 
@@ -924,85 +1228,67 @@ erDiagram
 <script>
   mermaid.initialize({
     startOnLoad: false,
-    theme: 'dark',
+    theme: 'base',
     securityLevel: 'loose',
     themeVariables: {
-      primaryColor: '#1c2130',
-      primaryTextColor: '#e6edf3',
-      primaryBorderColor: '#388bfd',
-      lineColor: '#58a6ff',
-      secondaryColor: '#161b27',
-      tertiaryColor: '#0d1117',
-      background: '#0d1117',
-      mainBkg: '#1c2130',
-      nodeBorder: '#388bfd',
-      clusterBkg: '#161b27',
-      titleColor: '#e6edf3',
-      edgeLabelBackground: '#1c2130',
-      actorBkg: '#1c2130',
-      actorBorder: '#388bfd',
-      actorTextColor: '#e6edf3',
-      actorLineColor: '#8b949e',
-      signalColor: '#58a6ff',
-      signalTextColor: '#e6edf3',
-      labelBoxBkgColor: '#1c2130',
-      labelBoxBorderColor: '#388bfd',
-      labelTextColor: '#e6edf3',
-      loopTextColor: '#e6edf3',
-      noteBorderColor: '#bc8cff',
-      noteBkgColor: '#1c2130',
-      noteTextColor: '#e6edf3',
-      activationBorderColor: '#388bfd',
-      activationBkgColor: '#161b27',
-      sequenceNumberColor: '#58a6ff',
-      fontSize: '14px',
-      attributeBackgroundColorEven: '#1c2130',
-      attributeBackgroundColorOdd: '#161b27'
+      primaryColor: '#eff6ff', primaryTextColor: '#1e3a5f', primaryBorderColor: '#bfdbfe',
+      lineColor: '#6b7280', secondaryColor: '#f0fdf4', tertiaryColor: '#f8f9fb',
+      edgeLabelBackground: '#ffffff', fontSize: '13px',
+      actorBkg: '#eff6ff', actorBorder: '#bfdbfe', actorTextColor: '#1e3a5f',
+      actorLineColor: '#9ca3af', signalColor: '#1d4ed8', signalTextColor: '#1e3a5f',
+      labelBoxBkgColor: '#eff6ff', labelBoxBorderColor: '#bfdbfe', labelTextColor: '#1e3a5f',
+      noteBorderColor: '#6d28d9', noteBkgColor: '#f5f3ff', noteTextColor: '#4c1d95',
+      activationBorderColor: '#1d4ed8', activationBkgColor: '#dbeafe'
     },
-    sequence: {
-      diagramMarginX: 30, diagramMarginY: 20,
-      actorMargin: 60, width: 160, height: 65,
-      boxMargin: 10, boxTextMargin: 5,
-      noteMargin: 10, messageMargin: 35,
-      useMaxWidth: true, showSequenceNumbers: false
-    },
-    classDiagram: { diagramPadding: 20, useMaxWidth: true },
-    er: { diagramPadding: 20, useMaxWidth: true }
+    sequence: { diagramMarginX: 30, diagramMarginY: 20, actorMargin: 60, width: 155, height: 60, messageMargin: 32, useMaxWidth: true },
+    classDiagram: { diagramPadding: 20, useMaxWidth: true }
   });
 
+  const darkVars = {
+    primaryColor: '#1c2130', primaryTextColor: '#e6edf3', primaryBorderColor: '#388bfd',
+    lineColor: '#8b949e', secondaryColor: '#161b27', tertiaryColor: '#0d1117',
+    edgeLabelBackground: '#1c2130', fontSize: '13px',
+    actorBkg: '#1c2130', actorBorder: '#388bfd', actorTextColor: '#e6edf3',
+    actorLineColor: '#484f58', signalColor: '#58a6ff', signalTextColor: '#e6edf3',
+    labelBoxBkgColor: '#1c2130', labelBoxBorderColor: '#388bfd', labelTextColor: '#e6edf3',
+    noteBorderColor: '#bc8cff', noteBkgColor: '#1a0e2e', noteTextColor: '#ddd6fe',
+    activationBorderColor: '#58a6ff', activationBkgColor: '#0d2045'
+  };
+
   document.addEventListener('DOMContentLoaded', () => {
-    // Cache original diagram source before Mermaid replaces innerHTML
-    document.querySelectorAll('.mermaid').forEach(el => {
-      el.setAttribute('data-src', el.textContent.trim());
-    });
-    // Restore saved theme
-    if (localStorage.getItem('paypulse-theme') === 'light') applyLight();
-    else applyDark();
+    document.querySelectorAll('.mermaid').forEach(el => el.setAttribute('data-src', el.textContent.trim()));
+    if (localStorage.getItem('pp-diag-theme') === 'dark') applyDark(false);
+    else applyLight(false);
     mermaid.run({ querySelector: '.mermaid' });
   });
 
-  function applyDark() {
-    document.body.classList.remove('light');
-    document.getElementById('themeBtn').textContent = '🌙 Dark';
-    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'dark' });
+  function applyLight(rerender) {
+    document.body.classList.remove('dark');
+    document.getElementById('themeBtn').textContent = 'Dark mode';
+    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'base', themeVariables: {
+      primaryColor:'#eff6ff', primaryTextColor:'#1e3a5f', primaryBorderColor:'#bfdbfe',
+      lineColor:'#6b7280', secondaryColor:'#f0fdf4', tertiaryColor:'#f8f9fb',
+      edgeLabelBackground:'#ffffff', fontSize:'13px',
+      actorBkg:'#eff6ff', actorBorder:'#bfdbfe', actorTextColor:'#1e3a5f',
+      actorLineColor:'#9ca3af', signalColor:'#1d4ed8', signalTextColor:'#1e3a5f',
+      labelBoxBkgColor:'#eff6ff', labelBoxBorderColor:'#bfdbfe', labelTextColor:'#1e3a5f',
+      noteBorderColor:'#6d28d9', noteBkgColor:'#f5f3ff', noteTextColor:'#4c1d95',
+      activationBorderColor:'#1d4ed8', activationBkgColor:'#dbeafe'
+    }});
+    if (rerender) rerenderAll();
   }
-  function applyLight() {
-    document.body.classList.add('light');
-    document.getElementById('themeBtn').textContent = '☀️ Light';
-    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'default' });
+  function applyDark(rerender) {
+    document.body.classList.add('dark');
+    document.getElementById('themeBtn').textContent = 'Light mode';
+    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'dark', themeVariables: darkVars });
+    if (rerender) rerenderAll();
   }
-
   function toggleTheme() {
-    const isLight = document.body.classList.toggle('light');
-    localStorage.setItem('paypulse-theme', isLight ? 'light' : 'dark');
-    if (isLight) {
-      document.getElementById('themeBtn').textContent = '☀️ Light';
-      mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'default' });
-    } else {
-      document.getElementById('themeBtn').textContent = '🌙 Dark';
-      mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'dark' });
-    }
-    // Re-render all diagrams with new theme
+    const isDark = document.body.classList.contains('dark');
+    localStorage.setItem('pp-diag-theme', isDark ? 'light' : 'dark');
+    isDark ? applyLight(true) : applyDark(true);
+  }
+  function rerenderAll() {
     document.querySelectorAll('.mermaid').forEach(el => {
       el.removeAttribute('data-processed');
       const src = el.getAttribute('data-src');
@@ -1010,15 +1296,13 @@ erDiagram
     });
     mermaid.run({ querySelector: '.mermaid' });
   }
-
   function showTab(name, btn) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
     btn.classList.add('active');
   }
 </script>
-
 </body>
 </html>
 
