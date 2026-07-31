@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PayPulse - Dashboard (Wireframe)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse <span class="tag">Wireframe - Dummy Data</span></div>
+  <nav class="nav">
+    <a href="index.html" class="active">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Dashboard</h1>
+    <p>Landing page - shows platform health at a glance before any transactional action. All figures below are dummy/sample data for review purposes.</p>
+  </div>
+
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="card">
+    <h2>Volume by Currency</h2>
+    <div class="kpi-grid" id="volumeGrid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Payments - Last 8 Hours (Trend)</h2>
+    <div class="bars" id="trendBars"></div>
+  </div>
+
+  <div class="card">
+    <h2>Top Failure Reasons</h2>
+    <table class="table" id="failureTable">
+      <thead><tr><th>Error Code</th><th>Occurrences (last 24h)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <p class="footer-note">This dashboard is deliberately the first screen shown - business health is visible before the user does anything else. Data source: dummy JSON (<code>assets/dummy-data.js</code>); the real backend API will replace this with live aggregation queries without changing this page's layout.</p>
+</main>
+
+<script src="assets/dummy-data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  var kpis = window.DUMMY_DATA.kpis;
+
+  document.getElementById("kpiGrid").innerHTML = [
+    kpiCard("Total Payments", kpis.totalPayments, "", ""),
+    kpiCard("Success Rate", kpis.successRatePct + "%", "green", "COMPLETED / total terminal"),
+    kpiCard("Failure Rate", kpis.failureRatePct + "%", "red", "FAILED / total terminal"),
+    kpiCard("Avg. Processing Time", kpis.avgProcessingTimeSeconds + "s", "blue", "CREATED to terminal status"),
+    kpiCard("Throughput", kpis.throughputPerMinute + "/min", "blue", "trailing window")
+  ].join("");
+
+  function kpiCard(label, value, colorClass, sub) {
+    return '<div class="kpi-card ' + colorClass + '">' +
+      '<div class="label">' + label + '</div>' +
+      '<div class="value">' + value + '</div>' +
+      (sub ? '<div class="sub">' + sub + '</div>' : '') +
+      '</div>';
+  }
+
+  var vol = kpis.volumeByCurrency;
+  document.getElementById("volumeGrid").innerHTML =
+    kpiCard("INR Volume", formatMoney(vol.INR, "INR"), "", "sum of all INR payments") +
+    kpiCard("USD Volume", formatMoney(vol.USD, "USD"), "", "sum of all USD payments");
+
+  var trend = window.DUMMY_DATA.trend;
+  var maxVal = Math.max.apply(null, trend.map(function (t) { return t.created; }));
+  document.getElementById("trendBars").innerHTML = trend.map(function (t) {
+    var completedH = Math.round((t.completed / maxVal) * 100);
+    var failedH = Math.round((t.failed / maxVal) * 100);
+    return '<div class="bar-col">' +
+      '<div class="bar completed" style="height:' + completedH + '%"></div>' +
+      '<div class="bar failed" style="height:' + failedH + '%"></div>' +
+      '<div class="bar-label">' + t.hour + '</div>' +
+      '</div>';
+  }).join("");
+
+  var failTbody = document.querySelector("#failureTable tbody");
+  Object.keys(kpis.topFailureReasons).forEach(function (code) {
+    var tr = document.createElement("tr");
+    tr.innerHTML = "<td><code>" + code + "</code></td><td>" + kpis.topFailureReasons[code] + "</td>";
+    failTbody.appendChild(tr);
+  });
+</script>
+</body>
+</html>
+

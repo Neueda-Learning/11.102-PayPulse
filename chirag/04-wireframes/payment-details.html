@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PayPulse - Payment Details (Wireframe)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse <span class="tag">Wireframe - Dummy Data</span></div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Payment Details</h1>
+    <p><a href="payments.html" class="btn ghost">&larr; Back to Payments</a></p>
+  </div>
+
+  <div id="content"></div>
+
+  <p class="footer-note">Data source: dummy JSON, looked up by the <code>id</code> query parameter. In the real system this page calls <code>GET /payments/{id}</code> and <code>GET /payments/{id}/history</code>.</p>
+</main>
+
+<script src="assets/dummy-data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  var id = getQueryParam("id");
+  var payment = id ? findPayment(id) : null;
+  var content = document.getElementById("content");
+
+  if (!payment) {
+    content.innerHTML = '<div class="card"><div class="notice error">PAYMENT_NOT_FOUND: no payment found' + (id ? ' with id <code>' + id + '</code>' : '') + '.</div></div>';
+  } else {
+    var acc = findAccount(payment.sourceAccountId);
+
+    var errorBlock = "";
+    if (payment.status === "FAILED") {
+      errorBlock =
+        '<div class="notice error">' +
+          '<strong>' + payment.errorCode + '</strong>: ' + payment.errorMessage +
+        '</div>';
+    }
+
+    content.innerHTML =
+      '<div class="card">' +
+        '<h2>Payment ' + payment.id + ' &nbsp; ' + badgeHtml(payment.status) + '</h2>' +
+        errorBlock +
+        '<dl class="field-list">' +
+          '<dt>Source Account</dt><dd>' + acc.label + ' - ' + acc.accountNumber + ' (' + acc.currency + ')</dd>' +
+          '<dt>Destination Account</dt><dd>' + payment.destinationAccount + '</dd>' +
+          '<dt>Amount</dt><dd>' + formatMoney(payment.amount, payment.currency) + '</dd>' +
+          '<dt>Currency</dt><dd>' + payment.currency + '</dd>' +
+          '<dt>Reference</dt><dd>' + (payment.reference || '<span style="color:#9aa1ab;">(none)</span>') + '</dd>' +
+          '<dt>Created At</dt><dd>' + formatDateTime(payment.createdAt) + '</dd>' +
+          '<dt>Updated At</dt><dd>' + formatDateTime(payment.updatedAt) + '</dd>' +
+        '</dl>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h2>Status History (Audit Trail)</h2>' +
+        '<ul class="timeline" id="timeline"></ul>' +
+      '</div>';
+
+    var timeline = document.getElementById("timeline");
+    payment.history.forEach(function (h) {
+      var li = document.createElement("li");
+      var desc = h.previousStatus ? (h.previousStatus + " &rarr; " + h.newStatus) : ("Payment created (" + h.newStatus + ")");
+      var errPart = h.errorCode ? ' <span style="color:#b91c1c;">(' + h.errorCode + ": " + h.errorMessage + ')</span>' : "";
+      li.innerHTML = '<span class="t-time">' + formatDateTime(h.occurredAt) + '</span><span>' + desc + errPart + '</span>';
+      timeline.appendChild(li);
+    });
+  }
+</script>
+</body>
+</html>
+

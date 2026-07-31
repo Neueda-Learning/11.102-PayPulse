@@ -14,16 +14,19 @@
 - **Validation:** Jakarta Bean Validation (`spring-boot-starter-validation`)
 - **API Docs:** springdoc-openapi (Swagger UI)
 - **Mapping:** MapStruct (Entity ↔ DTO)
-- **Testing:** JUnit 5, Mockito, Spring Boot Test, Testcontainers (optional, for real MySQL integration tests)
+- **Rate Limiting (new, MEM-020):** Bucket4j (in-memory token bucket; Redis-backed bucket noted as a Sprint 2+/production upgrade path)
+- **Resilience (new, MEM-021):** Resilience4j (Circuit Breaker + Retry) around simulated send/complete calls
+- **Testing:** JUnit 5, Mockito, Spring Boot Test, Testcontainers (optional, for real MySQL integration tests); Gatling or JMeter for load testing (new, MEM-020)
 - **Logging:** SLF4J + Logback (default with Spring Boot)
-- **State machine (optional lib):** Spring Statemachine — OR a hand-rolled State pattern (decision pending in Phase 2)
+- **State machine (optional lib):** Spring Statemachine — OR a hand-rolled State pattern (decision: hand-rolled, see MEM-009)
 
 ### Frontend
 - **Library:** React (18+), via Vite
 - **Language:** TypeScript (recommended for API contract safety)
 - **HTTP client:** Axios or fetch wrapper
-- **Routing:** React Router
+- **Routing:** React Router — default route is the **KPI Dashboard** (new, MEM-019)
 - **State/data-fetching:** React Query (TanStack Query) recommended for server state
+- **Charts (new, MEM-019):** a lightweight charting library (e.g. Recharts or Chart.js) for the KPI dashboard/trend view — team's choice, low ceremony
 - **Styling:** Team's choice (plain CSS/Tailwind/MUI) — decide when frontend phase starts
 - **API mocking (for parallel work before backend is ready):** MSW (Mock Service Worker) or Swagger-driven mock, using `docs/openapi.yaml`
 
@@ -31,7 +34,7 @@
 - **Version control:** Git (feature branches + PRs, no direct pushes to `main`)
 - **Diagrams:** Mermaid (renders in Markdown/GitHub) and/or PlantUML for UML
 - **Task tracking:** Trello (or GitHub Projects) mirroring `docs/00-ROADMAP.md`
-- **CI (stretch):** GitHub Actions — build + test on PR
+- **CI (stretch):** GitHub Actions — build + test on PR; dependency vulnerability scan (OWASP Dependency-Check / `npm audit`) as a scheduled, non-blocking job (new, MEM-022)
 
 ## 2. Coding Standards
 
@@ -53,19 +56,19 @@ Assign real names against **M1–M4** below once you tell me who's who (I'll upd
 
 | Member | Core Phase (Day 1–4) — Backend Module Ownership | Enhancement Phase (Day 5–7) |
 |---|---|---|
-| **M1** | Project skeleton, Git repo setup, `Payment` entity + Flyway migration (MySQL), DB schema, Idempotency handling (unique key + lookup) | Backend: validation rule chain (Strategy pattern), edge-case tests |
-| **M2** | Status transition engine (State pattern) + `payment_status_history` audit table + history endpoint | Backend: search/filter by status, retry/simulated async processing, Swagger polish |
-| **M3** | Create Payment endpoint + request validation (Bean Validation) + global exception handler + error code contract (Appendix B) | Frontend: Create Payment screen + Payment Details/status-history timeline |
-| **M4** | Get Payment by ID + List Payments endpoint + OpenAPI/Swagger setup (`docs/openapi.yaml` first, so it can double as the API contract for M3's frontend teammates) | Frontend: Payment List screen (filter/search) + error/failed-payment view |
+| **M1** | Project skeleton, Git repo setup, `Payment` entity + Flyway migration (MySQL), DB schema, Idempotency handling (unique key + lookup), **`Account` entity + migration + seed data + `AccountRepository`** (new, MEM-017) | Backend: validation rule chain (Strategy pattern), edge-case tests, connection-pool/index tuning for scale (NFR-10) |
+| **M2** | Status transition engine (State pattern) + `payment_status_history` audit table + history endpoint | Backend: search/filter by status, retry/simulated async processing, Swagger polish, **Resilience4j Circuit Breaker/Retry wiring** (new, MEM-021) |
+| **M3** | Create Payment endpoint + request validation (Bean Validation) + global exception handler + error code contract (Appendix B), **`AccountValidator`/`CurrencyValidator` updated for `sourceAccountId` + INR/USD** (new, MEM-017/018) | Frontend: Create Payment screen (incl. source-account dropdown) + Payment Details/status-history timeline; **security headers/CORS config** (new, MEM-022) |
+| **M4** | Get Payment by ID + List Payments endpoint + OpenAPI/Swagger setup (`docs/openapi.yaml` first, so it can double as the API contract for M3's frontend teammates), **`GET /accounts` endpoints** (new, MEM-017) | Frontend: **KPI Dashboard screen (landing page)** + Payment List screen (filter/search) + error/failed-payment view; **`AnalyticsService`/`GET /analytics/*`** (new, MEM-019) |
 
-> Rationale: M4 owns the API contract early since list/detail endpoints are the simplest to spec first, giving the frontend-bound pair (M3/M4) something concrete to design screens against from Day 2 (Phase 4 gate) even before full implementation lands.
+> Rationale: M4 owns the API contract early since list/detail endpoints are the simplest to spec first, giving the frontend-bound pair (M3/M4) something concrete to design screens against from Day 2 (Phase 4 gate) even before full implementation lands. Rate limiting (`RateLimitFilter`, MEM-020) is a shared cross-cutting task, owned by whichever pair (M1/M2 backend track) has bandwidth first in Sprint 1.5 — see `00-ROADMAP.md`.
 
 ### Skill Area Coverage Matrix
 
 | Skill Area | Why needed | Owner(s) |
 |---|---|---|
 | Spring Boot REST controllers & validation | Core API | M3 |
-| Spring Data JPA / Flyway (MySQL) | Persistence & schema | M1 |
+| Spring Data JPA / Flyway (MySQL) | Persistence & schema (incl. new `account` table) | M1 |
 | State machine / status transition logic | Core business rule | M2 |
 | Exception handling & error contract | Robust API under failure | M3 |
 | Unit/integration testing (JUnit, Mockito) | Quality | All 4 (own module's tests) |
@@ -73,6 +76,10 @@ Assign real names against **M1–M4** below once you tell me who's who (I'll upd
 | API contract / OpenAPI authoring | Enables FE/BE parallel work | M4 |
 | Git workflow (branching/PRs) | Team collaboration hygiene | Everyone |
 | UML/diagramming (Mermaid/PlantUML) | Design communication | Shared — drafted centrally (this doc set), reviewed by all 4 |
+| **Rate limiting (Bucket4j)** *(new)* | Handles 40k req/min target | M1/M2 (shared cross-cutting) |
+| **Resilience (Resilience4j Circuit Breaker/Retry)** *(new)* | Reliability/durability under load | M2 |
+| **Analytics/aggregation queries** *(new)* | Powers KPI dashboard | M4 |
+| **API security hardening** *(new)* | Injection prevention, secure headers, CORS | M3 |
 
 
 ## 4. Learning/Reference Notes

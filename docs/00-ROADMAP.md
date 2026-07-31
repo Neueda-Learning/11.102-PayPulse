@@ -3,8 +3,10 @@
 > **Rule of engagement:** We go ONE stage at a time. A stage is not "done" until reviewed & explicitly confirmed. This file is the single source of truth for progress. Check items off as we go — do not jump ahead.
 
 **Deadline:** Thursday, **6 Aug 2026**
-**Today:** 30 Jul 2026
-**Time available:** ~7 working days → we MUST stay lean, agile, and ruthlessly prioritize the CORE lifecycle first.
+**Today:** 31 Jul 2026
+**Time available:** ~6 working days → we MUST stay lean, agile, and ruthlessly prioritize the CORE lifecycle first.
+
+> **31 Jul 2026 update:** First customer meeting held. New scope confirmed: `Account` entity (multi-account source picker), INR/USD-only currencies, KPI dashboard + basic analytics, ~40k req/min rate limiting, elevated concurrency/durability/reliability, and API security hardening. All design docs (Phases 0–4) have been revised accordingly — see `01-CONTEXT.md` §9 and `02-MEMORY.md` MEM-017–022. **No implementation code has been written yet, so this is a documentation-only revision, not a rework.**
 
 ---
 
@@ -68,21 +70,23 @@
 
 - [ ] Sprint 0: Project skeleton (Maven/Gradle, package structure, Git repo, CI skeleton) — **M1**
 - [ ] Sprint 1 (CORE — MUST HAVE by mid-week) — all 4 members, one vertical module each (see `docs/03-SKILLS.md` §3):
-  - **M1:** Payment entity (minimal fields) + Flyway/MySQL migration + idempotency key handling (unique constraint + lookup)
+  - **M1:** `Payment` entity (minimal fields) + Flyway/MySQL migration + idempotency key handling (unique constraint + lookup) + **`Account` entity/migration/seed data + `AccountRepository`** (new, MEM-017)
   - **M2:** Status transition engine (State pattern) + validation of transitions + `payment_status_history` audit table + history endpoint
-  - **M3:** Create Payment endpoint + request validation (Bean Validation) + global exception handling + error code contract (Appendix B)
-  - **M4:** Get Payment by ID + List Payments endpoint + Swagger/OpenAPI setup (`docs/openapi.yaml`) — becomes the contract M3/M4 hand to frontend later
+  - **M3:** Create Payment endpoint + request validation (Bean Validation) + global exception handling + error code contract (Appendix B) + `AccountValidator`/`CurrencyValidator` updated for `sourceAccountId`/INR-USD (MEM-017/018)
+  - **M4:** Get Payment by ID + List Payments endpoint + Swagger/OpenAPI setup (`docs/openapi.yaml`) + **`GET /accounts` endpoints** — becomes the contract M3/M4 hand to frontend later
   - Unit + integration tests for happy path & key edge cases — each member owns tests for their module
-- [ ] Sprint 2 (enhance, Day 5+) — **M1 + M2 (backend)**: validation rule chain (Strategy pattern), search/filter by status, retry/simulated async processing, test hardening
+- [ ] Sprint 1.5 (NEW cross-cutting, MEM-019/020/021/022 — target Day 4–5): `RateLimitFilter` (Bucket4j), Resilience4j Circuit Breaker/Retry around simulated send/complete, `AnalyticsService` + `GET /analytics/summary|trend`, security headers/CORS lock-down — shared across the team, whoever has bandwidth first
+- [ ] Sprint 2 (enhance, Day 5+) — **M1 + M2 (backend)**: validation rule chain (Strategy pattern), search/filter by status, retry/simulated async processing, test hardening, load-test pass (§ testing strategy 2.6)
 - [ ] Sprint 3 (stretch, Appendix E): pick 1–2 advanced features if time allows — M1/M2 if backend is ahead of schedule
 
 ## 🎨 Phase 6 — Frontend (React) — **M3 + M4**, starts Day 5 once API design is locked (Phase 4)
 
 - [ ] React app skeleton (Vite + TS) — **M4**
-- [ ] Create Payment screen — **M3**
+- [ ] **KPI Dashboard screen (landing page, per customer directive)** — **M4** (new, MEM-019)
+- [ ] Create Payment screen — **including source-account dropdown fed by `GET /accounts`** — **M3** (updated, MEM-017)
 - [ ] Payment Details + status history timeline — **M3**
 - [ ] Payment List + filter/search — **M4**
-- [ ] Error display for failed payments — **M4**
+- [ ] Error display for failed payments (incl. graceful `429` handling) — **M4** (updated, MEM-020)
 
 ## 🧪 Phase 7 — Testing, Hardening, Docs polish
 
@@ -102,20 +106,18 @@
 
 | Day | Date | Focus |
 |---|---|---|
-| 1 | Jul 30 (today) | Groundwork docs + SRS + Design pattern decisions |
-| 2 | Jul 31 | UML (class, sequence, state) + API design/OpenAPI |
-| 3 | Aug 1 | Backend skeleton + DB schema + Create/Get Payment |
-| 4 | Aug 2 | Status transition engine + audit trail + error handling |
-| 5 | Aug 3 | Search/filter, tests, Swagger polish; **Frontend starts in parallel** |
-| 6 | Aug 4 | Frontend screens wired to API; backend hardening/tests |
+| 1 | Jul 30 | Groundwork docs + SRS + Design pattern decisions |
+| 2 | Jul 31 (today) | First customer meeting → docs revised (Account, KPIs, INR/USD, rate limiting, security, concurrency) + UML (class, sequence, state) + API design/OpenAPI, all updated |
+| 3 | Aug 1 | Backend skeleton + DB schema (incl. `account` table) + Create/Get Payment + Account endpoints |
+| 4 | Aug 2 | Status transition engine + audit trail + error handling + RateLimitFilter + Circuit Breaker wiring |
+| 5 | Aug 3 | Search/filter, Analytics endpoints, tests, Swagger polish, load-test pass; **Frontend starts in parallel** |
+| 6 | Aug 4 | Frontend screens wired to API (Dashboard first!); backend hardening/tests |
 | 7 | Aug 5 | Integration pass, bug fixes, stretch features if time, demo rehearsal |
 | — | Aug 6 | **Presentation day** |
 
 ---
 
 ### ✅ Current Status
-**Phase 0 ✅ | Phase 1 (SRS) ✅ | Phase 2 (Architecture, Patterns & Testing Strategy) ✅ | Phase 3 (UML) ✅ | Phase 4 (API Design/OpenAPI) ✅ | We are now on: Phase 5 — Core Implementation (Backend Sprint 0/1).**
+**Phase 0 ✅ | Phase 1 (SRS) ✅ Revised 31 Jul | Phase 2 (Architecture, Patterns & Testing Strategy) ✅ Revised 31 Jul | Phase 3 (UML) ✅ Revised 31 Jul | Phase 4 (API Design/OpenAPI) ✅ Revised 31 Jul | We are now on: Phase 5 — Core Implementation (Backend Sprint 0/1), incorporating the customer-meeting scope update.**
 
-> ⏰ **Day check:** Today is Jul 30 (Day 1). All design/documentation phases (0–4) are done in a single day — ahead of the Day-2 target in the original schedule. This buys the team a head start: Sprint 0 (project skeleton) can begin immediately.
-
-a
+> ⏰ **Day check:** Today is Jul 31 (Day 2). First customer meeting completed same day; all design/documentation phases (0–4) revised in response before any implementation code was written — zero throwaway code, pure documentation update. Sprint 0 (project skeleton) begins Day 3 as planned, now against the updated contract.

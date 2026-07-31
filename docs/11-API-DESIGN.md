@@ -2,6 +2,8 @@
 
 Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-readable version of this doc). This is the **single source of truth** the frontend team (M3/M4) builds against — treat any change here as a breaking-change discussion, not a silent edit.
 
+> **Updated 31 Jul 2026** post-customer-meeting: added `/accounts` and `/analytics/*` endpoints, `sourceAccountId` replaces free-text `sourceAccount`, currency restricted to `INR`/`USD`, rate-limit headers/429 documented — MEM-017/018/019/020.
+
 **Base URL (local dev):** `http://localhost:8080/api/v1`
 
 ---
@@ -11,8 +13,10 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 - All request/response bodies are `application/json`.
 - All timestamps are ISO-8601 UTC, e.g. `2026-07-30T14:23:01Z`.
 - `id` fields are UUID strings.
-- Idempotency key is passed as a request **header**: `Idempotency-Key: <client-generated-string>` (preferred over body field — standard REST convention, keeps it out of the domain payload). *(Supersedes earlier SRS draft that showed it as a body field — see MEM-013.)* **Important:** this key identifies a single *submission attempt*, not the payment's business content — it must be generated fresh (e.g. `crypto.randomUUID()`) client-side once per attempt, never derived from `amount`/account fields. Full rationale + worked scenarios: `04-SRS.md` §7a / FR-1.1a.
+- **Supported currencies: `INR` and `USD` only** (customer-confirmed 31 Jul 2026, MEM-018). A payment's `currency` must equal its `sourceAccountId`'s currency.
+- Idempotency key is passed as a request **header**: `Idempotency-Key: <client-generated-string>` (preferred over body field — standard REST convention, keeps it out of the domain payload). *(Supersedes earlier SRS draft that showed it as a body field — see MEM-013.)* **Important:** this key identifies a single *submission attempt*, not the payment's business content — it must be generated fresh (e.g. `crypto.randomUUID()`) client-side once per attempt, never derived from `amount`/`sourceAccountId` fields. Full rationale + worked scenarios: `04-SRS.md` §7a / FR-1.1a.
 - Pagination: query params `page` (0-based, default `0`), `size` (default `20`, max `100`), response wrapped in a `Page` envelope.
+- **Rate limiting (new, MEM-020):** every response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers. Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header (seconds) and the standard error body below, `errorCode: RATE_LIMIT_EXCEEDED`.
 - All error responses share the shape:
 ```json
 {
@@ -22,11 +26,14 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
   "path": "/api/v1/payments"
 }
 ```
+- **Security note (new, MEM-022):** this shape is the *only* thing ever returned on error — no stack traces, no internal exception class names. All endpoints require HTTPS in deployed environments; CORS is restricted to the known frontend origin.
 
 ## 2. Endpoint Summary
 
 | Method | Path | Purpose |
 |---|---|---|
+| GET | `/accounts` | List the operator's accounts (source-account picker) *(new)* |
+| GET | `/accounts/{id}` | Get a single account *(new)* |
 | POST | `/payments` | Create a new payment |
 | GET | `/payments/{id}` | Get a payment by ID |
 | GET | `/payments` | List/search/filter payments (paginated) |
@@ -34,21 +41,41 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 | POST | `/payments/{id}/validate` | Explicitly trigger `CREATED→VALIDATED` transition |
 | POST | `/payments/{id}/send` | Explicitly trigger `VALIDATED→SENT` transition |
 | POST | `/payments/{id}/complete` | Explicitly trigger `SENT→COMPLETED` transition |
+| GET | `/analytics/summary` | KPI dashboard summary (success rate, failure rate, avg processing time, throughput, volume) *(new)* |
+| GET | `/analytics/trend` | Time-bucketed trend (payments per hour, last 24h, by status) *(new)* |
 
-> Note (MEM-007): payments **auto-progress** through the full lifecycle immediately on creation for demo speed. The explicit `/validate`, `/send`, `/complete` endpoints exist for testing, manual control, and demonstrating rejection of illegal transitions — the frontend's primary flow only needs `POST /payments` + polling/`GET`, not manual calls to these.
+> Note (MEM-007): payments **auto-progress** through the full lifecycle immediately on creation for demo speed. The explicit `/validate`, `/send`, `/complete` endpoints exist for testing, manual control, and demonstrating rejection of illegal transitions — the frontend's primary flow only needs `GET /accounts` + `POST /payments` + polling/`GET`, not manual calls to these.
 
 ---
 
-## 3. `POST /payments` — Create Payment
+## 3. `GET /accounts` — List the Operator's Accounts (new, MEM-017)
+
+**Response `200 OK`:**
+```json
+[
+  { "id": "acc-001-...", "label": "Primary INR Savings", "accountNumber": "ACC1000001", "currency": "INR", "status": "ACTIVE" },
+  { "id": "acc-002-...", "label": "USD Wallet", "accountNumber": "ACC2000002", "currency": "USD", "status": "ACTIVE" }
+]
+```
+Used by the frontend to populate the **source-account dropdown** on the Create Payment screen (per customer directive: "user will see during payment option at UI and select one of them").
+
+## 4. `GET /accounts/{id}` — Get a Single Account (new)
+
+- **`200 OK`** — same shape as one array element above.
+- **`404 Not Found`** — `ACCOUNT_NOT_FOUND`.
+
+---
+
+## 5. `POST /payments` — Create Payment
 
 **Headers:** `Idempotency-Key: <string>` *(optional but recommended)*
 
 **Request Body:**
 ```json
 {
+  "sourceAccountId": "acc-001-1111-2222-3333",
   "amount": 250.00,
-  "currency": "USD",
-  "sourceAccount": "ACC1000001",
+  "currency": "INR",
   "destinationAccount": "ACC2000002",
   "reference": "Invoice #4471"
 }
@@ -57,10 +84,10 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 **Field rules:**
 | Field | Type | Required | Rules |
 |---|---|---|---|
+| `sourceAccountId` | UUID | yes | Must reference an existing, `ACTIVE` `Account` (§3/§4) — unknown/inactive → `INVALID_ACCOUNT` |
 | `amount` | number | yes | > 0, <= 1,000,000, max 2 decimal places |
-| `currency` | string | yes | 3-letter ISO code, one of supported list (e.g. USD, EUR, GBP) |
-| `sourceAccount` | string | yes | 8–20 alphanumeric chars |
-| `destinationAccount` | string | yes | 8–20 alphanumeric chars, must differ from `sourceAccount` |
+| `currency` | string | yes | `INR` or `USD` only; **must equal the source account's currency** — mismatch → `INVALID_CURRENCY` |
+| `destinationAccount` | string | yes | 8–20 alphanumeric chars, must differ from the source account's `accountNumber` (format-only — external party, not existence-checked, MEM-017) |
 | `reference` | string | no | max 255 chars |
 
 **Responses:**
@@ -70,9 +97,9 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 ```json
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "sourceAccountId": "acc-001-1111-2222-3333",
   "amount": 250.00,
-  "currency": "USD",
-  "sourceAccount": "ACC1000001",
+  "currency": "INR",
   "destinationAccount": "ACC2000002",
   "reference": "Invoice #4471",
   "status": "COMPLETED",
@@ -83,20 +110,22 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 }
 ```
 - **`200 OK`** — `Idempotency-Key` matched an existing payment; body = the existing payment (MEM-006), no new resource created.
-- **`400 Bad Request`** — field-level validation failure (`VALIDATION_FAILED`, `INVALID_AMOUNT`, `INVALID_CURRENCY`, `INVALID_ACCOUNT`).
+- **`400 Bad Request`** — field-level or business-rule validation failure (`VALIDATION_FAILED`, `INVALID_AMOUNT`, `INVALID_CURRENCY`, `INVALID_ACCOUNT`).
+- **`404 Not Found`** — `sourceAccountId` doesn't exist at all (`ACCOUNT_NOT_FOUND`) — distinguished from `INVALID_ACCOUNT` (400) which covers an account that exists but is `INACTIVE`, or a malformed `destinationAccount`.
+- **`429 Too Many Requests`** — rate limit exceeded (`RATE_LIMIT_EXCEEDED`, new).
 
 ---
 
-## 4. `GET /payments/{id}` — Get Payment by ID
+## 6. `GET /payments/{id}` — Get Payment by ID
 
 **Responses:**
 - **`200 OK`**
 ```json
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "sourceAccountId": "acc-001-1111-2222-3333",
   "amount": 250.00,
-  "currency": "USD",
-  "sourceAccount": "ACC1000001",
+  "currency": "INR",
   "destinationAccount": "ACC2000002",
   "reference": "Invoice #4471",
   "status": "FAILED",
@@ -113,13 +142,14 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 
 ---
 
-## 5. `GET /payments` — List / Search / Filter
+## 7. `GET /payments` — List / Search / Filter
 
 **Query params:**
 | Param | Type | Notes |
 |---|---|---|
 | `status` | string | optional, one of `CREATED, VALIDATED, SENT, COMPLETED, FAILED` |
 | `search` | string | optional, matches against `reference` or `id` (partial match) |
+| `sourceAccountId` | UUID | optional, filter to payments from a specific account *(new)* |
 | `page` | int | default 0 |
 | `size` | int | default 20, max 100 |
 | `sort` | string | default `createdAt,desc` |
@@ -130,7 +160,7 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 ```json
 {
   "content": [
-    { "id": "...", "amount": 250.00, "currency": "USD", "status": "FAILED", "errorCode": "NETWORK_ERROR", "createdAt": "..." }
+    { "id": "...", "sourceAccountId": "acc-001-...", "amount": 250.00, "currency": "INR", "status": "FAILED", "errorCode": "NETWORK_ERROR", "createdAt": "..." }
   ],
   "page": 0,
   "size": 20,
@@ -141,7 +171,7 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 
 ---
 
-## 6. `GET /payments/{id}/history` — Status History / Audit Trail
+## 8. `GET /payments/{id}/history` — Status History / Audit Trail
 
 **Response `200 OK`:**
 ```json
@@ -155,12 +185,12 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 
 ---
 
-## 7. `POST /payments/{id}/validate` | `/send` | `/complete` — Explicit Transitions
+## 9. `POST /payments/{id}/validate` | `/send` | `/complete` — Explicit Transitions
 
-No request body. Behave exactly like the corresponding automatic step (§3), but callable independently — primarily for testing/demo of the state machine's guard logic.
+No request body. Behave exactly like the corresponding automatic step (§5), but callable independently — primarily for testing/demo of the state machine's guard logic.
 
 **Responses:**
-- **`200 OK`** — updated `PaymentResponse` (same shape as §4).
+- **`200 OK`** — updated `PaymentResponse` (same shape as §6).
 - **`400 Bad Request`** — illegal transition attempted:
 ```json
 { "errorCode": "INVALID_STATUS_TRANSITION", "message": "Cannot transition from COMPLETED to VALIDATED", "timestamp": "...", "path": "/api/v1/payments/.../validate" }
@@ -173,13 +203,48 @@ No request body. Behave exactly like the corresponding automatic step (§3), but
 
 ---
 
-## 8. Error Code → HTTP Status Reference (adopted from brief Appendix B — final)
+## 10. `GET /analytics/summary` — KPI Dashboard Summary (new, MEM-019)
+
+**Query params:** `from`, `to` (ISO-8601, optional — default: last 24h).
+
+**Response `200 OK`:**
+```json
+{
+  "totalPayments": 1287,
+  "successRatePct": 94.2,
+  "failureRatePct": 5.8,
+  "avgProcessingTimeSeconds": 0.84,
+  "throughputPerMinute": 53.6,
+  "volumeByCurrency": { "INR": 1845200.00, "USD": 42310.50 },
+  "topFailureReasons": { "NETWORK_ERROR": 41, "INVALID_CURRENCY": 12, "PROCESSING_ERROR": 9 }
+}
+```
+> Deliberately **no** vanity metrics (no "total users", no gamified badges) — every field answers a real payments-ops question, per explicit customer guidance (MEM-019).
+
+## 11. `GET /analytics/trend` — Basic Trend Chart Data (new, MEM-019)
+
+**Query params:** `hours` (default 24).
+
+**Response `200 OK`:**
+```json
+{
+  "buckets": [
+    { "periodStart": "2026-07-31T09:00:00Z", "created": 40, "completed": 35, "failed": 5 },
+    { "periodStart": "2026-07-31T10:00:00Z", "created": 52, "completed": 48, "failed": 4 }
+  ]
+}
+```
+
+---
+
+## 12. Error Code → HTTP Status Reference (adopted from brief Appendix B, extended post-customer-meeting)
 
 | Error Code | HTTP Status | Triggered by |
 |---|---|---|
 | VALIDATION_FAILED | 400 | Generic field-level validation |
-| INVALID_ACCOUNT | 400 | Bad account format / same source & destination |
-| INVALID_CURRENCY | 400 | Unsupported currency code |
+| INVALID_ACCOUNT | 400 | Unknown/inactive `sourceAccountId`, bad `destinationAccount` format, or source==destination |
+| ACCOUNT_NOT_FOUND | 404 | `GET /accounts/{id}` with unknown ID *(new)* |
+| INVALID_CURRENCY | 400 | Currency not `INR`/`USD`, or ≠ source account's currency |
 | INVALID_AMOUNT | 400 | Amount <= 0, > max, or wrong decimal precision |
 | DUPLICATE_PAYMENT | *(reserved, not used by default — see MEM-006)* | Would apply only if strict-reject mode chosen instead of 200+existing |
 | INVALID_STATUS_TRANSITION | 400 | Illegal transition attempted |
@@ -187,13 +252,17 @@ No request body. Behave exactly like the corresponding automatic step (§3), but
 | PROCESSING_ERROR | 500 (or 409 for lock conflicts) | Internal/simulated processing error, optimistic lock conflict |
 | NETWORK_ERROR | 503 *(reflected in payment body as-is; HTTP response for the *triggering* explicit endpoint call itself is 200 since the transition to FAILED succeeded as an operation)* | Simulated network failure |
 | INSUFFICIENT_FUNDS | 400 | Reserved — not actively triggered in core scope (no real balance ledger), available for a stretch enhancement |
+| **RATE_LIMIT_EXCEEDED** *(new)* | **429** | Token bucket exhausted (global or per-client) — MEM-020 |
 
-> **Important distinction:** For **explicit transition endpoints**, a "successful transition to FAILED" is still an HTTP `200` (the API call itself succeeded — it did what was asked: attempt the transition, and correctly recorded a failure). HTTP error statuses (`400/404/409/500/503`) are reserved for when the **API call itself** couldn't be honored (bad request shape, illegal transition, not found, conflict, internal fault) — not for "the payment's business outcome was a failure." This distinction is called out explicitly to avoid frontend confusion.
+> **Important distinction:** For **explicit transition endpoints**, a "successful transition to FAILED" is still an HTTP `200` (the API call itself succeeded — it did what was asked: attempt the transition, and correctly recorded a failure). HTTP error statuses (`400/404/409/429/500/503`) are reserved for when the **API call itself** couldn't be honored (bad request shape, illegal transition, not found, conflict, rate-limited, internal fault) — not for "the payment's business outcome was a failure." This distinction is called out explicitly to avoid frontend confusion.
 
-## 9. Frontend Integration Notes
+## 13. Frontend Integration Notes
 
+- **Landing page is the KPI dashboard** (`GET /analytics/summary` + `/analytics/trend`), per customer directive — not the Create Payment form.
+- On the Create Payment screen, call `GET /accounts` first to populate the **source-account dropdown**; currency field auto-populates/locks to the selected account's currency (client-side convenience; server still validates independently).
 - Use `GET /payments/{id}` (short poll every 1–2s, or just once since auto-progression is synchronous in Sprint 1) to reflect final status after `POST /payments`.
 - Status badge color mapping (Appendix D): 🟢 `COMPLETED`, 🟡 `CREATED`/`VALIDATED`/`SENT`, 🔴 `FAILED`.
+- **Handle `429` gracefully:** show a "please slow down" toast using the `Retry-After` header rather than a generic error (new, MEM-020).
 - **Idempotency-Key generation rule (see `04-SRS.md` §7a for full scenario table):**
   1. Generate the key (`crypto.randomUUID()`) **once**, at the moment the Submit button is clicked — store it in component state/ref tied to that submission attempt.
   2. **Disable the Submit button immediately** on click (before the request even fires) — this is the primary defense against double-click generating two different keys for what the user intended as one action.

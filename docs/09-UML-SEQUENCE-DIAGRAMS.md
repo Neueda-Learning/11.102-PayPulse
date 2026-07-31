@@ -2,38 +2,46 @@
 
 Related: `08-UML-CLASS-DIAGRAM.md`, `05-ARCHITECTURE.md` §3 (request flow narrative). Rendered in Mermaid.
 
-## 1. Create Payment — Happy Path (auto-progresses to COMPLETED)
+> **Updated 31 Jul 2026** post-customer-meeting: diagram 1 updated for account selection; new diagrams 8 (Rate Limit Exceeded) and 9 (KPI Dashboard fetch) added — MEM-017/019/020.
+
+## 1. Create Payment — Happy Path (auto-progresses to COMPLETED, now with Account selection)
 
 ```mermaid
 sequenceDiagram
     actor Client
+    participant Filter as RateLimitFilter
     participant Ctrl as PaymentController
     participant Svc as PaymentService
     participant Idem as IdempotencyService
+    participant AcctSvc as AccountService
     participant Repo as PaymentRepository
     participant Engine as StatusTransitionEngine
     participant HistRepo as PaymentStatusHistoryRepository
     participant Mapper as PaymentMapper
 
-    Client->>Ctrl: POST /payments (body, Idempotency-Key)
+    Client->>Filter: POST /payments (body incl. sourceAccountId, Idempotency-Key)
+    Filter->>Filter: check token bucket (has capacity)
+    Filter->>Ctrl: forward request
     Ctrl->>Ctrl: @Valid bean validation (field-level)
     Ctrl->>Svc: createPayment(request)
     Svc->>Idem: findExisting(idempotencyKey)
     Idem->>Repo: findByIdempotencyKey(key)
     Repo-->>Idem: empty
     Idem-->>Svc: empty
+    Svc->>AcctSvc: getActiveAccount(sourceAccountId)
+    AcctSvc-->>Svc: Account(currency=INR, status=ACTIVE)
     Svc->>Mapper: toEntity(request)
-    Mapper-->>Svc: Payment(status=CREATED)
+    Mapper-->>Svc: Payment(status=CREATED, sourceAccountId=...)
     Svc->>Repo: save(payment)
     Repo-->>Svc: payment (id assigned)
     Svc->>HistRepo: save(history: null→CREATED)
     Svc->>Engine: validate(payment)
-    Engine->>Engine: run ValidationChain (amount/currency/account)
+    Engine->>Engine: run ValidationChain (amount/currency-matches-account/account-active)
     Engine->>Repo: save(payment status=VALIDATED)
     Engine->>HistRepo: save(history: CREATED→VALIDATED)
     Engine-->>Svc: payment(VALIDATED)
     Svc->>Engine: send(payment)
-    Engine->>Engine: simulate transmission
+    Engine->>Engine: simulate transmission (Circuit Breaker + Retry wrapped)
     Engine->>Repo: save(payment status=SENT)
     Engine->>HistRepo: save(history: VALIDATED→SENT)
     Engine-->>Svc: payment(SENT)
@@ -204,3 +212,42 @@ sequenceDiagram
     Ctrl-->>Client: 200 OK + paginated list
 ```
 
+## 8. Rate Limit Exceeded (new, MEM-020)
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Filter as RateLimitFilter
+    participant Bucket as TokenBucket (Bucket4j)
+    participant Ctrl as PaymentController
+
+    Client->>Filter: POST /payments (client already at limit)
+    Filter->>Bucket: tryConsume(1 token)
+    Bucket-->>Filter: false (no tokens available)
+    Note over Filter: Short-circuit — request never reaches the controller/service/DB
+    Filter-->>Client: 429 Too Many Requests + ApiError(RATE_LIMIT_EXCEEDED) + Retry-After header
+```
+
+> This is deliberately the **cheapest possible rejection point** in the whole architecture (§4 of `05-ARCHITECTURE.md`) — no DB connection, no service logic, no business validation is spent on a request that's going to be rejected anyway.
+
+## 9. KPI Dashboard Fetch (new, MEM-019)
+
+```mermaid
+sequenceDiagram
+    actor Client as React App (landing page)
+    participant Ctrl as AnalyticsController
+    participant Svc as AnalyticsService
+    participant Repo as PaymentRepository
+    participant HistRepo as PaymentStatusHistoryRepository
+
+    Client->>Ctrl: GET /analytics/summary
+    Ctrl->>Svc: computeSummary(from, to)
+    Svc->>Repo: aggregate counts by status, volume by currency
+    Repo-->>Svc: raw aggregates
+    Svc->>HistRepo: aggregate avg(occurred_at[terminal] - occurred_at[CREATED])
+    HistRepo-->>Svc: avg processing time
+    Svc->>Svc: compute successRatePct, failureRatePct, throughputPerMinute, topFailureReasons
+    Svc-->>Ctrl: KpiSummaryResponse
+    Ctrl-->>Client: 200 OK + KpiSummaryResponse
+    Note over Client: Rendered as the FIRST screen the user sees (customer directive)
+```

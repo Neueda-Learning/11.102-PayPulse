@@ -59,3 +59,7 @@ Any ❌ cell attempted at runtime → `InvalidStatusTransitionException` → `40
 
 Using dedicated `CompletedState`/`FailedState` classes (rather than a single `if (isTerminal(status)) throw` guard scattered elsewhere) keeps **all** transition knowledge inside the State pattern's classes — consistent with the Class Diagram and easy to extend later (e.g. if a future "Payment Reversal" stretch feature, Appendix E, ever needed to add a legal transition OUT of `COMPLETED`, it's a one-class change, not a hunt through guard conditions across the codebase).
 
+## 5. `Account` Status — Deliberately NOT a State Machine (new, MEM-017)
+
+`Account.status` (`ACTIVE` / `INACTIVE`) is a simple flag, not a finite state machine — there's no lifecycle of transitions to enforce (no "pending", no automatic progression). It's checked as a **guard condition** by `AccountValidator` when a payment is created (an `INACTIVE` account cannot be used as a payment source), but it does not participate in the `PaymentState` hierarchy above. Keeping it a plain enum/flag rather than a second State-pattern hierarchy avoids over-engineering a concept that doesn't need one — consistent with the brief's "start small" guidance, now reapplied to the newly-added `Account` entity.
+

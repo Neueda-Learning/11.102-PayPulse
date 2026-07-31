@@ -14,21 +14,27 @@ Define the functional and non-functional requirements for the **Payments Process
 
 | Actor | Description |
 |---|---|
-| **Client / End User** | The single (unauthenticated) user interacting via the React UI or directly via the REST API. |
+| **Client / End User** | The single (unauthenticated) operator, who owns **multiple `Account` records**, interacting via the React UI or directly via the REST API. |
 | **System (self)** | The backend itself acts as an internal actor that simulates payment network processing (async/scheduled transition from `SENT` → `COMPLETED`/`FAILED`). |
-| **Instructor ("Customer")** | Provides/clarifies requirements on request; not a system actor. |
+| **Instructor ("Customer")** | Provides/clarifies requirements on request; not a system actor. Gave direct answers in the 31-Jul-2026 meeting — see `01-CONTEXT.md` §9 and MEM-017–022. |
 
 ## 3. Functional Requirements
 
+### FR-0 — Account Management (new, post-customer-meeting — MEM-017)
+- **FR-0.1** The system maintains a set of `Account` records for the single operator: `id`, `label` (e.g. "Primary INR Savings"), `accountNumber`, `currency` (`INR` or `USD`), `status` (`ACTIVE`/`INACTIVE`). Seeded via Flyway migration for Sprint 1 (no account-creation UI required in core scope — that's a stretch item).
+- **FR-0.2** `GET /accounts` returns the operator's accounts (used to populate the source-account dropdown in the UI).
+- **FR-0.3** `GET /accounts/{id}` returns a single account's detail.
+- **FR-0.4** Only `ACTIVE` accounts may be used as a payment source; an `INACTIVE` account selected as source is rejected with `INVALID_ACCOUNT`.
+
 ### FR-1 — Create Payment
-- **FR-1.1** Client can submit a new payment with: `sourceAccount`, `destinationAccount`, `amount`, `currency`, optional `reference/description`, and an optional `idempotencyKey` (delivered as an `Idempotency-Key` HTTP header per MEM-013, not a body field).
+- **FR-1.1** Client can submit a new payment with: `sourceAccountId` (UUID, **must reference an existing, `ACTIVE` `Account`** — FR-0), `destinationAccount` (free-text, format-validated, external party), `amount`, `currency` (must equal the source account's currency — see FR-9), optional `reference/description`, and an optional `idempotencyKey` (delivered as an `Idempotency-Key` HTTP header per MEM-013, not a body field).
 - **FR-1.2** On creation, payment status is set to `CREATED` and a status-history record is written.
 - **FR-1.3** If an `idempotencyKey` is supplied and a payment with that key already exists, the system **returns the existing payment** (HTTP `200`, per MEM-006) rather than creating a duplicate.
 - **FR-1.4** Request is validated per FR-9 (Validation Rules) **before** persisting as `CREATED`...
 
-  > **Design decision:** invalid input (a) is rejected outright with `400` and nothing persisted for basic field-level validation (missing/malformed fields). (b) Business-rule validation (unknown account format, unsupported currency) is persisted first as `CREATED` then immediately transitioned to `FAILED` with an audit trail entry — so there's a real audit trail of *why* it failed.
+  > **Design decision:** invalid input (a) is rejected outright with `400` and nothing persisted for basic field-level validation (missing/malformed fields, unknown `sourceAccountId`). (b) Business-rule validation (unsupported currency, currency/account mismatch) is persisted first as `CREATED` then immediately transitioned to `FAILED` with an audit trail entry — so there's a real audit trail of *why* it failed.
 
-- **FR-1.5 — Idempotency Key Semantics (clarified, see §3.1 below for full detail):** The idempotency key identifies a **single client submission attempt**, NOT the business content of the payment. It is generated **client-side**, once per attempt, immediately before the HTTP request is sent — never derived from/hashed against `amount`/`sourceAccount`/`destinationAccount`. This means:
+- **FR-1.5 — Idempotency Key Semantics (clarified, see §3.1 below for full detail):** The idempotency key identifies a **single client submission attempt**, NOT the business content of the payment. It is generated **client-side**, once per attempt, immediately before the HTTP request is sent — never derived from/hashed against `amount`/`sourceAccountId`/`destinationAccount`. This means:
   - A genuine retry of the *same* attempt (network timeout, double-click before the UI disables the button) reuses the *same* key → correctly deduplicated, no second payment created.
   - A deliberate, separate payment — even with **byte-for-byte identical field values** (e.g. paying the same account the same amount again next week, or twice in a row on purpose) — uses a **newly generated key** → correctly creates a new, independent payment. The system has no way (nor should it) to distinguish "duplicate by accident" from "legitimately identical business transaction" other than via this client-attempt-scoped key.
 
@@ -85,8 +91,9 @@ Define the functional and non-functional requirements for the **Payments Process
 
 ### FR-9 — Validation Rules (Appendix C, finalized for our system)
 - Amount: `> 0`, `<= 1,000,000`, max 2 decimal places.
-- Source/destination accounts: required, must differ from each other, must match a defined format (regex, e.g. alphanumeric 8–20 chars), must "exist" — for this training system, accounts are **not a separately managed entity**; we validate **format only** (documented assumption — see §7 Assumptions) unless instructor says otherwise.
-- Currency: must be one of a supported ISO 4217 subset, e.g. `USD, EUR, GBP` (configurable list).
+- Source account: required, must be a `sourceAccountId` referencing an **existing, `ACTIVE`** `Account` record (FR-0) — unknown/inactive ID → `INVALID_ACCOUNT`.
+- Destination account: required, must differ from the resolved source account's `accountNumber`, must match a defined format (regex, e.g. alphanumeric 8–20 chars) — this remains **format-only** validation (it's an external party's account, not one we manage — see MEM-017).
+- Currency: must be one of **`INR`, `USD`** (customer-confirmed, MEM-018) **and must equal the selected source account's currency** — mismatch → `INVALID_CURRENCY`.
 - Idempotency key: optional, if provided must be unique per payment.
 
 ### FR-10 — Status Transition Rules (state machine — Appendix C)
@@ -101,6 +108,23 @@ SENT       → FAILED
 ```
 Any other transition attempt (including from a terminal state `COMPLETED`/`FAILED`) is rejected with `INVALID_STATUS_TRANSITION` (400). **No transition ever goes "backwards."** `COMPLETED` and `FAILED` are terminal.
 
+### FR-11 — Rate Limiting (new, MEM-020)
+- **FR-11.1** All API endpoints are protected by a token-bucket rate limiter sized for a peak of ~40,000 requests/minute (≈667 req/sec) system-wide, plus a per-client (IP-based) bucket to prevent any single caller from starving others.
+- **FR-11.2** A request that exceeds the limit receives `429 Too Many Requests` with error code `RATE_LIMIT_EXCEEDED`, a `Retry-After` header, and `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` headers.
+- **FR-11.3** Rate limiting is implemented as a single cross-cutting servlet filter (`RateLimitFilter`) ahead of the controller layer — no per-controller duplication.
+
+### FR-12 — KPI Dashboard & Analytics (new, MEM-019)
+- **FR-12.1** `GET /analytics/summary` returns: total payments (in a time window, default: today), success rate (%), failure rate (%), average processing time (CREATED→terminal, in seconds), throughput (payments/minute, trailing window), total volume per currency (`INR`, `USD` — no conversion/aggregation across currencies), and a top-N breakdown of failure `errorCode`s.
+- **FR-12.2** `GET /analytics/trend` returns a simple time-bucketed series (e.g. payments per hour for the last 24h) of counts by status, for a basic trend chart.
+- **FR-12.3** These are **read-only, computed-on-demand** endpoints (aggregation queries over `payment`/`payment_status_history`), not a separate stored-metrics subsystem — appropriate for this data volume/timeframe.
+- **FR-12.4** The dashboard deliberately excludes non-actionable/"fancy" metrics (e.g. no gamification, no metrics that don't correspond to a real payments-ops question) per explicit customer guidance.
+
+### FR-13 — Security Hardening (new, MEM-022)
+- **FR-13.1** All error responses (including rate-limit and validation errors) use the existing consistent `ApiError` shape and never leak stack traces or internal exception messages.
+- **FR-13.2** All mutating endpoints are protected by Bean Validation + parameterized JPA queries (no string-concatenated SQL) to prevent injection.
+- **FR-13.3** Responses set secure headers (`X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy` on the frontend, restrictive CORS allow-list) — see `05-ARCHITECTURE.md` §7.
+
+
 ## 4. Non-Functional Requirements (NFRs)
 
 | ID | Requirement |
@@ -111,28 +135,45 @@ Any other transition attempt (including from a terminal state `COMPLETED`/`FAILE
 | NFR-4 | **API documentation** — Swagger/OpenAPI available and kept in sync with actual endpoints. |
 | NFR-5 | **Testability** — business logic (validation, state transitions) must be unit-testable independent of the web layer and DB (per Appendix G guidance). |
 | NFR-6 | **Consistent error contract** — all errors return a predictable JSON shape `{errorCode, message, timestamp, ...}` with correct HTTP status per Appendix B mapping. |
-| NFR-7 | **Performance (light)** — no specific SLA required for a training project, but list/search endpoints must be paginated (avoid unbounded result sets). |
-| NFR-8 | **Concurrency (basic)** — two simultaneous status-transition requests on the same payment must not corrupt state (DB-level optimistic locking `@Version` — minimum viable protection; full concurrency handling is a stretch item per Appendix E). |
+| NFR-7 | **Performance** — list/search/analytics endpoints must be paginated (avoid unbounded result sets) and backed by indexes (`status`, `created_at`, `source_account_id`, `idempotency_key`) so p95 latency stays low even as data grows. |
+| NFR-8 | **Concurrency** — two simultaneous status-transition requests on the same payment must not corrupt state (DB-level optimistic locking `@Version` — minimum viable protection). At the target scale (NFR-10), the service layer is **stateless** so it can run as multiple horizontally-scaled instances behind a load balancer; the DB connection pool (HikariCP) is sized accordingly. |
 | NFR-9 | **Portability** — runs against MySQL via Spring Data JPA; tests can run against H2 without code changes (dialect-only config difference). |
+| NFR-10 | **Scale / Throughput** — system is designed and load-tested toward a peak of **~40,000 requests/minute** (≈667 req/sec) (customer target, MEM-020). This drives NFR-7/8/11/12 below. |
+| NFR-11 | **Rate limiting** — a token-bucket rate limiter (Bucket4j) protects every endpoint; breaches return `429 RATE_LIMIT_EXCEEDED` with `Retry-After`/`X-RateLimit-*` headers (FR-11, MEM-020). |
+| NFR-12 | **Reliability / Resilience** — the simulated send/complete steps are wrapped with a Resilience4j Circuit Breaker + bounded Retry so a burst of transient (simulated) failures degrades gracefully (fail-fast) instead of exhausting request threads (MEM-021). |
+| NFR-13 | **Durability** — the payment's status update and its audit-trail insert happen in the **same DB transaction** (never partially applied), and MySQL's durable storage engine (InnoDB, default) is used — no in-memory-only persistence in any deployed environment (MEM-021). |
+| NFR-14 | **Security** — no SQL/NoSQL injection (parameterized queries only), secure response headers, HTTPS in deployed environments, no leakage of internal errors/stack traces, request payload size limits, least-privilege DB credentials, dependency vulnerability scanning (stretch/CI) (FR-13, MEM-022). |
 
-## 5. Minimum Viable Data Model (Sprint 1 target — supersedes MEM-004 draft)
+## 5. Minimum Viable Data Model (Sprint 1 target — supersedes MEM-004 draft; updated post-customer-meeting MEM-017)
+
+### `account` (new)
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID (PK) | Generated server-side |
+| `label` | VARCHAR(100) | e.g. "Primary INR Savings" |
+| `account_number` | VARCHAR(20) | Unique, format-validated |
+| `currency` | VARCHAR(3) | `INR` or `USD` only |
+| `status` | VARCHAR(20) / ENUM | `ACTIVE`, `INACTIVE` |
+| `created_at` | TIMESTAMP | Set on insert |
 
 ### `payment`
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID (PK) | Generated server-side |
 | `amount` | DECIMAL(19,2) | > 0, <= 1,000,000 |
-| `currency` | VARCHAR(3) | ISO 4217 subset |
-| `source_account` | VARCHAR(20) | Required, format-validated |
-| `destination_account` | VARCHAR(20) | Required, format-validated, must differ from source |
+| `currency` | VARCHAR(3) | `INR` or `USD` only — must equal `source_account.currency` |
+| `source_account_id` | FK → `account.id` | **New** — replaces free-text `source_account`; must reference an `ACTIVE` account |
+| `destination_account` | VARCHAR(20) | Required, format-validated free text (external party — no existence check) |
 | `reference` | VARCHAR(255) | Optional |
 | `status` | VARCHAR(20) / ENUM | `CREATED, VALIDATED, SENT, COMPLETED, FAILED` |
 | `error_code` | VARCHAR(50) | Nullable, set only when `FAILED` |
 | `error_message` | VARCHAR(500) | Nullable |
 | `idempotency_key` | VARCHAR(100) | Nullable, **unique** constraint |
-| `created_at` | TIMESTAMP | Set on insert |
+| `created_at` | TIMESTAMP | Set on insert, **indexed** (NFR-7) |
 | `updated_at` | TIMESTAMP | Updated on every change |
 | `version` | BIGINT | Optimistic locking (NFR-8) |
+
+> Indexes (NFR-7/10): `idempotency_key` (unique), `status`, `created_at`, `source_account_id`.
 
 ### `payment_status_history` (append-only audit trail)
 | Field | Type | Notes |
@@ -146,32 +187,36 @@ Any other transition attempt (including from a terminal state `COMPLETED`/`FAILE
 | `triggered_by` | VARCHAR(20) | `SYSTEM` (no auth in scope) |
 | `occurred_at` | TIMESTAMP | |
 
-> Deliberately minimal — no separate `Account` entity yet (see Assumption A-2). Can be added later without breaking the API contract if instructor requires it.
+> `Account` is a genuinely managed entity now (MEM-017) — this supersedes the old "deliberately minimal, no separate Account entity" note. Destination remains free-text by design (external party, format-only).
 
-## 6. Error Code Contract (from brief's Appendix B — adopted as-is)
+## 6. Error Code Contract (from brief's Appendix B — adopted as-is, extended post-customer-meeting)
 
 | Error Code | Description | HTTP Status |
 |---|---|---|
 | VALIDATION_FAILED | Generic validation failure | 400 |
 | INSUFFICIENT_FUNDS | Reserved for future/simulated use | 400 |
-| INVALID_ACCOUNT | Account format invalid | 400 |
-| INVALID_CURRENCY | Currency not supported | 400 |
+| INVALID_ACCOUNT | Unknown/inactive `sourceAccountId`, or bad `destinationAccount` format, or source==destination | 400 |
+| INVALID_CURRENCY | Currency not supported (not `INR`/`USD`), or doesn't match source account's currency | 400 |
 | INVALID_AMOUNT | Amount zero/negative/invalid | 400 |
 | DUPLICATE_PAYMENT | Idempotency key collision | 409 |
 | INVALID_STATUS_TRANSITION | Illegal transition attempted | 400 |
 | PAYMENT_NOT_FOUND | Unknown payment ID | 404 |
+| ACCOUNT_NOT_FOUND | Unknown account ID (`GET /accounts/{id}`) | 404 |
 | PROCESSING_ERROR | Internal error during simulated processing | 500 |
 | NETWORK_ERROR | Simulated network/transmission failure | 503 |
+| **RATE_LIMIT_EXCEEDED** *(new, MEM-020)* | Client exceeded the token-bucket rate limit | 429 |
 
 ## 7. Assumptions
 
 - **A-1:** Single user, no auth — confirmed by brief; `triggered_by` in audit trail will always read `SYSTEM` (or `CLIENT` for the initial creation) rather than a real username.
-- **A-2:** No separate `Account`/`Customer` master entity in the core build — accounts are free-text identifiers validated by format/pattern only, not existence-checked against a real ledger. (Flag to revisit with instructor if they expect account existence checks.)
+- **A-2:** ~~No separate `Account`/`Customer` master entity~~ **Superseded by MEM-017 (31 Jul 2026 customer meeting).** A real `Account` entity now exists — the operator's own accounts are existence- and status-checked (`ACTIVE`) as the payment **source**. The **destination** account remains free-text, format-only validated (external party, not a managed entity) — this narrower assumption stands.
 - **A-3:** "Sent to destination system" and "processing/confirmation" are **simulated** — e.g. an internal service call with an artificial delay and a configurable success/failure rate — no real payment gateway integration (explicit in brief).
-- **A-4:** Validation (`CREATED→VALIDATED`) happens synchronously right after creation in the core build, not via an external queue — keeps Sprint 1 scope small; can evolve into async processing (Appendix E-adjacent) later.
+- **A-4:** Validation (`CREATED→VALIDATED`) happens synchronously right after creation in the core build, not via an external queue — keeps Sprint 1 scope small; can evolve into async processing (Appendix E-adjacent) later. Resilience4j Circuit Breaker/Retry (MEM-021) wraps the simulated send/complete steps so this remains safe under load.
 - **A-5:** Idempotency key, if omitted by the client, means no duplicate protection is requested for that call — each such request creates a new payment. (We recommend the frontend always generates one, but the API doesn't mandate it.) **The key is scoped to a single client submission attempt (generated fresh per attempt, client-side), never derived from payment field values — see FR-1.1a for full rationale and the scenario table below.**
-- **A-6:** Currency support list is small and hardcoded/config-driven initially (e.g. USD, EUR, GBP) — not a full ISO 4217 table.
+- **A-6:** ~~Currency support list is small and hardcoded (USD, EUR, GBP)~~ **Superseded by MEM-018 (customer-confirmed 31 Jul 2026): exactly `INR` and `USD`**, each `Account` denominated in one; no conversion between them.
 - **A-7:** MySQL is used per team's VM/tooling (MEM-003); schema managed via Flyway migrations, inspected/administered via MySQL Workbench.
+- **A-8 (new):** Rate limiting (MEM-020) is enforced in-application (Bucket4j filter) for Sprint 1; a Redis-backed bucket (for correctness across multiple horizontally-scaled instances) and/or an infra-level gateway limiter are noted as a Sprint 2+/production evolution, not required for the training deliverable's single-instance demo.
+- **A-9 (new):** KPI/analytics endpoints (MEM-019) compute aggregates on-demand from existing tables — no separate metrics-store/time-series DB is introduced, appropriate for this data volume.
 
 ## 7a. Idempotency — Worked Scenarios (disambiguates FR-1.5 / FR-1.1a)
 
@@ -186,28 +231,45 @@ Any other transition attempt (including from a terminal state `COMPLETED`/`FAILE
 
 ## 8. Out of Scope
 
-See `01-CONTEXT.md` §4 — restated here for completeness: authentication/multi-user, real payment gateway integration, batch payments, scheduling/recurring payments, notifications, analytics/reporting dashboards, multi-currency conversion, payment reversal/cancellation, full pessimistic concurrency control. These are Appendix E candidates only if core (Phase 5 Sprint 1) finishes early.
+See `01-CONTEXT.md` §4 — restated here for completeness: full login/auth system, real payment gateway integration, batch payments, scheduling/recurring payments, notifications, currency conversion/FX rates between INR and USD, payment reversal/cancellation, full pessimistic concurrency control. `Account` entity, KPI dashboard, basic analytics, and rate limiting are now **in scope** (see §9 revision note below), superseding their earlier "out of scope" listing.
 
-## 9. Acceptance Criteria (Sprint 1 / Core "Definition of Done")
+## 9. Revision Note — Post-Customer-Meeting (31 Jul 2026)
 
-- [ ] Can create a payment via API with minimal valid fields → returns `201` with `CREATED` status + Location header/ID.
+This SRS was revised after the team's first customer meeting. Summary of every change made in this revision, each traceable to a `02-MEMORY.md` entry:
+- **FR-0** (Account Management) added — MEM-017.
+- **FR-1.1**, **FR-9**, data model (§5), assumptions A-2/A-6 updated for `Account` entity + `sourceAccountId` + INR/USD-only currencies — MEM-017/018.
+- **FR-11** (Rate Limiting), **NFR-10/11** added — MEM-020.
+- **FR-12** (KPI Dashboard & Analytics) added — MEM-019.
+- **FR-13** (Security Hardening), **NFR-12/13/14** added — MEM-021/022.
+- Error code contract (§6) extended with `ACCOUNT_NOT_FOUND`, `RATE_LIMIT_EXCEEDED`.
+- No functional requirement from the original SRS was removed — this is a pure extension of scope, not a redesign of the core payment lifecycle (which the customer did not ask to change).
+
+## 10. Acceptance Criteria (Sprint 1 / Core "Definition of Done")
+
+- [ ] Can create a payment via API with minimal valid fields (incl. a valid `sourceAccountId`) → returns `201` with `CREATED` status + Location header/ID.
 - [ ] Submitting the same idempotency key twice does **not** create a duplicate row; returns the original payment.
-- [ ] Invalid amount/currency/account submission is rejected with correct `errorCode` + `400`.
+- [ ] Invalid amount/currency/account submission is rejected with correct `errorCode` + `400` (incl. unknown/inactive `sourceAccountId` → `INVALID_ACCOUNT`, currency ≠ source account currency → `INVALID_CURRENCY`).
 - [ ] A newly created payment automatically progresses to `VALIDATED` (or `FAILED` with reason) without manual client intervention.
 - [ ] A `VALIDATED` payment can be progressed to `SENT` then `COMPLETED` (or `FAILED` at either stage), each transition recorded in history.
 - [ ] `GET /payments/{id}` returns current state; `GET /payments/{id}/history` returns full ordered audit trail.
 - [ ] Attempting an illegal transition (e.g. force `COMPLETED → CREATED` if such an endpoint existed) is rejected with `INVALID_STATUS_TRANSITION`.
 - [ ] `GET /payments?status=FAILED` (or similar) filters correctly.
+- [ ] `GET /accounts` returns the operator's accounts; `GET /accounts/{id}` returns one.
+- [ ] `GET /analytics/summary` returns success rate, failure rate, average processing time, throughput, and volume by currency computed from real data.
+- [ ] Exceeding the configured rate limit returns `429 RATE_LIMIT_EXCEEDED` with `Retry-After` header.
 - [ ] Swagger UI reachable and reflects all of the above.
-- [ ] Unit tests cover: validation rules, state machine transitions (valid + invalid), idempotency logic.
+- [ ] Unit tests cover: validation rules, state machine transitions (valid + invalid), idempotency logic, rate-limit filter, account validation.
 
-## 10. Open Questions for Instructor ("Customer") — resolved with defaults (MEM-006/007), revisit if instructor disagrees
+## 11. Open Questions for Instructor ("Customer") — resolved with defaults, updated post-31-Jul-2026 meeting
 
 1. ~~Do duplicate idempotency-key submissions return `200 OK` with the existing payment, or `409 Conflict`?~~ → **Resolved (MEM-006): `200 OK` + existing payment.**
-2. Should account existence be validated against some account registry, or is format-only validation acceptable (A-2)? → **Still open — low risk, format-only validation stands as default (A-2).**
+2. ~~Should account existence be validated against some account registry, or is format-only validation acceptable (A-2)?~~ → **Resolved (MEM-017, 31 Jul 2026): existence-check via a real `Account` entity for the source account; destination remains format-only.**
 3. ~~Is a fully automatic lifecycle acceptable, or do they want explicit client-triggered transition endpoints?~~ → **Resolved (MEM-007): both** — auto-progression + explicit `POST /payments/{id}/{validate|send|complete}` endpoints.
+4. ~~Which currencies should be supported?~~ → **Resolved (MEM-018, 31 Jul 2026): INR and USD only.**
+5. **Still open (low risk):** Exact per-client rate-limit bucket size vs. the 40,000 req/min system-wide figure (is 40k a *total* system ceiling, or expected *per client*?) — our default (MEM-020): 40k/min is the **system-wide** ceiling; per-client buckets are a smaller fair-share sub-limit. Confirm at next check-in.
+6. **Still open (low risk):** Should `Account.balance` be modeled/enforced (enabling a real `INSUFFICIENT_FUNDS` check), or is balance out of scope for this training system? Our default: **out of scope** — accounts have no balance field in Sprint 1; `INSUFFICIENT_FUNDS` remains a reserved, unused error code.
 
 ---
 
-**Status: Draft → defaults accepted for Sprint 1 planning purposes (see MEM-006, MEM-007).** Proceeding to **Phase 2: Architecture & Design Patterns**. Any of these can be revisited later at negligible cost if the instructor gives different guidance.
+**Status: Draft → defaults accepted for Sprint 1 planning purposes; revised 31 Jul 2026 post-customer-meeting (see MEM-006, MEM-007, MEM-017–022).** Proceeding to **Phase 2: Architecture & Design Patterns** update. Any of these can be revisited later at negligible cost if the instructor gives different guidance.
 

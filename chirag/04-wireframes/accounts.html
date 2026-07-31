@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PayPulse - Accounts (Wireframe)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse <span class="tag">Wireframe - Dummy Data</span></div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html" class="active">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Your Accounts</h1>
+    <p>These are your own accounts. Select one as the source account when creating a payment. Only ACTIVE accounts can be used to pay from.</p>
+  </div>
+
+  <div class="card">
+    <div class="acc-grid" id="accGrid"></div>
+  </div>
+
+  <p class="footer-note">Accounts are pre-provisioned for this MVP (no "add account" screen yet - see <code>../06-questions-for-next-meeting.md</code>). Data source: dummy JSON.</p>
+</main>
+
+<script src="assets/dummy-data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  var grid = document.getElementById("accGrid");
+  window.DUMMY_DATA.accounts.forEach(function (acc) {
+    var div = document.createElement("div");
+    div.className = "acc-card";
+    div.innerHTML =
+      '<div class="acc-label">' + acc.label + '</div>' +
+      '<div class="acc-number">' + acc.accountNumber + '</div>' +
+      '<div>Currency: <strong>' + acc.currency + '</strong></div>' +
+      '<div class="acc-status ' + acc.status + '">' + acc.status + '</div>';
+    grid.appendChild(div);
+  });
+</script>
+</body>
+</html>
+
