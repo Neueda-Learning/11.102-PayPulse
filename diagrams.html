@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PayPulse — UML Diagrams</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f1117; color: #e6edf3; min-height: 100vh; }
+
+    header {
+      background: linear-gradient(135deg, #1a1f2e 0%, #161b27 100%);
+      border-bottom: 1px solid #30363d;
+      padding: 22px 40px;
+      display: flex; align-items: center; gap: 18px;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    header .logo { font-size: 2rem; }
+    header h1 {
+      font-size: 1.6rem; font-weight: 700;
+      background: linear-gradient(90deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    header p { font-size: 0.82rem; color: #8b949e; margin-top: 2px; }
+
+    nav {
+      background: #161b27; border-bottom: 1px solid #21262d;
+      padding: 0 40px; display: flex; gap: 2px; overflow-x: auto;
+    }
+    nav button {
+      background: none; border: none; color: #8b949e; font-size: 0.9rem;
+      padding: 13px 16px; cursor: pointer; border-bottom: 3px solid transparent;
+      transition: all 0.2s; white-space: nowrap; font-family: inherit;
+    }
+    nav button:hover { color: #e6edf3; }
+    nav button.active { color: #58a6ff; border-bottom-color: #58a6ff; font-weight: 600; }
+
+    main { padding: 28px 40px; max-width: 1400px; margin: 0 auto; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .section-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+    .section-desc { font-size: 0.88rem; color: #8b949e; margin-bottom: 22px; line-height: 1.6; }
+
+    .diagram-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+
+    .diagram-card {
+      background: #161b27; border: 1px solid #21262d; border-radius: 12px; overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .diagram-card:hover { border-color: #388bfd55; box-shadow: 0 0 0 3px #388bfd15; }
+
+    .card-header {
+      padding: 13px 22px; background: #1c2130; border-bottom: 1px solid #21262d;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .badge {
+      background: #388bfd22; color: #58a6ff; font-size: 0.7rem; font-weight: 700;
+      padding: 3px 10px; border-radius: 20px; text-transform: uppercase;
+      letter-spacing: 0.05em; flex-shrink: 0;
+    }
+    .badge.green  { background: #2ea04322; color: #3fb950; }
+    .badge.yellow { background: #d2992222; color: #d29922; }
+    .badge.red    { background: #f8514922; color: #f85149; }
+    .badge.purple { background: #bc8cff22; color: #bc8cff; }
+
+    .card-header h3 { font-size: 0.96rem; font-weight: 600; color: #e6edf3; }
+    .card-header .note { margin-left: auto; font-size: 0.78rem; color: #8b949e; }
+
+    .card-body { padding: 24px; overflow-x: auto; background: #0d1117; }
+    .card-body .mermaid { display: flex; justify-content: center; min-height: 40px; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { padding: 10px 14px; border: 1px solid #21262d; text-align: center; }
+    th { background: #1c2130; color: #8b949e; font-weight: 600; }
+    td { color: #e6edf3; }
+    td:first-child { font-weight: 700; color: #58a6ff; text-align: left; }
+
+    /* Q&A */
+    .qa-list { display: flex; flex-direction: column; gap: 14px; }
+    .qa-item { background: #161b27; border: 1px solid #21262d; border-radius: 10px; overflow: hidden; }
+    .qa-item-header { padding: 13px 20px; background: #1c2130; border-bottom: 1px solid #21262d; display: flex; align-items: flex-start; gap: 12px; }
+    .qa-num { font-size: 0.75rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; white-space: nowrap; margin-top: 2px; flex-shrink: 0; }
+    .qa-item-header h4 { font-size: 0.94rem; color: #e6edf3; line-height: 1.5; }
+    .qa-body { padding: 14px 20px; }
+    .qa-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; font-size: 0.87rem; line-height: 1.6; }
+    .qa-row:last-child { margin-bottom: 0; }
+    .qa-label { font-weight: 700; font-size: 0.72rem; padding: 2px 9px; border-radius: 4px; white-space: nowrap; margin-top: 2px; flex-shrink: 0; }
+    .qa-label.default { background: #58a6ff22; color: #58a6ff; }
+    .qa-label.why { background: #bc8cff22; color: #bc8cff; }
+    .qa-row p { color: #c9d1d9; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+    /* ── Theme variables ── */
+    :root {
+      --bg: #0f1117;
+      --surface: #161b27;
+      --surface2: #1c2130;
+      --border: #21262d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --text-body: #c9d1d9;
+      --card-body: #0d1117;
+      --header-bg1: #1a1f2e;
+      --header-bg2: #161b27;
+    }
+    body.light {
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --surface2: #f0f2f5;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --text-muted: #57606a;
+      --text-body: #3d444d;
+      --card-body: #f6f8fa;
+      --header-bg1: #0969da;
+      --header-bg2: #0550ae;
+    }
+
+    body { background: var(--bg); color: var(--text); }
+    header { background: linear-gradient(135deg, var(--header-bg1) 0%, var(--header-bg2) 100%); }
+    nav { background: var(--surface); border-bottom-color: var(--border); }
+    nav button { color: var(--text-muted); }
+    nav button:hover { color: var(--text); }
+    nav button.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+    body.light nav button.active { color: #0969da; border-bottom-color: #0969da; }
+    .diagram-card { background: var(--surface); border-color: var(--border); }
+    .card-header { background: var(--surface2); border-bottom-color: var(--border); }
+    .card-header h3 { color: var(--text); }
+    .card-header .note { color: var(--text-muted); }
+    .card-body { background: var(--card-body); }
+    .section-desc { color: var(--text-muted); }
+    th { background: var(--surface2); color: var(--text-muted); }
+    th, td { border-color: var(--border); }
+    td { color: var(--text); }
+    .qa-item { background: var(--surface); border-color: var(--border); }
+    .qa-item-header { background: var(--surface2); border-bottom-color: var(--border); }
+    .qa-item-header h4 { color: var(--text); }
+    .qa-row p { color: var(--text-body); }
+
+    /* Theme toggle button */
+    .theme-btn {
+      margin-left: auto;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 0.82rem;
+      padding: 7px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+    .theme-btn:hover { background: rgba(255,255,255,0.22); }
+    body.light .theme-btn { background: rgba(0,0,0,0.12); border-color: rgba(0,0,0,0.2); color: #fff; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">💳</div>
+  <div>
+    <h1>PayPulse — System Diagrams</h1>
+    <p>Interactive visualization · Class · Sequence · State · Entity · Questions</p>
+  </div>
+  <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙 Dark</button>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('class',this)">📐 Class Diagram</button>
+  <button onclick="showTab('sequence',this)">🔁 Sequence Diagrams</button>
+  <button onclick="showTab('state',this)">🔀 State Machine</button>
+  <button onclick="showTab('entity',this)">🗄️ Entity Diagram</button>
+  <button onclick="showTab('questions',this)">❓ Questions</button>
+</nav>
+
+<main>
+
+  <!-- ══════ CLASS DIAGRAM ══════ -->
+  <div class="section active" id="tab-class">
+    <div class="section-title">📐 Class Diagram</div>
+    <div class="section-desc">Full system class structure across all layers: API, Business Logic, Domain entities, and Data Access.</div>
+    <div class="diagram-grid">
+      <div class="diagram-card">
+        <div class="card-header">
+          <span class="badge">Class</span>
+          <h3>Full System Class Diagram</h3>
+          <span class="note">PayPulse v1</span>
+        </div>
+        <div class="card-body">
+          <div class="mermaid">
+classDiagram
+    direction TB
+
+    class PaymentController {
+        -PaymentService paymentService
+        +create(CreatePaymentRequest) ResponseEntity
+        +getById(UUID) ResponseEntity
+        +list(PaymentStatus) ResponseEntity
+        +getHistory(UUID id) ResponseEntity
+        +validatePayment(UUID id) ResponseEntity
+        +sendPayment(UUID id) ResponseEntity
+        +completePayment(UUID id) ResponseEntity
+    }
+    class CreatePaymentRequest {
+        +BigDecimal amount
+        +String currency
+        +String sourceAccount
+        +String destinationAccount
+        +String reference
+        +String idempotencyKey
+    }
+    class PaymentResponse {
+        +UUID id
+        +BigDecimal amount
+        +String currency
+        +String sourceAccount
+        +String destinationAccount
+        +PaymentStatus status
+        +String errorCode
+        +String errorMessage
+        +Instant createdAt
+        +Instant updatedAt
+    }
+    class PaymentHistoryResponse {
+        +UUID id
+        +PaymentStatus previousStatus
+        +PaymentStatus newStatus
+        +String errorCode
+        +String triggeredBy
+        +Instant occurredAt
+    }
+    class PaymentMapper {
+        interface
+        +toEntity(CreatePaymentRequest) Payment
+        +toResponse(Payment) PaymentResponse
+        +toHistoryResponse(PaymentStatusHistory) PaymentHistoryResponse
+    }
+    class GlobalExceptionHandler {
+        +handlePaymentNotFound(PaymentNotFoundException) ResponseEntity
+        +handleInvalidTransition(InvalidStatusTransitionException) ResponseEntity
+        +handleValidation(MethodArgumentNotValidException) ResponseEntity
+        +handleGeneric(Exception) ResponseEntity
+    }
+    class ApiError {
+        +String errorCode
+        +String message
+        +Instant timestamp
+        +String path
+    }
+    class PaymentService {
+        -PaymentRepository paymentRepository
+        -IdempotencyService idempotencyService
+        -StatusTransitionEngine transitionEngine
+        -PaymentMapper mapper
+        +createPayment(CreatePaymentRequest) Payment
+        +getById(UUID) Payment
+        +list(PaymentStatus, Pageable) Page
+        +getHistory(UUID) List
+        +triggerValidate(UUID) Payment
+        +triggerSend(UUID) Payment
+        +triggerComplete(UUID) Payment
+    }
+    class IdempotencyService {
+        -PaymentRepository paymentRepository
+        +findExisting(String idempotencyKey) Optional
+    }
+    class StatusTransitionEngine {
+        -Map states
+        -ValidationChain validationChain
+        +validate(Payment) Payment
+        +send(Payment) Payment
+        +complete(Payment) Payment
+        -recordHistory(Payment, PaymentStatus, PaymentStatus) void
+    }
+    class PaymentState {
+        interface
+        +status() PaymentStatus
+        +validate(Payment, ValidationChain) TransitionResult
+        +send(Payment) TransitionResult
+        +complete(Payment) TransitionResult
+    }
+    class CreatedState {
+        +validate(Payment, ValidationChain) TransitionResult
+        +send(Payment) TransitionResult
+        +complete(Payment) TransitionResult
+    }
+    class ValidatedState {
+        +validate(Payment, ValidationChain) TransitionResult
+        +send(Payment) TransitionResult
+        +complete(Payment) TransitionResult
+    }
+    class SentState {
+        +validate(Payment, ValidationChain) TransitionResult
+        +send(Payment) TransitionResult
+        +complete(Payment) TransitionResult
+    }
+    class CompletedState {
+        +validate(Payment, ValidationChain) TransitionResult
+        +send(Payment) TransitionResult
+        +complete(Payment) TransitionResult
+    }
+    class FailedState {
+        +validate(Payment, ValidationChain) TransitionResult
+        +send(Payment) TransitionResult
+        +complete(Payment) TransitionResult
+    }
+    class TransitionResult {
+        +PaymentStatus newStatus
+        +String errorCode
+        +String errorMessage
+        +boolean success
+    }
+    class ValidationChain {
+        -List validators
+        +runAll(Payment) List
+    }
+    class PaymentValidator {
+        interface
+        +validate(Payment) Optional
+    }
+    class AmountValidator {
+        +validate(Payment) Optional
+    }
+    class CurrencyValidator {
+        -Set supportedCurrencies
+        +validate(Payment) Optional
+    }
+    class AccountValidator {
+        +validate(Payment) Optional
+    }
+    class ValidationError {
+        +String errorCode
+        +String message
+    }
+    class Payment {
+        +UUID id
+        +BigDecimal amount
+        +String currency
+        +String sourceAccount
+        +String destinationAccount
+        +String reference
+        +PaymentStatus status
+        +String errorCode
+        +String errorMessage
+        +String idempotencyKey
+        +Instant createdAt
+        +Instant updatedAt
+        +Long version
+    }
+    class PaymentStatusHistory {
+        +UUID id
+        +UUID paymentId
+        +PaymentStatus previousStatus
+        +PaymentStatus newStatus
+        +String errorCode
+        +String errorMessage
+        +String triggeredBy
+        +Instant occurredAt
+    }
+    class PaymentStatus {
+        enumeration
+        CREATED
+        VALIDATED
+        SENT
+        COMPLETED
+        FAILED
+    }
+    class PaymentRepository {
+        interface
+        +findByIdempotencyKey(String) Optional
+        +findByStatus(PaymentStatus, Pageable) Page
+        +findByReferenceContaining(String, Pageable) Page
+    }
+    class PaymentStatusHistoryRepository {
+        interface
+        +findByPaymentIdOrderByOccurredAtAsc(UUID) List
+    }
+
+    PaymentController --> PaymentService
+    PaymentController --> PaymentMapper
+    PaymentController ..> CreatePaymentRequest
+    PaymentController ..> PaymentResponse
+    PaymentController ..> PaymentHistoryResponse
+    GlobalExceptionHandler ..> ApiError
+
+    PaymentService --> PaymentRepository
+    PaymentService --> PaymentStatusHistoryRepository
+    PaymentService --> IdempotencyService
+    PaymentService --> StatusTransitionEngine
+    PaymentService --> PaymentMapper
+
+    IdempotencyService --> PaymentRepository
+
+    StatusTransitionEngine --> PaymentState
+    StatusTransitionEngine --> ValidationChain
+    StatusTransitionEngine --> PaymentStatusHistoryRepository
+    StatusTransitionEngine ..> TransitionResult
+
+    PaymentState <|.. CreatedState
+    PaymentState <|.. ValidatedState
+    PaymentState <|.. SentState
+    PaymentState <|.. CompletedState
+    PaymentState <|.. FailedState
+
+    ValidationChain --> PaymentValidator
+    PaymentValidator <|.. AmountValidator
+    PaymentValidator <|.. CurrencyValidator
+    PaymentValidator <|.. AccountValidator
+    ValidationChain ..> ValidationError
+
+    PaymentMapper ..> Payment
+    PaymentMapper ..> PaymentStatusHistory
+
+    Payment --> PaymentStatus
+    PaymentStatusHistory --> PaymentStatus
+    PaymentRepository ..> Payment
+    PaymentStatusHistoryRepository ..> PaymentStatusHistory
+    Payment "1" --> "0..*" PaymentStatusHistory : has history
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ SEQUENCE DIAGRAMS ══════ -->
+  <div class="section" id="tab-sequence">
+    <div class="section-title">🔁 Sequence Diagrams</div>
+    <div class="section-desc">Step-by-step message flows for all 7 key payment scenarios — happy paths, failure cases, and edge cases.</div>
+    <div class="diagram-grid">
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge green">Seq 1</span><h3>Create Payment — Happy Path (auto-progresses to COMPLETED)</h3></div>
+        <div class="card-body"><div class="mermaid">
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Idem as IdempotencyService
+    participant Repo as PaymentRepository
+    participant Engine as StatusTransitionEngine
+    participant HistRepo as HistoryRepository
+    participant Mapper as PaymentMapper
+
+    Client->>Ctrl: POST /payments body + Idempotency-Key
+    Ctrl->>Ctrl: Bean validation
+    Ctrl->>Svc: createPayment(request)
+    Svc->>Idem: findExisting(idempotencyKey)
+    Idem->>Repo: findByIdempotencyKey(key)
+    Repo-->>Idem: empty
+    Idem-->>Svc: empty
+    Svc->>Mapper: toEntity(request)
+    Mapper-->>Svc: Payment status CREATED
+    Svc->>Repo: save(payment)
+    Repo-->>Svc: payment with id
+    Svc->>HistRepo: save history null to CREATED
+    Svc->>Engine: validate(payment)
+    Engine->>Engine: run ValidationChain
+    Engine->>Repo: save payment status VALIDATED
+    Engine->>HistRepo: save history CREATED to VALIDATED
+    Engine-->>Svc: payment VALIDATED
+    Svc->>Engine: send(payment)
+    Engine->>Engine: simulate transmission
+    Engine->>Repo: save payment status SENT
+    Engine->>HistRepo: save history VALIDATED to SENT
+    Engine-->>Svc: payment SENT
+    Svc->>Engine: complete(payment)
+    Engine->>Engine: simulate confirmation
+    Engine->>Repo: save payment status COMPLETED
+    Engine->>HistRepo: save history SENT to COMPLETED
+    Engine-->>Svc: payment COMPLETED
+    Svc-->>Ctrl: payment COMPLETED
+    Ctrl->>Mapper: toResponse(payment)
+    Mapper-->>Ctrl: PaymentResponse
+    Ctrl-->>Client: 201 Created + PaymentResponse
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge yellow">Seq 2</span><h3>Create Payment — Duplicate Idempotency Key</h3></div>
+        <div class="card-body"><div class="mermaid">
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Idem as IdempotencyService
+    participant Repo as PaymentRepository
+    participant Mapper as PaymentMapper
+
+    Client->>Ctrl: POST /payments same Idempotency-Key
+    Ctrl->>Svc: createPayment(request)
+    Svc->>Idem: findExisting(idempotencyKey)
+    Idem->>Repo: findByIdempotencyKey(key)
+    Repo-->>Idem: existingPayment
+    Idem-->>Svc: existingPayment
+    Note over Svc: Short-circuit, do NOT create new payment
+    Svc-->>Ctrl: existingPayment
+    Ctrl->>Mapper: toResponse(existingPayment)
+    Mapper-->>Ctrl: PaymentResponse
+    Ctrl-->>Client: 200 OK + existing PaymentResponse
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge red">Seq 3</span><h3>Failure Path — Validation Fails (CREATED to FAILED)</h3></div>
+        <div class="card-body"><div class="mermaid">
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Repo as PaymentRepository
+    participant Engine as StatusTransitionEngine
+    participant Chain as ValidationChain
+    participant HistRepo as HistoryRepository
+
+    Client->>Ctrl: POST /payments unsupported currency XYZ
+    Ctrl->>Svc: createPayment(request)
+    Svc->>Repo: save payment status CREATED
+    Svc->>HistRepo: save history null to CREATED
+    Svc->>Engine: validate(payment)
+    Engine->>Chain: runAll(payment)
+    Chain-->>Engine: ValidationError INVALID_CURRENCY
+    Engine->>Repo: save payment status FAILED errorCode INVALID_CURRENCY
+    Engine->>HistRepo: save history CREATED to FAILED
+    Engine-->>Svc: payment FAILED
+    Svc-->>Ctrl: payment FAILED
+    Ctrl-->>Client: 201 Created + PaymentResponse status FAILED
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge red">Seq 4</span><h3>Failure Path — Simulated Network Error at SENT stage</h3></div>
+        <div class="card-body"><div class="mermaid">
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Engine as StatusTransitionEngine
+    participant Repo as PaymentRepository
+    participant HistRepo as HistoryRepository
+
+    Client->>Ctrl: POST /payments/{id}/send
+    Ctrl->>Svc: triggerSend(id)
+    Svc->>Repo: findById(id)
+    Repo-->>Svc: payment status VALIDATED
+    Svc->>Engine: send(payment)
+    Engine->>Engine: simulate transmission injected failure
+    Engine->>Repo: save payment status FAILED errorCode NETWORK_ERROR
+    Engine->>HistRepo: save history VALIDATED to FAILED
+    Engine-->>Svc: payment FAILED
+    Svc-->>Ctrl: payment FAILED
+    Ctrl-->>Client: 200 OK + PaymentResponse status FAILED
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge red">Seq 5</span><h3>Illegal Transition Attempt (Rejected)</h3></div>
+        <div class="card-body"><div class="mermaid">
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Repo as PaymentRepository
+    participant Engine as StatusTransitionEngine
+    participant State as CompletedState
+
+    Client->>Ctrl: POST /payments/{id}/validate payment is COMPLETED
+    Ctrl->>Svc: triggerValidate(id)
+    Svc->>Repo: findById(id)
+    Repo-->>Svc: payment status COMPLETED
+    Svc->>Engine: validate(payment)
+    Engine->>State: validate(payment, chain)
+    State-->>Engine: TransitionResult success false INVALID_STATUS_TRANSITION
+    Engine-->>Svc: throws InvalidStatusTransitionException
+    Svc-->>Ctrl: propagates exception
+    Ctrl-->>Client: 400 Bad Request + ApiError INVALID_STATUS_TRANSITION
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge">Seq 6</span><h3>Get Payment Details + History (Read Path)</h3></div>
+        <div class="card-body"><div class="mermaid">
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Repo as PaymentRepository
+    participant HistRepo as HistoryRepository
+    participant Mapper as PaymentMapper
+
+    Client->>Ctrl: GET /payments/{id}
+    Ctrl->>Svc: getById(id)
+    Svc->>Repo: findById(id)
+    Repo-->>Svc: payment or empty
+    alt not found
+        Svc-->>Ctrl: throws PaymentNotFoundException
+        Ctrl-->>Client: 404 Not Found + ApiError PAYMENT_NOT_FOUND
+    else found
+        Svc-->>Ctrl: payment
+        Ctrl->>Mapper: toResponse(payment)
+        Mapper-->>Ctrl: PaymentResponse
+        Ctrl-->>Client: 200 OK + PaymentResponse
+    end
+    Client->>Ctrl: GET /payments/{id}/history
+    Ctrl->>Svc: getHistory(id)
+    Svc->>Repo: existsById(id)
+    Repo-->>Svc: true
+    Svc->>HistRepo: findByPaymentIdOrderByOccurredAtAsc(id)
+    HistRepo-->>Svc: List of PaymentStatusHistory
+    Svc-->>Ctrl: history list
+    Ctrl->>Mapper: toHistoryResponse(each)
+    Mapper-->>Ctrl: List of PaymentHistoryResponse
+    Ctrl-->>Client: 200 OK + history list
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge">Seq 7</span><h3>List / Search / Filter Payments</h3></div>
+        <div class="card-body"><div class="mermaid">
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Repo as PaymentRepository
+    participant Mapper as PaymentMapper
+
+    Client->>Ctrl: GET /payments?status=FAILED&page=0&size=20
+    Ctrl->>Svc: list(FAILED, pageable)
+    Svc->>Repo: findByStatus(FAILED, pageable)
+    Repo-->>Svc: Page of Payment
+    Svc-->>Ctrl: Page of Payment
+    Ctrl->>Mapper: toResponse(each)
+    Mapper-->>Ctrl: Page of PaymentResponse
+    Ctrl-->>Client: 200 OK + paginated list
+        </div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════ STATE DIAGRAM ══════ -->
+  <div class="section" id="tab-state">
+    <div class="section-title">🔀 Payment State Machine</div>
+    <div class="section-desc">All valid payment states and the transitions driven by validate / send / complete operations.</div>
+    <div class="diagram-grid">
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge purple">State</span><h3>Payment Status State Diagram</h3></div>
+        <div class="card-body"><div class="mermaid">
+stateDiagram-v2
+    [*] --> CREATED : POST /payments
+
+    CREATED --> VALIDATED : validate() succeeds
+    CREATED --> FAILED : validate() fails
+
+    VALIDATED --> SENT : send() succeeds
+    VALIDATED --> FAILED : send() fails NETWORK_ERROR
+
+    SENT --> COMPLETED : complete() succeeds
+    SENT --> FAILED : complete() fails PROCESSING_ERROR
+
+    COMPLETED --> [*]
+    FAILED --> [*]
+
+    note right of COMPLETED
+        Terminal state.
+        No transitions out.
+    end note
+
+    note right of FAILED
+        Terminal state.
+        Reachable from CREATED,
+        VALIDATED, or SENT.
+    end note
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge">Table</span><h3>Transition Table (authoritative)</h3></div>
+        <div class="card-body" style="padding:24px;">
+          <table>
+            <thead><tr><th>From \ To</th><th>CREATED</th><th>VALIDATED</th><th>SENT</th><th>COMPLETED</th><th>FAILED</th></tr></thead>
+            <tbody>
+              <tr><td>CREATED</td><td>❌</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td></tr>
+              <tr><td>VALIDATED</td><td>❌</td><td>❌</td><td>✅</td><td>❌</td><td>✅</td></tr>
+              <tr><td>SENT</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+              <tr><td>COMPLETED</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌ terminal</td></tr>
+              <tr><td>FAILED</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌ terminal</td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:0.82rem;color:#8b949e;margin-top:14px;">
+            Any ❌ transition at runtime → <code style="color:#f97316;background:#f9731611;padding:2px 6px;border-radius:4px;">InvalidStatusTransitionException</code> → <strong>400 INVALID_STATUS_TRANSITION</strong>
+          </p>
+        </div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge">Mapping</span><h3>State Pattern Class Mapping</h3></div>
+        <div class="card-body" style="padding:24px;">
+          <table>
+            <thead><tr><th>State (enum)</th><th>Class</th><th>Legal outgoing transitions</th></tr></thead>
+            <tbody>
+              <tr><td>CREATED</td><td>CreatedState</td><td>VALIDATED (validate success), FAILED (validate failure)</td></tr>
+              <tr><td>VALIDATED</td><td>ValidatedState</td><td>SENT (send success), FAILED (send failure)</td></tr>
+              <tr><td>SENT</td><td>SentState</td><td>COMPLETED (complete success), FAILED (complete failure)</td></tr>
+              <tr><td>COMPLETED</td><td>CompletedState</td><td>none — all methods throw illegal transition</td></tr>
+              <tr><td>FAILED</td><td>FailedState</td><td>none — all methods throw illegal transition</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ ENTITY DIAGRAM ══════ -->
+  <div class="section" id="tab-entity">
+    <div class="section-title">🗄️ Entity Relationship Diagram</div>
+    <div class="section-desc">Database schema — tables, columns, data types, primary keys, foreign keys, and cardinality relationships.</div>
+    <div class="diagram-grid">
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge purple">ER</span><h3>Payment System — Entity Relationship Diagram</h3><span class="note">JPA / PostgreSQL</span></div>
+        <div class="card-body"><div class="mermaid">
+erDiagram
+    PAYMENT {
+        UUID id PK
+        DECIMAL amount
+        VARCHAR currency
+        VARCHAR source_account
+        VARCHAR destination_account
+        VARCHAR reference
+        VARCHAR status
+        VARCHAR error_code
+        VARCHAR error_message
+        VARCHAR idempotency_key
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        BIGINT version
+    }
+    PAYMENT_STATUS_HISTORY {
+        UUID id PK
+        UUID payment_id FK
+        VARCHAR previous_status
+        VARCHAR new_status
+        VARCHAR error_code
+        VARCHAR error_message
+        VARCHAR triggered_by
+        TIMESTAMP occurred_at
+    }
+    PAYMENT ||--o{ PAYMENT_STATUS_HISTORY : "has history"
+        </div></div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge purple">Enum</span><h3>PaymentStatus Enum Values</h3></div>
+        <div class="card-body" style="padding:24px;">
+          <table>
+            <thead><tr><th>Value</th><th>Meaning</th><th>Terminal?</th><th>Set by</th></tr></thead>
+            <tbody>
+              <tr><td style="color:#3fb950">CREATED</td><td style="text-align:left">Payment record created, awaiting validation</td><td>❌</td><td>PaymentService.createPayment()</td></tr>
+              <tr><td style="color:#58a6ff">VALIDATED</td><td style="text-align:left">All validators passed (amount, currency, account)</td><td>❌</td><td>StatusTransitionEngine.validate()</td></tr>
+              <tr><td style="color:#d29922">SENT</td><td style="text-align:left">Payment transmitted to processing network</td><td>❌</td><td>StatusTransitionEngine.send()</td></tr>
+              <tr><td style="color:#bc8cff">COMPLETED</td><td style="text-align:left">Processing confirmed, payment settled</td><td>✅</td><td>StatusTransitionEngine.complete()</td></tr>
+              <tr><td style="color:#f85149">FAILED</td><td style="text-align:left">Validation or transmission error occurred</td><td>✅</td><td>StatusTransitionEngine (any stage)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="card-header"><span class="badge purple">Index</span><h3>Database Indexes &amp; Constraints</h3></div>
+        <div class="card-body" style="padding:24px;">
+          <table>
+            <thead><tr><th>Table</th><th>Column(s)</th><th>Type</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td>PAYMENT</td><td>id</td><td>PRIMARY KEY</td><td>Unique payment identity (UUID)</td></tr>
+              <tr><td>PAYMENT</td><td>idempotency_key</td><td>UNIQUE INDEX</td><td>Idempotent submission guard</td></tr>
+              <tr><td>PAYMENT</td><td>status</td><td>INDEX</td><td>Fast filter by status in list queries</td></tr>
+              <tr><td>PAYMENT</td><td>created_at</td><td>INDEX</td><td>Default sort — newest first</td></tr>
+              <tr><td>PAYMENT</td><td>reference</td><td>INDEX</td><td>Search by reference (partial match)</td></tr>
+              <tr><td>PAYMENT_STATUS_HISTORY</td><td>id</td><td>PRIMARY KEY</td><td>Unique history row identity</td></tr>
+              <tr><td>PAYMENT_STATUS_HISTORY</td><td>payment_id</td><td>FK + INDEX</td><td>Join to PAYMENT + timeline queries</td></tr>
+              <tr><td>PAYMENT_STATUS_HISTORY</td><td>occurred_at</td><td>INDEX</td><td>Timeline ordering within a payment</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════ QUESTIONS ══════ -->
+  <div class="section" id="tab-questions">
+    <div class="section-title">❓ Clarification Questions</div>
+    <div class="section-desc">Open questions for the instructor / customer. Each shows the working default assumption and why it matters. Bring to the next check-in and log answers in <code style="color:#58a6ff;background:#58a6ff11;padding:2px 6px;border-radius:4px;">02-MEMORY.md</code>.</div>
+
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+      <span style="background:#f8514922;color:#f85149;padding:5px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;">🔴 3 High Priority</span>
+      <span style="background:#d2992222;color:#d29922;padding:5px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;">🟡 4 Medium Priority</span>
+      <span style="background:#2ea04322;color:#3fb950;padding:5px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;">🟢 3 Lower Priority</span>
+    </div>
+
+    <div class="qa-list">
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#f8514922;color:#f85149;">Q1 🔴</span>
+          <h4>Idempotent duplicate submission — if a client submits the same Idempotency-Key twice, should we (a) return the existing payment with 200 OK, or (b) reject with 409 Conflict + DUPLICATE_PAYMENT?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>Option (a) — return 200 + existing payment (MEM-006). Brief Appendix B lists DUPLICATE_PAYMENT → 409, but the Considerations section asks the question explicitly — ambiguous by design.</p></div>
+          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Changes the API contract and frontend retry logic. Needs early confirmation to avoid a retrofit.</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#f8514922;color:#f85149;">Q2 🔴</span>
+          <h4>Auto-progression vs. explicit lifecycle — should a payment auto-progress CREATED → VALIDATED → SENT → COMPLETED immediately after creation, or require an explicit API call per transition?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>Both — auto-progress for the main demo flow, and also expose explicit /validate, /send, /complete endpoints for testing and manual control (MEM-007).</p></div>
+          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Affects demo realism and how much of the retry/error-handling story is visible to the user during the presentation.</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#f8514922;color:#f85149;">Q3 🔴</span>
+          <h4>Account existence validation — must source/destination accounts exist in a registry table, or is format-only validation (regex) sufficient?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>Format-only — no separate Account entity in core scope (SRS A-2).</p></div>
+          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>If real account existence is required, we need a seed accounts table and an INVALID_ACCOUNT check path — a data-model change best made early.</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q4 🟡</span>
+          <h4>Realistic delay vs. instant — should validation/processing simulate a visible delay, or resolve synchronously within the same HTTP request?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>Synchronous/instant for Sprint 1; can add artificial delay + polling in Sprint 2 for demo realism.</p></div>
+          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Determines whether the frontend needs polling / websockets or just a single request-response cycle.</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q5 🟡</span>
+          <h4>Supported currencies — is a small hardcoded list (USD, EUR, GBP) sufficient, or do you expect a broader ISO 4217 configurable set?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>Small hardcoded/config-driven list (SRS A-6).</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q6 🟡</span>
+          <h4>Failure simulation strategy — random (10% chance), deterministic triggers (magic account/amount), or configurable via an admin endpoint?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>Deterministic triggers for reliable test/demo (a reserved test account always fails) PLUS a small random chance for realism — gives both reliable test cases and a live-demo surprise element.</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#d2992222;color:#d29922;">Q7 🟡</span>
+          <h4>Search behavior — exact-match or partial/fuzzy match on reference? Case-sensitive?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>Partial, case-insensitive match on reference; exact match on id (UUID).</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#2ea04322;color:#3fb950;">Q8 🟢</span>
+          <h4>Pagination defaults — any preference on default page size or sort order for the payment list?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label default">Default</span><p>size=20, sorted by createdAt DESC (newest first).</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#2ea04322;color:#3fb950;">Q9 🟢</span>
+          <h4>Which Appendix E advanced feature would most impress? (concurrency demo, reporting/analytics, payment cancellation, or other)</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Helps prioritize Sprint 3 stretch work in the final 1-2 days rather than guessing.</p></div>
+        </div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-item-header">
+          <span class="qa-num" style="background:#2ea04322;color:#3fb950;">Q10 🟢</span>
+          <h4>Presentation emphasis — technical (design patterns / architecture) or product-demo style (user-facing flow), given the audience may include non-technical stakeholders?</h4>
+        </div>
+        <div class="qa-body">
+          <div class="qa-row"><span class="qa-label why">Why it matters</span><p>Shapes how we structure the live demo and any slides accompanying it.</p></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    securityLevel: 'loose',
+    themeVariables: {
+      primaryColor: '#1c2130',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#388bfd',
+      lineColor: '#58a6ff',
+      secondaryColor: '#161b27',
+      tertiaryColor: '#0d1117',
+      background: '#0d1117',
+      mainBkg: '#1c2130',
+      nodeBorder: '#388bfd',
+      clusterBkg: '#161b27',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#1c2130',
+      actorBkg: '#1c2130',
+      actorBorder: '#388bfd',
+      actorTextColor: '#e6edf3',
+      actorLineColor: '#8b949e',
+      signalColor: '#58a6ff',
+      signalTextColor: '#e6edf3',
+      labelBoxBkgColor: '#1c2130',
+      labelBoxBorderColor: '#388bfd',
+      labelTextColor: '#e6edf3',
+      loopTextColor: '#e6edf3',
+      noteBorderColor: '#bc8cff',
+      noteBkgColor: '#1c2130',
+      noteTextColor: '#e6edf3',
+      activationBorderColor: '#388bfd',
+      activationBkgColor: '#161b27',
+      sequenceNumberColor: '#58a6ff',
+      fontSize: '14px',
+      attributeBackgroundColorEven: '#1c2130',
+      attributeBackgroundColorOdd: '#161b27'
+    },
+    sequence: {
+      diagramMarginX: 30, diagramMarginY: 20,
+      actorMargin: 60, width: 160, height: 65,
+      boxMargin: 10, boxTextMargin: 5,
+      noteMargin: 10, messageMargin: 35,
+      useMaxWidth: true, showSequenceNumbers: false
+    },
+    classDiagram: { diagramPadding: 20, useMaxWidth: true },
+    er: { diagramPadding: 20, useMaxWidth: true }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Cache original diagram source before Mermaid replaces innerHTML
+    document.querySelectorAll('.mermaid').forEach(el => {
+      el.setAttribute('data-src', el.textContent.trim());
+    });
+    // Restore saved theme
+    if (localStorage.getItem('paypulse-theme') === 'light') applyLight();
+    else applyDark();
+    mermaid.run({ querySelector: '.mermaid' });
+  });
+
+  function applyDark() {
+    document.body.classList.remove('light');
+    document.getElementById('themeBtn').textContent = '🌙 Dark';
+    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'dark' });
+  }
+  function applyLight() {
+    document.body.classList.add('light');
+    document.getElementById('themeBtn').textContent = '☀️ Light';
+    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'default' });
+  }
+
+  function toggleTheme() {
+    const isLight = document.body.classList.toggle('light');
+    localStorage.setItem('paypulse-theme', isLight ? 'light' : 'dark');
+    if (isLight) {
+      document.getElementById('themeBtn').textContent = '☀️ Light';
+      mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'default' });
+    } else {
+      document.getElementById('themeBtn').textContent = '🌙 Dark';
+      mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'dark' });
+    }
+    // Re-render all diagrams with new theme
+    document.querySelectorAll('.mermaid').forEach(el => {
+      el.removeAttribute('data-processed');
+      const src = el.getAttribute('data-src');
+      if (src) el.textContent = src;
+    });
+    mermaid.run({ querySelector: '.mermaid' });
+  }
+
+  function showTab(name, btn) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
+
