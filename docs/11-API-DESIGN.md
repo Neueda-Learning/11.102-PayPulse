@@ -53,16 +53,17 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 **Response `200 OK`:**
 ```json
 [
-  { "id": "acc-001-...", "label": "Primary INR Savings", "accountNumber": "ACC1000001", "currency": "INR", "status": "ACTIVE" },
-  { "id": "acc-002-...", "label": "USD Wallet", "accountNumber": "ACC2000002", "currency": "USD", "status": "ACTIVE" }
+  { "id": "b2c3d4e5-1111-4a11-8a11-111111111111", "label": "Primary INR Savings", "accountNumber": "ACC1000001", "currency": "INR", "status": "ACTIVE" },
+  { "id": "c3d4e5f6-2222-4a22-8a22-222222222222", "label": "USD Wallet", "accountNumber": "ACC2000002", "currency": "USD", "status": "ACTIVE" }
 ]
 ```
-Used by the frontend to populate the **source-account dropdown** on the Create Payment screen (per customer directive: "user will see during payment option at UI and select one of them").
+Used by the frontend to populate the **source-account dropdown** on the Create Payment screen (per customer directive: "user will see during payment option at UI and select one of them"). This endpoint is also rate-limited (`429`) like every other endpoint — see §1.
 
 ## 4. `GET /accounts/{id}` — Get a Single Account (new)
 
 - **`200 OK`** — same shape as one array element above.
 - **`404 Not Found`** — `ACCOUNT_NOT_FOUND`.
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
 
 ---
 
@@ -73,7 +74,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 **Request Body:**
 ```json
 {
-  "sourceAccountId": "acc-001-1111-2222-3333",
+  "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111",
   "amount": 250.00,
   "currency": "INR",
   "destinationAccount": "ACC2000002",
@@ -97,7 +98,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 ```json
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "sourceAccountId": "acc-001-1111-2222-3333",
+  "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111",
   "amount": 250.00,
   "currency": "INR",
   "destinationAccount": "ACC2000002",
@@ -123,7 +124,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 ```json
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "sourceAccountId": "acc-001-1111-2222-3333",
+  "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111",
   "amount": 250.00,
   "currency": "INR",
   "destinationAccount": "ACC2000002",
@@ -139,6 +140,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 ```json
 { "errorCode": "PAYMENT_NOT_FOUND", "message": "No payment found with id a1b2...", "timestamp": "...", "path": "/api/v1/payments/a1b2..." }
 ```
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
 
 ---
 
@@ -160,7 +162,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 ```json
 {
   "content": [
-    { "id": "...", "sourceAccountId": "acc-001-...", "amount": 250.00, "currency": "INR", "status": "FAILED", "errorCode": "NETWORK_ERROR", "createdAt": "..." }
+    { "id": "...", "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111", "amount": 250.00, "currency": "INR", "status": "FAILED", "errorCode": "NETWORK_ERROR", "createdAt": "..." }
   ],
   "page": 0,
   "size": 20,
@@ -168,6 +170,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
   "totalPages": 1
 }
 ```
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
 
 ---
 
@@ -182,6 +185,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 ]
 ```
 - **`404 Not Found`** if the payment ID doesn't exist (`PAYMENT_NOT_FOUND`).
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
 
 ---
 
@@ -200,6 +204,7 @@ No request body. Behave exactly like the corresponding automatic step (§5), but
 ```json
 { "errorCode": "PROCESSING_ERROR", "message": "Payment was concurrently modified, please retry", "timestamp": "...", "path": "..." }
 ```
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
 
 ---
 

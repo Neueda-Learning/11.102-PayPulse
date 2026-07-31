@@ -1,0 +1,24 @@
+# Docker profile — overrides for the paypulse-backend container.
+# Spring datasource URL and credentials come from docker-compose environment variables;
+# they are already set via SPRING_DATASOURCE_* env vars injected by Docker Compose,
+# so we only need docker-specific overrides here.
+
+spring:
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+
+paypulse:
+  cors:
+    allowed-origins:
+      - "http://localhost:3000"
+      - "http://frontend"
+      - "http://paypulse-frontend"
+
+logging:
+  level:
+    com.paypulse: INFO
+    org.hibernate.SQL: WARN
+    org.flywaydb: INFO
+

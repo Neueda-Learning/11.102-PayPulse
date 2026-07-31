@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>PayPulse — Create Payment</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse</div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Create Payment</h1>
+    <p>Select your source account, enter the destination, and submit. The payment will be automatically processed.</p>
+  </div>
+
+  <div id="formNotice"></div>
+
+  <div class="card" id="formCard">
+    <h2>Payment Details</h2>
+    <form id="paymentForm">
+
+      <div class="form-row">
+        <label for="sourceAccount">Source Account *</label>
+        <select id="sourceAccount" required>
+          <option value="">Loading accounts...</option>
+        </select>
+        <div class="hint">Only your ACTIVE accounts are shown. Currency auto-matches.</div>
+      </div>
+
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label for="amount">Amount *</label>
+          <input type="number" id="amount" min="0.01" max="1000000" step="0.01"
+                 placeholder="e.g. 250.00" required/>
+        </div>
+        <div class="form-row">
+          <label for="currency">Currency</label>
+          <input type="text" id="currency" readonly placeholder="auto-filled"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="destinationAccount">Destination Account *</label>
+        <input type="text" id="destinationAccount" placeholder="e.g. ACC9998887"
+               minlength="8" maxlength="20" required/>
+        <div class="hint">8–20 alphanumeric characters. Must differ from your source account.</div>
+      </div>
+
+      <div class="form-row">
+        <label for="reference">Reference / Description (optional)</label>
+        <textarea id="reference" rows="2" maxlength="255" placeholder="e.g. Invoice #4471"></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="idempotencyKey">Idempotency Key (auto-generated)</label>
+        <input type="text" id="idempotencyKey" readonly aria-label="Idempotency Key"/>
+        <div class="hint">Generated once per submission. Prevents accidental double payments.</div>
+      </div>
+
+      <button type="submit" class="btn" id="submitBtn">Submit Payment</button>
+    </form>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none;">
+    <h2>Result</h2>
+    <div id="resultBody"></div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+let accounts = [];
+
+async function loadAccounts() {
+  const sel = document.getElementById('sourceAccount');
+  try {
+    accounts = await Accounts.list();
+    const active = accounts.filter(a => a.status === 'ACTIVE');
+    sel.innerHTML = '<option value="">— Select source account —</option>' +
+      active.map(a => `<option value="${a.id}" data-currency="${a.currency}">${a.label} — ${a.accountNumber} (${a.currency})</option>`).join('');
+    if (!active.length) {
+      sel.innerHTML = '<option value="">No active accounts available</option>';
+    }
+  } catch (err) {
+    sel.innerHTML = '<option value="">Could not load accounts</option>';
+  }
+}
+
+function syncCurrency() {
+  const opt = document.getElementById('sourceAccount').selectedOptions[0];
+  document.getElementById('currency').value = opt ? (opt.dataset.currency || '') : '';
+}
+
+document.getElementById('sourceAccount').addEventListener('change', syncCurrency);
+
+// Generate idempotency key on page load (refreshed after each submission)
+function refreshKey() {
+  document.getElementById('idempotencyKey').value = generateIdempotencyKey();
+}
+refreshKey();
+
+document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const noticeEl = document.getElementById('formNotice');
+  noticeEl.innerHTML = '';
+
+  const sourceAccountId = document.getElementById('sourceAccount').value;
+  const amount = parseFloat(document.getElementById('amount').value);
+  const currency = document.getElementById('currency').value;
+  const destinationAccount = document.getElementById('destinationAccount').value.trim();
+  const reference = document.getElementById('reference').value.trim();
+  const idempotencyKey = document.getElementById('idempotencyKey').value;
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
+
+  try {
+    const payment = await Payments.create(
+      { sourceAccountId, amount, currency, destinationAccount, reference },
+      idempotencyKey
+    );
+
+    const isOk = payment.status === 'COMPLETED';
+    const resultCard = document.getElementById('resultCard');
+    resultCard.style.display = 'block';
+    document.getElementById('resultBody').innerHTML = `
+      <div class="notice ${isOk ? 'success' : 'error'}">
+        ${isOk ? 'Payment completed successfully.' : `Payment ${payment.status}: ${payment.errorMessage || payment.errorCode}`}
+      </div>
+      <dl class="field-list">
+        <dt>Payment ID</dt><dd>${payment.id}</dd>
+        <dt>Status</dt><dd>${badgeHtml(payment.status)}</dd>
+        <dt>Amount</dt><dd>${formatMoney(payment.amount, payment.currency)}</dd>
+        <dt>Created</dt><dd>${formatDateTime(payment.createdAt)}</dd>
+      </dl>
+      <p style="margin-top:14px;">
+        <a class="btn ghost" href="payment-details.html?id=${encodeURIComponent(payment.id)}">View Full Details →</a>
+      </p>`;
+    resultCard.scrollIntoView({ behavior: 'smooth' });
+    refreshKey(); // new key for next submission
+  } catch (err) {
+    noticeEl.innerHTML = `<div class="notice error"><strong>${err.errorCode || 'ERROR'}</strong>: ${err.message || 'Submission failed.'}</div>`;
+    // On validation error: discard key so user gets a new one when they fix + resubmit
+    refreshKey();
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Payment';
+  }
+});
+
+loadAccounts();
+</script>
+</body>
+</html>
+

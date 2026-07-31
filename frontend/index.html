@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>PayPulse — Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse</div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Dashboard</h1>
+    <p id="subhead">Loading KPIs...</p>
+  </div>
+
+  <div id="kpiGrid" class="kpi-grid"></div>
+
+  <div class="card">
+    <h2>Volume by Currency</h2>
+    <div id="volumeGrid" class="kpi-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Payments — Last 24 Hours (Trend)</h2>
+    <div id="trendBars" class="bars"></div>
+    <div style="display:flex;gap:14px;margin-top:8px;font-size:11px;color:#6b7280;">
+      <span>🟢 Completed</span><span>🔴 Failed</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Top Failure Reasons</h2>
+    <table class="table">
+      <thead><tr><th>Error Code</th><th>Count (last 24h)</th></tr></thead>
+      <tbody id="failureTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+async function loadDashboard() {
+  try {
+    const [summary, trend] = await Promise.all([
+      Analytics.summary(),
+      Analytics.trend(24)
+    ]);
+
+    document.getElementById('subhead').textContent =
+      'Live data from the backend — refreshes every 30s.';
+
+    // KPI cards
+    document.getElementById('kpiGrid').innerHTML = [
+      kpiCard('Total Payments', summary.totalPayments, ''),
+      kpiCard('Success Rate', summary.successRatePct.toFixed(1) + '%', 'green', 'COMPLETED / total terminal'),
+      kpiCard('Failure Rate', summary.failureRatePct.toFixed(1) + '%', 'red', 'FAILED / total terminal'),
+      kpiCard('Avg. Processing Time', summary.avgProcessingTimeSeconds.toFixed(2) + 's', 'blue', 'CREATED to terminal'),
+      kpiCard('Throughput', summary.throughputPerMinute.toFixed(1) + '/min', 'blue', 'trailing window')
+    ].join('');
+
+    // Volume by currency
+    const vol = summary.volumeByCurrency || {};
+    document.getElementById('volumeGrid').innerHTML =
+      kpiCard('INR Volume', formatMoney(vol.INR || 0, 'INR'), '', 'sum of INR payments') +
+      kpiCard('USD Volume', formatMoney(vol.USD || 0, 'USD'), '', 'sum of USD payments');
+
+    // Trend bars
+    const buckets = (trend.buckets || []).slice(-12);
+    const maxVal = Math.max(1, ...buckets.map(b => b.created));
+    document.getElementById('trendBars').innerHTML = buckets.map(b => {
+      const cH = Math.round((b.completed / maxVal) * 100);
+      const fH = Math.round((b.failed / maxVal) * 100);
+      const label = new Date(b.periodStart).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      return `<div class="bar-col">
+        <div class="bar completed" style="height:${cH}%" title="${b.completed} completed"></div>
+        <div class="bar failed"    style="height:${fH}%" title="${b.failed} failed"></div>
+        <div class="bar-label">${label}</div>
+      </div>`;
+    }).join('');
+
+    // Top failure reasons
+    const reasons = summary.topFailureReasons || {};
+    const tbody = document.getElementById('failureTable');
+    const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="2" class="empty-state">No failures in the last 24h 🎉</td></tr>';
+    } else {
+      tbody.innerHTML = entries.map(([code, count]) =>
+        `<tr><td><code>${code}</code></td><td>${count}</td></tr>`
+      ).join('');
+    }
+
+  } catch (err) {
+    document.getElementById('subhead').textContent = '';
+    document.getElementById('kpiGrid').innerHTML =
+      `<div class="notice error">Could not load KPIs: ${err.message || 'Unknown error'}. Is the backend running?</div>`;
+  }
+}
+
+function kpiCard(label, value, colorClass, sub) {
+  return `<div class="kpi-card ${colorClass}">
+    <div class="label">${label}</div>
+    <div class="value">${value}</div>
+    ${sub ? `<div class="sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+loadDashboard();
+setInterval(loadDashboard, 30000); // auto-refresh every 30s
+</script>
+</body>
+</html>
+

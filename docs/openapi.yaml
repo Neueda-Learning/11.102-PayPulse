@@ -181,6 +181,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /payments/{id}/history:
     get:
@@ -204,6 +206,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /payments/{id}/validate:
     post:
@@ -237,6 +241,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /payments/{id}/send:
     post:
@@ -270,6 +276,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /payments/{id}/complete:
     post:
@@ -303,6 +311,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /analytics/summary:
     get:
@@ -405,6 +415,7 @@ components:
         id:
           type: string
           format: uuid
+          example: "b2c3d4e5-1111-4a11-8a11-111111111111"
         label:
           type: string
           example: "Primary INR Savings"
@@ -423,6 +434,7 @@ components:
         sourceAccountId:
           type: string
           format: uuid
+          example: "b2c3d4e5-1111-4a11-8a11-111111111111"
           description: Must reference an existing, ACTIVE Account (see GET /accounts)
         amount:
           type: number
