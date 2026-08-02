@@ -1,4 +1,4 @@
-package com.paypulse.payment.domain;
+package com.paypulse.payment;
 
 /**
  * Payment lifecycle states (state machine).
