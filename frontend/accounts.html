@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>PayPulse — Accounts</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse</div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Your Accounts</h1>
+    <p>These are your own accounts. Select one as the source when creating a payment. Only ACTIVE accounts can be used to pay from.</p>
+  </div>
+
+  <div class="card">
+    <div id="accGrid" class="acc-grid">
+      <div class="empty-state"><span class="spinner"></span> Loading accounts...</div>
+    </div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+async function loadAccounts() {
+  const grid = document.getElementById('accGrid');
+  try {
+    const accounts = await Accounts.list();
+    if (!accounts.length) {
+      grid.innerHTML = '<div class="empty-state">No accounts found.</div>';
+      return;
+    }
+    grid.innerHTML = accounts.map(acc => `
+      <div class="acc-card">
+        <div class="acc-label">${acc.label}</div>
+        <div class="acc-number">${acc.accountNumber}</div>
+        <div>Currency: <strong>${acc.currency}</strong></div>
+        <div class="acc-status ${acc.status}">${acc.status}</div>
+      </div>
+    `).join('');
+  } catch (err) {
+    grid.innerHTML = `<div class="notice error">Could not load accounts: ${err.message || 'Unknown error'}</div>`;
+  }
+}
+loadAccounts();
+</script>
+</body>
+</html>
+

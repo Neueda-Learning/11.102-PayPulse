@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>PayPulse — Payments</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse</div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Payments</h1>
+    <p>Browse, filter, and search all payments. Click any row to view full details.</p>
+  </div>
+
+  <div class="toolbar">
+    <label for="statusFilter" style="font-size:12px;font-weight:700;color:#374151;">Status</label>
+    <select id="statusFilter" aria-label="Filter by status">
+      <option value="">All statuses</option>
+      <option value="CREATED">CREATED</option>
+      <option value="VALIDATED">VALIDATED</option>
+      <option value="SENT">SENT</option>
+      <option value="COMPLETED">COMPLETED</option>
+      <option value="FAILED">FAILED</option>
+    </select>
+    <input type="search" id="searchBox" placeholder="Search by ID or reference..."
+           aria-label="Search payments"/>
+    <button class="btn ghost" id="clearBtn" type="button">Clear</button>
+    <button class="btn" id="refreshBtn" type="button">Refresh</button>
+  </div>
+
+  <div class="card" style="padding:0;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Payment ID</th>
+          <th>Source Account</th>
+          <th>Destination</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="paymentsBody">
+        <tr><td colspan="6" class="empty-state"><span class="spinner"></span> Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="pagination" style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:4px;"></div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+let currentPage = 0;
+let totalPages = 0;
+let accountMap = {};
+
+async function loadAccountMap() {
+  try {
+    const accs = await Accounts.list();
+    accs.forEach(a => { accountMap[a.id] = `${a.label} (${a.accountNumber})`; });
+  } catch (_) {}
+}
+
+async function loadPayments(page = 0) {
+  const tbody = document.getElementById('paymentsBody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><span class="spinner"></span> Loading...</td></tr>';
+
+  const status = document.getElementById('statusFilter').value;
+  const search = document.getElementById('searchBox').value.trim();
+
+  try {
+    const data = await Payments.list({ status, search, page, size: 20 });
+    currentPage = data.page;
+    totalPages  = data.totalPages;
+
+    if (!data.content || !data.content.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No payments found.</td></tr>';
+      renderPagination();
+      return;
+    }
+
+    tbody.innerHTML = data.content.map(p => `
+      <tr class="clickable" onclick="window.location.href='payment-details.html?id=${encodeURIComponent(p.id)}'">
+        <td><code style="font-size:11px;">${p.id}</code></td>
+        <td>${accountMap[p.sourceAccountId] || p.sourceAccountId}</td>
+        <td>${p.destinationAccount}</td>
+        <td>${formatMoney(p.amount, p.currency)}</td>
+        <td>${badgeHtml(p.status)}</td>
+        <td>${formatDateTime(p.createdAt)}</td>
+      </tr>
+    `).join('');
+
+    renderPagination();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="notice error">Failed to load payments: ${err.message || 'Unknown error'}</div></td></tr>`;
+  }
+}
+
+function renderPagination() {
+  const el = document.getElementById('pagination');
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button class="btn ghost" onclick="loadPayments(${currentPage - 1})" ${currentPage === 0 ? 'disabled' : ''}>← Prev</button>
+    <span>Page ${currentPage + 1} of ${totalPages}</span>
+    <button class="btn ghost" onclick="loadPayments(${currentPage + 1})" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next →</button>
+  `;
+}
+
+document.getElementById('statusFilter').addEventListener('change', () => loadPayments(0));
+document.getElementById('searchBox').addEventListener('input', () => loadPayments(0));
+document.getElementById('refreshBtn').addEventListener('click', () => loadPayments(currentPage));
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('statusFilter').value = '';
+  document.getElementById('searchBox').value = '';
+  loadPayments(0);
+});
+
+// Support ?status=FAILED deep link
+const initialStatus = getQueryParam('status');
+if (initialStatus) document.getElementById('statusFilter').value = initialStatus;
+
+loadAccountMap().then(() => loadPayments(0));
+</script>
+</body>
+</html>
+

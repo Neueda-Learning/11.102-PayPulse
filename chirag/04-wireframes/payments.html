@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PayPulse - Payments (Wireframe)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse <span class="tag">Wireframe - Dummy Data</span></div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html" class="active">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Payments</h1>
+    <p>Browse, filter, and search all payments. Click any row to view its full details and status history.</p>
+  </div>
+
+  <div class="toolbar">
+    <label for="statusFilter" style="font-size:12px;font-weight:700;color:#374151;">Status</label>
+    <select id="statusFilter" aria-label="Filter by status">
+      <option value="">All statuses</option>
+      <option value="CREATED">CREATED</option>
+      <option value="VALIDATED">VALIDATED</option>
+      <option value="SENT">SENT</option>
+      <option value="COMPLETED">COMPLETED</option>
+      <option value="FAILED">FAILED</option>
+    </select>
+    <label for="searchBox" class="sr-only" style="position:absolute;left:-9999px;">Search payments</label>
+    <input type="search" id="searchBox" placeholder="Search by payment ID or reference..." aria-label="Search by payment ID or reference" />
+    <button class="btn ghost" id="clearBtn" type="button">Clear</button>
+  </div>
+
+  <div class="card" style="padding:0;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Payment ID</th>
+          <th>Source Account</th>
+          <th>Destination</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="paymentsBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none;">No payments found for the current filter/search.</div>
+  </div>
+
+  <p class="footer-note">Data source: dummy JSON. The real backend supports pagination (<code>GET /payments?status=&amp;search=&amp;page=&amp;size=</code>) - this prototype filters the full dummy list client-side for simplicity.</p>
+</main>
+
+<script src="assets/dummy-data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  var statusFilter = document.getElementById("statusFilter");
+  var searchBox = document.getElementById("searchBox");
+  var tbody = document.getElementById("paymentsBody");
+  var emptyState = document.getElementById("emptyState");
+
+  function render() {
+    var status = statusFilter.value;
+    var q = searchBox.value.trim().toLowerCase();
+
+    var rows = window.DUMMY_DATA.payments.filter(function (p) {
+      if (status && p.status !== status) return false;
+      if (q) {
+        var matchesId = p.id.toLowerCase() === q;
+        var matchesRef = (p.reference || "").toLowerCase().indexOf(q) !== -1;
+        if (!matchesId && !matchesRef) return false;
+      }
+      return true;
+    });
+
+    tbody.innerHTML = "";
+    emptyState.style.display = rows.length ? "none" : "block";
+
+    rows.forEach(function (p) {
+      var tr = document.createElement("tr");
+      tr.className = "clickable";
+      tr.addEventListener("click", function () {
+        window.location.href = "payment-details.html?id=" + encodeURIComponent(p.id);
+      });
+      tr.innerHTML =
+        "<td><code>" + p.id + "</code></td>" +
+        "<td>" + accountLabel(p.sourceAccountId) + "</td>" +
+        "<td>" + p.destinationAccount + "</td>" +
+        "<td>" + formatMoney(p.amount, p.currency) + "</td>" +
+        "<td>" + badgeHtml(p.status) + "</td>" +
+        "<td>" + formatDateTime(p.createdAt) + "</td>";
+      tbody.appendChild(tr);
+    });
+  }
+
+  statusFilter.addEventListener("change", render);
+  searchBox.addEventListener("input", render);
+  document.getElementById("clearBtn").addEventListener("click", function () {
+    statusFilter.value = "";
+    searchBox.value = "";
+    render();
+  });
+
+  // support ?status=FAILED deep link from the dashboard, if ever added
+  var initialStatus = getQueryParam("status");
+  if (initialStatus) statusFilter.value = initialStatus;
+
+  render();
+</script>
+</body>
+</html>
+
+

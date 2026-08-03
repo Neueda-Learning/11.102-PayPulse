@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PayPulse — Customer Discussion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design tokens ── */
+    :root {
+      --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      --bg:          #f8f9fb;
+      --surface:     #ffffff;
+      --surface-alt: #f3f4f6;
+      --border:      #e5e7eb;
+      --border-soft: #f0f1f3;
+      --text-primary:   #111827;
+      --text-secondary: #4b5563;
+      --text-muted:     #9ca3af;
+      --accent:      #1d4ed8;
+      --accent-light:#eff6ff;
+      --accent-mid:  #bfdbfe;
+      --green:       #15803d;
+      --green-light: #f0fdf4;
+      --green-mid:   #bbf7d0;
+      --amber:       #b45309;
+      --amber-light: #fffbeb;
+      --amber-mid:   #fde68a;
+      --red:         #b91c1c;
+      --red-light:   #fef2f2;
+      --red-mid:     #fecaca;
+      --purple:      #6d28d9;
+      --purple-light:#f5f3ff;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow:    0 1px 3px rgba(0,0,0,0.07), 0 1px 8px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px rgba(0,0,0,0.05), 0 2px 16px rgba(0,0,0,0.06);
+      --radius: 8px;
+      --radius-lg: 12px;
+    }
+    body.dark {
+      --bg:          #0d1117;
+      --surface:     #161b27;
+      --surface-alt: #1c2130;
+      --border:      #2d3548;
+      --border-soft: #242a38;
+      --text-primary:   #f0f6fc;
+      --text-secondary: #8b949e;
+      --text-muted:     #484f58;
+      --accent:      #58a6ff;
+      --accent-light:#0d2045;
+      --accent-mid:  #1d4070;
+      --green:       #3fb950;
+      --green-light: #071f0e;
+      --green-mid:   #0e3318;
+      --amber:       #d29922;
+      --amber-light: #1c1200;
+      --amber-mid:   #332200;
+      --red:         #f85149;
+      --red-light:   #1f0a09;
+      --red-mid:     #3b1212;
+      --purple:      #bc8cff;
+      --purple-light:#1a0e2e;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow:    0 1px 3px rgba(0,0,0,0.4), 0 1px 8px rgba(0,0,0,0.2);
+      --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 2px 16px rgba(0,0,0,0.2);
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      height: 56px;
+      gap: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: var(--shadow-sm);
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .topbar-brand .logo-mark {
+      width: 30px; height: 30px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 0.9rem; font-weight: 700;
+    }
+    .topbar-brand span {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+    .topbar-divider {
+      width: 1px; height: 20px; background: var(--border); flex-shrink: 0;
+    }
+    .topbar-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .meta-tag {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .btn-ghost {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 5px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-ghost:hover {
+      background: var(--surface-alt);
+      color: var(--text-primary);
+      border-color: var(--border);
+    }
+
+    /* ── Nav tabs ── */
+    .nav-tabs {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      display: flex;
+      overflow-x: auto;
+    }
+    .nav-tabs button {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 12px 18px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: var(--font);
+      transition: all 0.15s;
+      letter-spacing: -0.01em;
+    }
+    .nav-tabs button:hover { color: var(--text-primary); }
+    .nav-tabs button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Page layout ── */
+    main { padding: 36px 40px; max-width: 1040px; margin: 0 auto; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .page-header { margin-bottom: 30px; }
+    .page-header h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+    .page-header p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+    .card-head {
+      padding: 13px 22px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-head h3 {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    .card-head .head-tag {
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    .card-body { padding: 22px; }
+    .card-body.diagram {
+      background: var(--bg);
+      display: flex;
+      justify-content: center;
+      padding: 28px 20px;
+      overflow-x: auto;
+    }
+    .card-body.diagram .mermaid { min-width: 300px; }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 4px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge-blue   { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-mid); }
+    .badge-green  { background: var(--green-light);  color: var(--green);  border: 1px solid var(--green-mid); }
+    .badge-amber  { background: var(--amber-light);  color: var(--amber);  border: 1px solid var(--amber-mid); }
+    .badge-red    { background: var(--red-light);    color: var(--red);    border: 1px solid var(--red-mid); }
+    .badge-purple { background: var(--purple-light); color: var(--purple); border: 1px solid #ddd6fe; }
+    body.dark .badge-purple { border-color: #3b2560; }
+
+    /* ── Tables ── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .data-table th {
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-soft);
+      color: var(--text-primary);
+      vertical-align: top;
+      line-height: 1.55;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--surface-alt); }
+    .data-table td.muted { color: var(--text-secondary); font-size: 0.83rem; }
+
+    /* ── Two-col scope grid ── */
+    .scope-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 680px) { .scope-grid { grid-template-columns: 1fr; } }
+    .scope-col { border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+    .scope-col-head {
+      font-size: 0.78rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .scope-item {
+      display: flex; align-items: flex-start; gap: 9px;
+      margin-bottom: 9px; font-size: 0.85rem; color: var(--text-secondary);
+    }
+    .scope-item:last-child { margin-bottom: 0; }
+    .scope-item .si-icon { flex-shrink: 0; font-size: 0.85rem; margin-top: 2px; }
+
+    /* ── Delivery timeline ── */
+    .timeline { display: flex; flex-direction: column; }
+    .tl-row { display: flex; gap: 16px; position: relative; }
+    .tl-row:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 15px; top: 34px; bottom: 0;
+      width: 1px;
+      background: var(--border);
+    }
+    .tl-dot {
+      width: 32px; height: 32px; flex-shrink: 0;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      z-index: 1;
+    }
+    .tl-body { padding-bottom: 24px; flex: 1; padding-top: 5px; }
+    .tl-body h4 { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; line-height: 1.4; }
+    .tl-body p { font-size: 0.83rem; color: var(--text-secondary); }
+
+    /* ── Actor legend ── */
+    .actor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 22px; }
+    .actor-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .actor-card .ac-icon {
+      width: 36px; height: 36px; flex-shrink: 0;
+      background: var(--accent-light);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+    .actor-card .ac-icon.sys { background: var(--green-light); }
+    .actor-card .ac-icon.ins { background: var(--amber-light); }
+    .actor-card b { display: block; font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
+    .actor-card span { font-size: 0.8rem; color: var(--text-secondary); }
+
+    /* ── Question cards ── */
+    .q-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 14px;
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+    .q-card-head {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .q-index {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      flex-shrink: 0;
+      padding-top: 3px;
+    }
+    .q-card-head h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.5;
+      letter-spacing: -0.01em;
+    }
+    .q-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .q-meta .q-scope { font-size: 0.75rem; color: var(--text-muted); }
+    .q-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+    .q-row { display: flex; gap: 10px; align-items: flex-start; font-size: 0.85rem; line-height: 1.6; }
+    .q-label {
+      flex-shrink: 0;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 3px 9px;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+    .ql-assume  { background: var(--accent-light); color: var(--accent); }
+    .ql-impact  { background: var(--amber-light);  color: var(--amber); }
+    .ql-options { background: var(--purple-light); color: var(--purple); }
+    .q-row p { color: var(--text-secondary); }
+    .q-row p strong { color: var(--text-primary); }
+    .q-answer {
+      border: 1.5px dashed var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    /* ── Overview highlight box ── */
+    .highlight-box {
+      background: var(--accent-light);
+      border: 1px solid var(--accent-mid);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: 0.92rem;
+      color: var(--text-primary);
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+
+    /* ── Info note ── */
+    .note {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-top: 14px;
+    }
+
+    /* ── Priority legend strip ── */
+    .priority-strip {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .priority-strip span {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .priority-strip .ps-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Summary answer table ── */
+    .answer-table td:last-child {
+      min-width: 160px;
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Hand-crafted Flow Diagram ── */
+    .flow-diagram {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+    .flow-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .flow-node {
+      border-radius: 10px;
+      padding: 10px 14px;
+      text-align: center;
+      min-width: 90px;
+      border: 1.5px solid transparent;
+      position: relative;
+    }
+    .flow-node-icon { font-size: 1.3rem; margin-bottom: 4px; }
+    .flow-node-step {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      margin-bottom: 3px;
+      opacity: 0.7;
+    }
+    .flow-node-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .flow-node-sub {
+      font-size: 0.68rem;
+      margin-top: 2px;
+      opacity: 0.75;
+    }
+    .flow-node-user {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .flow-node-blue {
+      background: var(--accent-light);
+      color: var(--accent);
+      border-color: var(--accent-mid);
+    }
+    .flow-node-green {
+      background: var(--green-light);
+      color: var(--green);
+      border-color: var(--green-mid);
+    }
+    .flow-node-amber {
+      background: var(--amber-light);
+      color: var(--amber);
+      border-color: var(--amber-mid);
+    }
+    .flow-node-completed {
+      background: var(--green-light);
+      color: var(--green);
+      border-color: var(--green);
+      border-width: 2px;
+      box-shadow: 0 0 0 3px var(--green-mid);
+    }
+    .flow-node-red {
+      background: var(--red-light);
+      color: var(--red);
+      border-color: var(--red-mid);
+    }
+    .flow-node-sm { min-width: 76px; padding: 7px 10px; }
+
+    /* Arrow between nodes */
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      font-size: 1rem;
+      color: var(--text-muted);
+      margin-top: 20px;
+      flex-shrink: 0;
+    }
+    .flow-arrow-yes {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--green);
+      gap: 2px;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    /* Diamond decision shape */
+    .flow-diamond {
+      width: 72px;
+      height: 72px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .flow-diamond-inner {
+      width: 54px;
+      height: 54px;
+      background: var(--surface-alt);
+      border: 1.5px solid var(--border);
+      transform: rotate(45deg);
+      position: absolute;
+      top: 9px; left: 9px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .flow-diamond-inner::after {
+      content: attr(data-label);
+      transform: rotate(-45deg);
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      position: absolute;
+    }
+    /* Text inside diamond via inner text node */
+    .flow-diamond-inner {
+      font-size: 0;
+    }
+    .flow-diamond .flow-diamond-inner {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .flow-diamond .flow-diamond-inner span {
+      transform: rotate(-45deg);
+      display: block;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    /* Fail branch dropping down */
+    .flow-fail-branch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 0;
+    }
+    .flow-branch-line-v {
+      width: 2px;
+      height: 16px;
+      background: var(--red-mid);
+    }
+
+    /* Flow legend */
+    .flow-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+      margin: 20px 0 14px;
+      padding: 14px 16px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius);
+    }
+    .flow-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .flow-legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* ── Use Case Diagram ── */
+    .usecase-diagram { display:none; } /* old, replaced */
+
+    /* ── UML Actor / Use Case Diagram ── */
+    .ucd-wrap {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 0;
+      min-height: 360px;
+      padding: 0 56px;
+    }
+
+    /* System boundary rectangle */
+    .ucd-boundary {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 36px 16px 20px;
+      position: relative;
+      display: flex;
+      gap: 0;
+      min-height: 340px;
+      background: var(--surface);
+    }
+    .ucd-boundary-label {
+      position: absolute;
+      top: -11px; left: 18px;
+      background: var(--surface);
+      padding: 0 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+    }
+
+    /* Two oval columns inside boundary */
+    .ucd-ovals-left, .ucd-ovals-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0 12px;
+    }
+    .ucd-inner-divider {
+      width: 1px;
+      background: var(--border-soft);
+      margin: 0 4px;
+      align-self: stretch;
+    }
+
+    /* Use case ovals */
+    .ucd-oval {
+      border-radius: 50px;
+      padding: 7px 16px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      text-align: center;
+      border: 1.5px solid transparent;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ucd-oval-blue  { background: var(--accent-light); color: var(--accent); border-color: var(--accent-mid); }
+    .ucd-oval-green { background: var(--green-light);  color: var(--green);  border-color: var(--green-mid); }
+    .ucd-oval-xs    { font-size:0.68rem; padding:3px 10px; display:inline-block; }
+
+    /* Stick figure actors */
+    .ucd-actor {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .ucd-actor-left     { left: -4px; }
+    .ucd-actor-right    { right: 130px; }
+    .ucd-actor-far-right{ right: -4px; }
+
+    .ucd-stick { display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+    /* Head */
+    .ucd-stick-head {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      background: var(--accent-light);
+    }
+    .ucd-stick-head-sys { border-color: var(--green); background: var(--green-light); }
+    .ucd-stick-head-ins { border-color: var(--amber); background: var(--amber-light); }
+
+    /* Body */
+    .ucd-stick-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    /* Arms */
+    .ucd-stick-arms {
+      width: 30px; height: 2px;
+      background: var(--accent);
+      margin: 3px 0;
+      border-radius: 2px;
+    }
+    .ucd-stick-arms-sys { background: var(--green); }
+    .ucd-stick-arms-ins { background: var(--amber); }
+
+    /* Torso (implied by leg gap) */
+    .ucd-stick-legs {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .ucd-stick-leg {
+      width: 2px; height: 18px;
+      background: var(--accent);
+      border-radius: 2px;
+      transform-origin: top center;
+    }
+    .ucd-stick-leg-l { transform: rotate(-12deg); }
+    .ucd-stick-leg-r { transform: rotate(12deg); }
+    .ucd-stick-leg-sys { background: var(--green); }
+    .ucd-stick-leg-ins { background: var(--amber); }
+
+    /* Also draw the torso line */
+    .ucd-stick-body::before {
+      content: '';
+      display: block;
+      width: 2px; height: 20px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+    .ucd-stick-sys .ucd-stick-body::before { background: var(--green); }
+    .ucd-stick-ins .ucd-stick-body::before { background: var(--amber); }
+
+    .ucd-actor-name {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-align: center;
+    }
+    .ucd-actor-sub {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* SVG association lines */
+    .ucd-lines {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .ucd-line {
+      stroke-width: 1.5;
+      stroke-dasharray: 4 3;
+    }
+    .ucd-line-user { stroke: var(--accent-mid); }
+    .ucd-line-sys  { stroke: var(--green-mid); }
+
+    /* Legend */
+    .ucd-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius);
+    }
+    .ucd-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    /* ── Hand-crafted ER Diagram ── */
+    .er-diagram {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .er-table {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      min-width: 420px;
+      box-shadow: var(--shadow);
+      flex-shrink: 0;
+    }
+    .er-table-head {
+      background: var(--accent-light);
+      border-bottom: 1.5px solid var(--accent-mid);
+      padding: 11px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .er-table-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .er-table-tag {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .er-table-body { background: var(--surface); }
+    .er-row {
+      display: grid;
+      grid-template-columns: 72px 1fr 36px 1fr;
+      align-items: center;
+      gap: 0;
+      padding: 6px 14px;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 0.8rem;
+      transition: background 0.1s;
+    }
+    .er-row:last-child { border-bottom: none; }
+    .er-row:hover { background: var(--surface-alt); }
+    .er-pk { background: color-mix(in srgb, var(--accent-light) 40%, var(--surface)); }
+    .er-fk { background: color-mix(in srgb, var(--green-light) 40%, var(--surface)); }
+    .er-type {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+      font-family: 'SF Mono', 'Consolas', monospace;
+    }
+    .er-col {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      font-family: 'SF Mono', 'Consolas', monospace;
+      padding: 0 8px;
+    }
+    .er-key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      width: 28px;
+    }
+    .er-key-pk { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-mid); }
+    .er-key-fk { background: var(--green-light);  color: var(--green);  border: 1px solid var(--green-mid); }
+    .er-key-uq { background: var(--amber-light);  color: var(--amber);  border: 1px solid var(--amber-mid); }
+    .er-key-opt { background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--border); }
+    .er-desc {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      padding-left: 12px;
+      line-height: 1.4;
+    }
+
+    /* ── Connector between tables ── */
+    .er-connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      min-width: 80px;
+      align-self: stretch;
+      gap: 6px;
+    }
+    .er-connector-line {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      gap: 4px;
+    }
+    .er-rel-line {
+      flex: 1;
+      height: 2px;
+      background: var(--border);
+      position: relative;
+    }
+    .er-rel-line::before, .er-rel-line::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .er-rel-line::before { left: -3px; }
+    .er-rel-line::after  { right: -3px; }
+    .er-rel-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .er-rel-label-right { text-align: right; }
+    .er-rel-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.4;
+      font-style: italic;
+    }
+
+    /* ── ER Legend ── */
+    .er-legend {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .er-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 960px) {
+      .er-diagram { flex-direction: column; align-items: center; }
+      .er-connector { flex-direction: row; padding: 10px 0; min-width: unset; width: 100%; max-width: 420px; }
+      .er-connector-line { flex-direction: column; width: auto; height: 50px; }
+      .er-rel-line { width: 2px; height: 100%; flex: 1; }
+      .er-rel-line::before { top: -3px; left: 50%; transform: translateX(-50%); }
+      .er-rel-line::after  { bottom: -3px; top: auto; left: 50%; transform: translateX(-50%); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<header class="topbar">
+  <a class="topbar-brand" href="#">
+    <div class="logo-mark">P</div>
+    <span>PayPulse</span>
+  </a>
+  <div class="topbar-divider"></div>
+  <span class="topbar-subtitle">Customer Discussion — Payment Processing System</span>
+  <div class="topbar-right">
+    <span class="meta-tag">Deadline: 6 Aug 2026</span>
+    <span class="meta-tag">Team of 4</span>
+    <button class="btn-ghost" onclick="toggleTheme()" id="themeBtn">Dark mode</button>
+  </div>
+</header>
+
+<!-- ── Nav ── -->
+<nav class="nav-tabs">
+  <button class="active" onclick="showTab('overview',this)">Overview</button>
+  <button onclick="showTab('actors',this)">Actors &amp; Use Cases</button>
+  <button onclick="showTab('er',this)">Data Model</button>
+  <button onclick="showTab('delivery',this)">Scope &amp; Delivery</button>
+  <button onclick="showTab('questions',this)">Open Questions</button>
+</nav>
+
+<main>
+
+  <!-- ════════════════════════════
+       1. OVERVIEW
+  ════════════════════════════ -->
+  <div class="section active" id="tab-overview">
+    <div class="page-header">
+      <h2>Project Overview</h2>
+      <p>A plain-language summary of what PayPulse is, how a payment moves through the system, and what the end user experiences.</p>
+    </div>
+
+    <div class="highlight-box">
+      <strong>PayPulse</strong> is a payment management system where a user submits a payment — amount, currency, source and destination accounts —
+      and the system automatically validates it, sends it for processing, and confirms completion.
+      Every step is permanently recorded in an audit trail. The user can track status, view history, filter and search payments,
+      and see exactly what went wrong if a payment fails.
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>How a payment travels through the system</h3></div>
+      <div class="card-body" style="padding:32px 24px 24px;">
+
+        <div class="flow-diagram">
+
+          <!-- Step 1: User submits -->
+          <div class="flow-col">
+            <div class="flow-node flow-node-user">
+              <div class="flow-node-icon">👤</div>
+              <div class="flow-node-label">User submits</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow">→</div>
+
+          <!-- Step 2: CREATED -->
+          <div class="flow-col">
+            <div class="flow-node flow-node-status flow-node-blue">
+              <div class="flow-node-step">1</div>
+              <div class="flow-node-label">CREATED</div>
+              <div class="flow-node-sub">Payment recorded</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow">→</div>
+
+          <!-- Decision: Valid? -->
+          <div class="flow-col">
+            <div class="flow-diamond">
+              <div class="flow-diamond-inner"><span>Valid?</span></div>
+            </div>
+            <div class="flow-fail-branch">
+              <div class="flow-branch-line-v"></div>
+              <div class="flow-node flow-node-status flow-node-red flow-node-sm">
+                <div class="flow-node-label">FAILED</div>
+                <div class="flow-node-sub">Invalid data</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-arrow flow-arrow-yes">Yes →</div>
+
+          <!-- Step 3: VALIDATED -->
+          <div class="flow-col">
+            <div class="flow-node flow-node-status flow-node-green">
+              <div class="flow-node-step">2</div>
+              <div class="flow-node-label">VALIDATED</div>
+              <div class="flow-node-sub">All checks passed</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow">→</div>
+
+          <!-- Decision: Sent OK? -->
+          <div class="flow-col">
+            <div class="flow-diamond">
+              <div class="flow-diamond-inner"><span>Sent OK?</span></div>
+            </div>
+            <div class="flow-fail-branch">
+              <div class="flow-branch-line-v"></div>
+              <div class="flow-node flow-node-status flow-node-red flow-node-sm">
+                <div class="flow-node-label">FAILED</div>
+                <div class="flow-node-sub">Network error</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-arrow flow-arrow-yes">Yes →</div>
+
+          <!-- Step 4: SENT -->
+          <div class="flow-col">
+            <div class="flow-node flow-node-status flow-node-amber">
+              <div class="flow-node-step">3</div>
+              <div class="flow-node-label">SENT</div>
+              <div class="flow-node-sub">Transmitted</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow">→</div>
+
+          <!-- Decision: Confirmed? -->
+          <div class="flow-col">
+            <div class="flow-diamond">
+              <div class="flow-diamond-inner"><span>Confirmed?</span></div>
+            </div>
+            <div class="flow-fail-branch">
+              <div class="flow-branch-line-v"></div>
+              <div class="flow-node flow-node-status flow-node-red flow-node-sm">
+                <div class="flow-node-label">FAILED</div>
+                <div class="flow-node-sub">Processing error</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-arrow flow-arrow-yes">Yes →</div>
+
+          <!-- Step 5: COMPLETED -->
+          <div class="flow-col">
+            <div class="flow-node flow-node-status flow-node-completed">
+              <div class="flow-node-step">✓</div>
+              <div class="flow-node-label">COMPLETED</div>
+              <div class="flow-node-sub">Settled</div>
+            </div>
+          </div>
+
+        </div><!-- /.flow-diagram -->
+
+        <!-- Status legend -->
+        <div class="flow-legend">
+          <div class="flow-legend-item">
+            <span class="flow-legend-dot" style="background:var(--accent);"></span>
+            <span><strong>CREATED</strong> — recorded, awaiting validation</span>
+          </div>
+          <div class="flow-legend-item">
+            <span class="flow-legend-dot" style="background:var(--green);"></span>
+            <span><strong>VALIDATED</strong> — amount, currency &amp; accounts all passed</span>
+          </div>
+          <div class="flow-legend-item">
+            <span class="flow-legend-dot" style="background:var(--amber);"></span>
+            <span><strong>SENT</strong> — transmitted to processing network</span>
+          </div>
+          <div class="flow-legend-item">
+            <span class="flow-legend-dot" style="background:#15803d;"></span>
+            <span><strong>COMPLETED</strong> — confirmed &amp; settled (terminal)</span>
+          </div>
+          <div class="flow-legend-item">
+            <span class="flow-legend-dot" style="background:var(--red);"></span>
+            <span><strong>FAILED</strong> — error at any stage, reason always recorded (terminal)</span>
+          </div>
+        </div>
+
+        <p class="note" style="margin-top:0;">
+          A payment can fail at <strong>any stage</strong> — the system always records exactly why (error code + description) so nothing is ever silently lost.
+        </p>
+
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>What the user sees — three screens</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Screen</th><th>What the user can do</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Create Payment</strong></td>
+              <td>Enter source account, destination account, amount, currency, and an optional description, then submit. The system processes it immediately and displays the final status.</td>
+            </tr>
+            <tr>
+              <td><strong>Payment Details</strong></td>
+              <td>View the current status of any payment, all its fields, and the complete timestamped history of every stage it went through — including error details if it failed.</td>
+            </tr>
+            <tr>
+              <td><strong>Payment List</strong></td>
+              <td>Browse all payments with pagination, filter by status (e.g. show only FAILED), and search by payment ID or reference text.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Key safeguards built in from day one</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th width="220">Safeguard</th><th>What it means in plain English</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Duplicate protection</strong></td>
+              <td>If the user accidentally clicks Submit twice, or the network retries the request automatically, the system will not create two payments. It detects the repeat and safely returns the original.</td>
+            </tr>
+            <tr>
+              <td><strong>Full audit trail</strong></td>
+              <td>Every status change is permanently recorded with a timestamp. Nothing is ever overwritten — the complete history of what happened to any payment is always available.</td>
+            </tr>
+            <tr>
+              <td><strong>Validation before processing</strong></td>
+              <td>The system checks the amount, currency, and account format before attempting to send. Invalid payments are rejected immediately with a clear reason.</td>
+            </tr>
+            <tr>
+              <td><strong>Strict lifecycle</strong></td>
+              <td>A payment can never skip steps or go backwards. A completed payment cannot be re-validated; a failed payment cannot be silently retried. The lifecycle is fully enforced.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════
+       2. ACTORS & USE CASES
+  ════════════════════════════ -->
+  <div class="section" id="tab-actors">
+    <div class="page-header">
+      <h2>Actors &amp; Use Cases</h2>
+      <p>Who is involved in the system, what they can do, and what is handled automatically.</p>
+    </div>
+
+    <div class="actor-grid">
+      <div class="actor-card">
+        <div class="ac-icon">👤</div>
+        <div><b>User</b><span>The person using the web application to submit and track payments.</span></div>
+      </div>
+      <div class="actor-card">
+        <div class="ac-icon sys">⚙️</div>
+        <div><b>System</b><span>The PayPulse backend — validates, processes, and records payments automatically.</span></div>
+      </div>
+      <div class="actor-card">
+        <div class="ac-icon ins">👨‍🏫</div>
+        <div><b>Instructor / Customer</b><span>Provides and clarifies requirements. Evaluates the delivered system.</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Actor &amp; Use Case Diagram</h3><span class="head-tag">UML-style</span></div>
+      <div class="card-body" style="padding:32px 24px;">
+        <div class="ucd-wrap">
+
+          <!-- System boundary box -->
+          <div class="ucd-boundary">
+            <div class="ucd-boundary-label">PayPulse System</div>
+
+            <!-- Use case ovals — left cluster (User-facing) -->
+            <div class="ucd-ovals-left">
+              <div class="ucd-oval ucd-oval-blue">Submit a new payment</div>
+              <div class="ucd-oval ucd-oval-blue">View payment status &amp; details</div>
+              <div class="ucd-oval ucd-oval-blue">View history &amp; audit trail</div>
+              <div class="ucd-oval ucd-oval-blue">List &amp; filter by status</div>
+              <div class="ucd-oval ucd-oval-blue">Search by ID or description</div>
+              <div class="ucd-oval ucd-oval-blue">View error details</div>
+            </div>
+
+            <!-- Vertical divider -->
+            <div class="ucd-inner-divider"></div>
+
+            <!-- Use case ovals — right cluster (System automatic) -->
+            <div class="ucd-ovals-right">
+              <div class="ucd-oval ucd-oval-green">Validate amount, currency &amp; accounts</div>
+              <div class="ucd-oval ucd-oval-green">Detect &amp; block duplicate submissions</div>
+              <div class="ucd-oval ucd-oval-green">Send to processing network</div>
+              <div class="ucd-oval ucd-oval-green">Confirm or fail the payment</div>
+              <div class="ucd-oval ucd-oval-green">Record every status change</div>
+            </div>
+
+          </div><!-- /.ucd-boundary -->
+
+          <!-- Actor: User (left) -->
+          <div class="ucd-actor ucd-actor-left">
+            <div class="ucd-stick">
+              <div class="ucd-stick-head"></div>
+              <div class="ucd-stick-body">
+                <div class="ucd-stick-arms"></div>
+                <div class="ucd-stick-legs">
+                  <div class="ucd-stick-leg ucd-stick-leg-l"></div>
+                  <div class="ucd-stick-leg ucd-stick-leg-r"></div>
+                </div>
+              </div>
+            </div>
+            <div class="ucd-actor-name">User</div>
+            <div class="ucd-actor-sub">Web application</div>
+          </div>
+
+          <!-- Actor: System (right) -->
+          <div class="ucd-actor ucd-actor-right">
+            <div class="ucd-stick ucd-stick-sys">
+              <div class="ucd-stick-head ucd-stick-head-sys"></div>
+              <div class="ucd-stick-body">
+                <div class="ucd-stick-arms ucd-stick-arms-sys"></div>
+                <div class="ucd-stick-legs">
+                  <div class="ucd-stick-leg ucd-stick-leg-l ucd-stick-leg-sys"></div>
+                  <div class="ucd-stick-leg ucd-stick-leg-r ucd-stick-leg-sys"></div>
+                </div>
+              </div>
+            </div>
+            <div class="ucd-actor-name" style="color:var(--green);">System</div>
+            <div class="ucd-actor-sub">Automatic</div>
+          </div>
+
+          <!-- Actor: Instructor (far right) -->
+          <div class="ucd-actor ucd-actor-far-right">
+            <div class="ucd-stick ucd-stick-ins">
+              <div class="ucd-stick-head ucd-stick-head-ins"></div>
+              <div class="ucd-stick-body">
+                <div class="ucd-stick-arms ucd-stick-arms-ins"></div>
+                <div class="ucd-stick-legs">
+                  <div class="ucd-stick-leg ucd-stick-leg-l ucd-stick-leg-ins"></div>
+                  <div class="ucd-stick-leg ucd-stick-leg-r ucd-stick-leg-ins"></div>
+                </div>
+              </div>
+            </div>
+            <div class="ucd-actor-name" style="color:var(--amber);">Instructor</div>
+            <div class="ucd-actor-sub">Customer</div>
+          </div>
+
+          <!-- Connection lines SVG overlay -->
+          <svg class="ucd-lines" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <!-- User → left ovals (6 lines from ~x=64 to x=180, spread across y) -->
+            <line x1="64" y1="120" x2="182" y2="62"  class="ucd-line ucd-line-user"/>
+            <line x1="64" y1="125" x2="182" y2="108" class="ucd-line ucd-line-user"/>
+            <line x1="64" y1="130" x2="182" y2="154" class="ucd-line ucd-line-user"/>
+            <line x1="64" y1="135" x2="182" y2="200" class="ucd-line ucd-line-user"/>
+            <line x1="64" y1="138" x2="182" y2="246" class="ucd-line ucd-line-user"/>
+            <line x1="64" y1="140" x2="182" y2="290" class="ucd-line ucd-line-user"/>
+          </svg>
+
+        </div><!-- /.ucd-wrap -->
+
+        <!-- Legend -->
+        <div class="ucd-legend">
+          <div class="ucd-legend-item"><span class="ucd-oval ucd-oval-blue ucd-oval-xs">use case</span>User-initiated action</div>
+          <div class="ucd-legend-item"><span class="ucd-oval ucd-oval-green ucd-oval-xs">use case</span>System-automated action</div>
+          <div class="ucd-legend-item">
+            <svg width="32" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="32" y2="5" stroke="var(--accent-mid)" stroke-width="1.5" stroke-dasharray="3,2"/></svg>
+            Association (actor ↔ use case)
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Responsibilities summary</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Actor</th><th>Can do</th><th>Cannot do</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>User</strong></td>
+              <td>Create payments · View status &amp; details · View history · Filter &amp; search · See error reasons</td>
+              <td>Cannot manually change a payment's status · Cannot delete payments · No login required (no authentication in scope)</td>
+            </tr>
+            <tr>
+              <td><strong>System</strong></td>
+              <td>Validate, send and complete payments automatically · Record every transition · Detect and deduplicate retries</td>
+              <td>No real payment network connection (all processing is simulated) · No email or push notifications</td>
+            </tr>
+            <tr>
+              <td><strong>Instructor</strong></td>
+              <td>Define and clarify requirements · Evaluate the final result · Request additions or changes</td>
+              <td>Not a system actor — does not interact with the running software directly</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Payment status lifecycle — plain English</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Status</th><th>Meaning</th><th>Who sets it</th><th>Terminal?</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-blue">CREATED</span></td>
+              <td>Payment received and recorded. Waiting to be validated.</td>
+              <td class="muted">System, immediately on submission</td>
+              <td class="muted">No</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-green">VALIDATED</span></td>
+              <td>All checks passed — amount, currency, and account format are valid.</td>
+              <td class="muted">System, automatically</td>
+              <td class="muted">No</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-amber">SENT</span></td>
+              <td>Payment transmitted to the simulated processing network.</td>
+              <td class="muted">System, automatically</td>
+              <td class="muted">No</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-green">COMPLETED</span></td>
+              <td>Processing confirmed. Payment is settled. Nothing further happens.</td>
+              <td class="muted">System, automatically</td>
+              <td class="muted"><strong>Yes</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-red">FAILED</span></td>
+              <td>An error occurred at some stage. The reason is always recorded. The payment cannot be automatically retried.</td>
+              <td class="muted">System, at any stage</td>
+              <td class="muted"><strong>Yes</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════
+       3. DATA MODEL
+  ════════════════════════════ -->
+  <div class="section" id="tab-er">
+    <div class="page-header">
+      <h2>Data Model — What Information We Store</h2>
+      <p>The system stores two types of records: a <strong>Payment</strong> (the main record) and a <strong>Payment History</strong> (the permanent audit trail). No technical jargon below.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Entity relationship diagram</h3>
+        <span class="head-tag">One payment · many history entries</span>
+      </div>
+      <div class="card-body" style="padding:28px 24px;overflow-x:auto;">
+        <div class="er-diagram">
+
+          <!-- PAYMENT table -->
+          <div class="er-table">
+            <div class="er-table-head">
+              <span class="er-table-name">PAYMENT</span>
+              <span class="er-table-tag">main record</span>
+            </div>
+            <div class="er-table-body">
+              <div class="er-row er-pk">
+                <span class="er-type">UUID</span>
+                <span class="er-col">id</span>
+                <span class="er-key er-key-pk">PK</span>
+                <span class="er-desc">Unique payment identifier</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">DECIMAL</span>
+                <span class="er-col">amount</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Money value &gt; 0, max 1,000,000</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">currency</span>
+                <span class="er-key"></span>
+                <span class="er-desc">USD / EUR / GBP</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">source_account</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Paying account (format-validated)</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">destination_account</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Receiving account, must differ from source</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">reference</span>
+                <span class="er-key er-key-opt">OPT</span>
+                <span class="er-desc">Optional description or label</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">status</span>
+                <span class="er-key"></span>
+                <span class="er-desc">CREATED · VALIDATED · SENT · COMPLETED · FAILED</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">error_code</span>
+                <span class="er-key er-key-opt">OPT</span>
+                <span class="er-desc">Set only when status is FAILED</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">error_message</span>
+                <span class="er-key er-key-opt">OPT</span>
+                <span class="er-desc">Human-readable failure reason</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">idempotency_key</span>
+                <span class="er-key er-key-uq">UQ</span>
+                <span class="er-desc">Duplicate-submission prevention key</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">TIMESTAMP</span>
+                <span class="er-col">created_at</span>
+                <span class="er-key"></span>
+                <span class="er-desc">When the payment was submitted</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">TIMESTAMP</span>
+                <span class="er-col">updated_at</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Last status change timestamp</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">BIGINT</span>
+                <span class="er-col">version</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Concurrency guard (optimistic lock)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Relationship connector -->
+          <div class="er-connector">
+            <div class="er-connector-line">
+              <div class="er-rel-label">1</div>
+              <div class="er-rel-line"></div>
+              <div class="er-rel-label er-rel-label-right">0..*</div>
+            </div>
+            <div class="er-rel-desc">records every<br>status change</div>
+          </div>
+
+          <!-- PAYMENT_STATUS_HISTORY table -->
+          <div class="er-table">
+            <div class="er-table-head" style="background:var(--green-light);border-bottom-color:var(--green-mid);">
+              <span class="er-table-name" style="color:var(--green);">PAYMENT_STATUS_HISTORY</span>
+              <span class="er-table-tag">audit trail</span>
+            </div>
+            <div class="er-table-body">
+              <div class="er-row er-pk">
+                <span class="er-type">UUID</span>
+                <span class="er-col">id</span>
+                <span class="er-key er-key-pk">PK</span>
+                <span class="er-desc">Unique history entry identifier</span>
+              </div>
+              <div class="er-row er-fk">
+                <span class="er-type">UUID</span>
+                <span class="er-col">payment_id</span>
+                <span class="er-key er-key-fk">FK</span>
+                <span class="er-desc">Links to PAYMENT.id</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">previous_status</span>
+                <span class="er-key er-key-opt">OPT</span>
+                <span class="er-desc">Status before this change (null on first entry)</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">new_status</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Status after this change</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">error_code</span>
+                <span class="er-key er-key-opt">OPT</span>
+                <span class="er-desc">Failure reason code if transition failed</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">VARCHAR</span>
+                <span class="er-col">triggered_by</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Always "SYSTEM" (no auth in scope)</span>
+              </div>
+              <div class="er-row">
+                <span class="er-type">TIMESTAMP</span>
+                <span class="er-col">occurred_at</span>
+                <span class="er-key"></span>
+                <span class="er-desc">Exact time this transition happened</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /.er-diagram -->
+
+        <!-- Legend -->
+        <div class="er-legend">
+          <span class="er-legend-item"><span class="er-key er-key-pk" style="font-size:0.68rem;">PK</span> Primary key</span>
+          <span class="er-legend-item"><span class="er-key er-key-fk" style="font-size:0.68rem;">FK</span> Foreign key</span>
+          <span class="er-legend-item"><span class="er-key er-key-uq" style="font-size:0.68rem;">UQ</span> Unique constraint</span>
+          <span class="er-legend-item"><span class="er-key er-key-opt" style="font-size:0.68rem;">OPT</span> Optional / nullable</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Payment — field-by-field explanation</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Field</th><th>What it holds</th><th>Required?</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>id</strong></td>
+              <td>A unique identifier generated automatically by the system for every payment.</td>
+              <td class="muted">Auto-generated</td>
+              <td class="muted">a3f2c1d0-…</td>
+            </tr>
+            <tr>
+              <td><strong>amount</strong></td>
+              <td>The money value to transfer. Must be greater than zero, maximum 1,000,000, and no more than 2 decimal places.</td>
+              <td class="muted">Yes</td>
+              <td class="muted">250.00</td>
+            </tr>
+            <tr>
+              <td><strong>currency</strong></td>
+              <td>The 3-letter currency code. Only a supported list is accepted (USD, EUR, GBP by default — see Open Questions Q4).</td>
+              <td class="muted">Yes</td>
+              <td class="muted">GBP</td>
+            </tr>
+            <tr>
+              <td><strong>source_account</strong></td>
+              <td>The account the money is coming from. Must follow the expected format (alphanumeric, 8–20 characters).</td>
+              <td class="muted">Yes</td>
+              <td class="muted">ACC00123456</td>
+            </tr>
+            <tr>
+              <td><strong>destination_account</strong></td>
+              <td>The account the money is going to. Must follow the same format and cannot be the same as source.</td>
+              <td class="muted">Yes</td>
+              <td class="muted">ACC00789012</td>
+            </tr>
+            <tr>
+              <td><strong>reference</strong></td>
+              <td>An optional free-text note or label (e.g. invoice number, reason for payment).</td>
+              <td class="muted">Optional</td>
+              <td class="muted">Invoice #2024-09</td>
+            </tr>
+            <tr>
+              <td><strong>status</strong></td>
+              <td>The payment's current position in its lifecycle. Automatically set and updated by the system.</td>
+              <td class="muted">Auto-set</td>
+              <td class="muted">COMPLETED</td>
+            </tr>
+            <tr>
+              <td><strong>error_code &amp; error_message</strong></td>
+              <td>Only populated when status is FAILED. Contains a short code (e.g. INVALID_CURRENCY) and a human-readable explanation.</td>
+              <td class="muted">On failure only</td>
+              <td class="muted">INVALID_CURRENCY</td>
+            </tr>
+            <tr>
+              <td><strong>idempotency_key</strong></td>
+              <td>A unique ID sent by the client to prevent accidental duplicate payments. If omitted, no duplicate detection is applied for that request.</td>
+              <td class="muted">Optional</td>
+              <td class="muted">uuid-abc-123</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Payment History — field-by-field explanation</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Field</th><th>What it holds</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td><strong>previous_status</strong></td><td>The status before this change. Empty for the very first entry (when CREATED).</td><td class="muted">VALIDATED</td></tr>
+            <tr><td><strong>new_status</strong></td><td>The status after this change.</td><td class="muted">SENT</td></tr>
+            <tr><td><strong>error_code</strong></td><td>If this transition resulted in a failure, the short code explaining why.</td><td class="muted">NETWORK_ERROR</td></tr>
+            <tr><td><strong>triggered_by</strong></td><td>Who or what caused this change. Always "SYSTEM" — no user accounts are in scope.</td><td class="muted">SYSTEM</td></tr>
+            <tr><td><strong>occurred_at</strong></td><td>The exact date and time this status change happened.</td><td class="muted">2026-08-01 14:23:01</td></tr>
+          </tbody>
+        </table>
+        <div style="padding:14px 22px;">
+          <p class="note"><strong>History is permanent.</strong> Records are never edited or deleted — this provides a complete, tamper-proof record of everything that happened to any payment and when.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>What a full payment history looks like</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>#</th><th>From</th><th>To</th><th>Time</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><td class="muted">1</td><td class="muted">—</td><td><span class="badge badge-blue">CREATED</span></td><td class="muted">14:23:00</td><td class="muted">Payment submitted by user</td></tr>
+            <tr><td class="muted">2</td><td><span class="badge badge-blue">CREATED</span></td><td><span class="badge badge-green">VALIDATED</span></td><td class="muted">14:23:01</td><td class="muted">Amount, currency, accounts all passed checks</td></tr>
+            <tr><td class="muted">3</td><td><span class="badge badge-green">VALIDATED</span></td><td><span class="badge badge-amber">SENT</span></td><td class="muted">14:23:01</td><td class="muted">Transmitted to processing network</td></tr>
+            <tr><td class="muted">4</td><td><span class="badge badge-amber">SENT</span></td><td><span class="badge badge-green">COMPLETED</span></td><td class="muted">14:23:02</td><td class="muted">Confirmed and settled</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════
+       4. SCOPE & DELIVERY
+  ════════════════════════════ -->
+  <div class="section" id="tab-delivery">
+    <div class="page-header">
+      <h2>Scope &amp; Delivery</h2>
+      <p>A clear commitment of what is included, what is not, and the delivery timeline.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>What is and is not included</h3></div>
+      <div class="card-body">
+        <div class="scope-grid">
+          <div class="scope-col">
+            <div class="scope-col-head" style="color:var(--green);">Included — Core deliverables</div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>Create a payment (amount, currency, accounts, optional description)</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>Automatic validation → send → complete lifecycle with full audit trail</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>View payment status and history — every step, timestamped</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>List and filter payments by status</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>Search by payment ID or reference description</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>Clear, structured error messages on failed payments</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>Duplicate submission protection</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>React web application — Create, Details, and List screens</span></div>
+            <div class="scope-item"><span class="si-icon">✓</span><span>REST API with full Swagger documentation</span></div>
+          </div>
+          <div class="scope-col">
+            <div class="scope-col-head" style="color:var(--red);">Not included — Out of scope</div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>User accounts, login, or authentication of any kind</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Real payment network connection (all processing is simulated)</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Email or push notifications on completion or failure</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Recurring or scheduled payments</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Payment reversal or cancellation</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Currency conversion or FX rates</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Analytics or reporting dashboards</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Account management screen or account registry</span></div>
+            <div class="scope-item"><span class="si-icon">✗</span><span>Batch or bulk payments</span></div>
+          </div>
+        </div>
+        <p class="note" style="margin-top:16px;">Items marked ✗ may be added as stretch features if time allows after the core is complete. We will flag this before the presentation on 6 Aug 2026.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Delivery timeline</h3></div>
+      <div class="card-body">
+        <div class="timeline">
+          <div class="tl-row">
+            <div class="tl-dot" style="background:var(--green-light);border-color:var(--green);">✓</div>
+            <div class="tl-body">
+              <h4>Days 1–2 &nbsp;·&nbsp; Jul 30–31 &nbsp;<span class="badge badge-green">Done</span>&nbsp; — Design &amp; Planning</h4>
+              <p>Requirements, architecture, all diagrams, and API contract finalised. Team assignments confirmed.</p>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-dot" style="background:var(--amber-light);border-color:var(--amber);">→</div>
+            <div class="tl-body">
+              <h4>Days 3–4 &nbsp;·&nbsp; Aug 1–2 &nbsp;<span class="badge badge-amber">In progress</span>&nbsp; — Core Backend</h4>
+              <p>Payment creation, validation, lifecycle, audit trail, and error handling built and tested.</p>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-dot" style="background:var(--accent-light);border-color:var(--accent);">→</div>
+            <div class="tl-body">
+              <h4>Days 5–6 &nbsp;·&nbsp; Aug 3–4 &nbsp;<span class="badge badge-blue">Upcoming</span>&nbsp; — Frontend &amp; Enhancements</h4>
+              <p>React screens wired to the API. Search, filter, and edge cases hardened.</p>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-dot" style="background:var(--accent-light);border-color:var(--accent);">→</div>
+            <div class="tl-body">
+              <h4>Day 7 &nbsp;·&nbsp; Aug 5 &nbsp;<span class="badge badge-blue">Upcoming</span>&nbsp; — Testing &amp; Rehearsal</h4>
+              <p>Integration testing, bug fixes, demo script, and presentation rehearsal.</p>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-dot" style="background:var(--purple-light);border-color:var(--purple);">★</div>
+            <div class="tl-body">
+              <h4>Aug 6 &nbsp;<span class="badge badge-purple">Presentation Day</span></h4>
+              <p>Live demo and Q&amp;A with instructor and stakeholders.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Error messages — what the user sees when something goes wrong</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead><tr><th>Situation</th><th>Error code</th><th>What the user should do</th></tr></thead>
+          <tbody>
+            <tr><td>Amount is zero, negative, or invalid</td><td><code>INVALID_AMOUNT</code></td><td>Enter an amount greater than 0</td></tr>
+            <tr><td>Currency is not on the supported list</td><td><code>INVALID_CURRENCY</code></td><td>Use USD, EUR, or GBP</td></tr>
+            <tr><td>Account number format is incorrect</td><td><code>INVALID_ACCOUNT</code></td><td>Check the account number format</td></tr>
+            <tr><td>Source and destination are the same account</td><td><code>INVALID_ACCOUNT</code></td><td>Use two different account numbers</td></tr>
+            <tr><td>Simulated network failure during transmission</td><td><code>NETWORK_ERROR</code></td><td>The payment failed in transit — submit a new one</td></tr>
+            <tr><td>Simulated processing failure after send</td><td><code>PROCESSING_ERROR</code></td><td>Processing failed — submit a new one</td></tr>
+            <tr><td>Payment ID not found</td><td><code>PAYMENT_NOT_FOUND</code></td><td>Verify the payment ID</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════
+       5. OPEN QUESTIONS
+  ════════════════════════════ -->
+  <div class="section" id="tab-questions">
+    <div class="page-header">
+      <h2>Open Questions — We Need Your Input</h2>
+      <p>For each question, we have noted our current working assumption so development is not blocked.
+        Your answer may change what we build — particularly the first three, which affect core design decisions.
+        Please bring your preferences to the next check-in.</p>
+    </div>
+
+    <div class="priority-strip">
+      <span><span class="ps-dot" style="background:var(--red);"></span>Must answer — affects core design or data model</span>
+      <span style="margin-left:16px;"><span class="ps-dot" style="background:var(--amber);"></span>Important — affects scope or user experience</span>
+      <span style="margin-left:16px;"><span class="ps-dot" style="background:var(--green);"></span>Nice to know — low impact, good default in place</span>
+    </div>
+
+    <!-- Q1 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 01</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-red">Must answer</span>
+            <span class="q-scope">Affects: account validation, data model</span>
+          </div>
+          <h4>Should the system verify that accounts actually <em>exist</em>, or only check that they are in the correct format?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-assume">Our assumption</span>
+          <p>We currently check <strong>format only</strong> — e.g. alphanumeric, 8–20 characters. We do not verify that an account exists in any registry or database. This is simpler and faster to build.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-impact">If you want existence checks</span>
+          <p>We would need to build an <strong>Account entity</strong> — a list of valid accounts the system checks against. This adds a few extra hours of work and may require a seed-data setup or a new management screen. We would need to know <strong>today</strong> to plan it into the schedule.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> Format-only validation — simpler, faster (our default)<br>
+            <strong>B.</strong> Existence check against a fixed list of known test accounts — moderate effort<br>
+            <strong>C.</strong> Full Account entity with management screen — significant additional scope
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Q2 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 02</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-red">Must answer</span>
+            <span class="q-scope">Affects: user experience, API behaviour</span>
+          </div>
+          <h4>When a user accidentally submits the same payment twice — double-click or network retry — should the system return the original silently, or show a clear duplicate error?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-assume">Our assumption</span>
+          <p>We <strong>silently return the original payment</strong> with a success response. The retry is invisible to the user — seamless and safe. This matches how Stripe and PayPal handle duplicate submissions.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-impact">If you want an explicit error</span>
+          <p>We return a <strong>409 Conflict</strong> response with a DUPLICATE_PAYMENT error code. The user sees an explicit message. This is a one-line change — just confirm your preference early.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> Silent return — smooth, retry-safe (our default)<br>
+            <strong>B.</strong> 409 error — explicit, user-visible rejection
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Q3 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 03</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-red">Must answer</span>
+            <span class="q-scope">Affects: demo experience, frontend design</span>
+          </div>
+          <h4>After submitting, should the user see the final result immediately, or watch it progress step by step with a short visible delay?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-assume">Our assumption</span>
+          <p>The result appears <strong>immediately</strong>. The full lifecycle completes in under a second and the final status is shown straight away. Simpler, more reliable, and easier to test.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-impact">If you want step-by-step visibility</span>
+          <p>We can add a short delay (e.g. 1–2 seconds per stage) so the status updates on screen in real time: CREATED → VALIDATED → SENT → COMPLETED. More engaging for a live demo but adds complexity. We would do this in the second half of the project if time allows.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> Instant result — simple, reliable (our default)<br>
+            <strong>B.</strong> Step-by-step with visible progress — more engaging for the presentation demo
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Q4 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 04</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-amber">Important</span>
+            <span class="q-scope">Affects: which currencies users can submit</span>
+          </div>
+          <h4>Which currencies should the system accept?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-assume">Our assumption</span>
+          <p>A small fixed list: <strong>USD, EUR, GBP</strong>. Any other currency triggers INVALID_CURRENCY. The list is easy to extend.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> USD, EUR, GBP only (our default)<br>
+            <strong>B.</strong> A custom list you specify — tell us which currencies to include<br>
+            <strong>C.</strong> Full ISO 4217 international set — more realistic but more work
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Q5 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 05</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-amber">Important</span>
+            <span class="q-scope">Affects: how failure scenarios appear in the demo</span>
+          </div>
+          <h4>When should a payment fail during simulated processing — on specific test data, randomly, or both?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-assume">Our assumption</span>
+          <p><strong>Deterministic triggers</strong> — specific reserved account numbers always cause a failure (NETWORK_ERROR or PROCESSING_ERROR), making failure scenarios reliable and repeatable for demo and testing. We may also add a small random chance for additional realism.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-impact">Why this matters</span>
+          <p>If you want to demonstrate a failed payment during the live presentation, a deterministic trigger means it <em>always</em> fails on cue. A purely random failure may not occur at the right moment.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> Deterministic: a reserved test account always triggers failure (our default)<br>
+            <strong>B.</strong> Random: each payment has a small independent chance of failing<br>
+            <strong>C.</strong> Both: deterministic triggers plus a small random chance
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Q6 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 06</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-amber">Important</span>
+            <span class="q-scope">Affects: search behaviour</span>
+          </div>
+          <h4>When searching by description or reference — should it match partial words, or exact text only?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-assume">Our assumption</span>
+          <p><strong>Partial, case-insensitive</strong> match on description (e.g. searching "invoice" finds "Invoice #2024-09"). Exact match on payment ID (UUID).</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> Partial match on description, exact on ID (our default)<br>
+            <strong>B.</strong> Exact match only on all fields
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Q7 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 07</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-green">Nice to know</span>
+            <span class="q-scope">Affects: presentation structure</span>
+          </div>
+          <h4>For the final presentation — should we focus on the product experience, the technical design, or an equal mix of both?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-impact">Why it matters</span>
+          <p>This shapes how much of the presentation is a live walkthrough of the user interface versus an explanation of our architecture, design patterns, and technical decisions.</p>
+        </div>
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> Mostly product demo — walk through what the user sees and does<br>
+            <strong>B.</strong> Mix — product demo with brief explanation of key technical decisions<br>
+            <strong>C.</strong> Mostly technical — focus on architecture, patterns, and implementation choices
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Q8 -->
+    <div class="q-card">
+      <div class="q-card-head">
+        <span class="q-index">Q 08</span>
+        <div style="flex:1;">
+          <div class="q-meta">
+            <span class="badge badge-green">Nice to know</span>
+            <span class="q-scope">Affects: stretch feature prioritisation</span>
+          </div>
+          <h4>If we complete the core features ahead of schedule, which bonus feature would add the most value to your evaluation?</h4>
+        </div>
+      </div>
+      <div class="q-body">
+        <div class="q-row">
+          <span class="q-label ql-options">Options</span>
+          <p>
+            <strong>A.</strong> Payment cancellation — user can cancel a CREATED payment before it is processed<br>
+            <strong>B.</strong> Dashboard / analytics — charts showing payment volumes and failure rates<br>
+            <strong>C.</strong> Concurrency safety demo — show that simultaneous duplicate submissions are handled correctly<br>
+            <strong>D.</strong> Something else — please specify
+          </p>
+        </div>
+        <div class="q-answer">📝 &nbsp;<span>Your answer: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      </div>
+    </div>
+
+    <!-- Summary table -->
+    <div class="card" style="margin-top:28px;">
+      <div class="card-head"><h3>Summary — answers to bring back to us</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table answer-table">
+          <thead><tr><th width="60">#</th><th>Question</th><th width="180">Our default</th><th width="180">Your answer</th></tr></thead>
+          <tbody>
+            <tr><td class="muted">Q1 <span class="badge badge-red">Must</span></td><td>Account validation: format-only or existence check?</td><td class="muted">Format only</td><td class="muted">—</td></tr>
+            <tr><td class="muted">Q2 <span class="badge badge-red">Must</span></td><td>Duplicate submission: silent return or 409 error?</td><td class="muted">Silent 200 return</td><td class="muted">—</td></tr>
+            <tr><td class="muted">Q3 <span class="badge badge-red">Must</span></td><td>Processing speed: instant or step-by-step?</td><td class="muted">Instant</td><td class="muted">—</td></tr>
+            <tr><td class="muted">Q4 <span class="badge badge-amber">Imp.</span></td><td>Supported currencies?</td><td class="muted">USD, EUR, GBP</td><td class="muted">—</td></tr>
+            <tr><td class="muted">Q5 <span class="badge badge-amber">Imp.</span></td><td>Failure simulation: deterministic or random?</td><td class="muted">Deterministic triggers</td><td class="muted">—</td></tr>
+            <tr><td class="muted">Q6 <span class="badge badge-amber">Imp.</span></td><td>Search: partial or exact match?</td><td class="muted">Partial on description</td><td class="muted">—</td></tr>
+            <tr><td class="muted">Q7 <span class="badge badge-green">Nice</span></td><td>Presentation focus?</td><td class="muted">—</td><td class="muted">—</td></tr>
+            <tr><td class="muted">Q8 <span class="badge badge-green">Nice</span></td><td>Preferred stretch feature?</td><td class="muted">—</td><td class="muted">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    securityLevel: 'loose',
+    themeVariables: {
+      primaryColor: '#eff6ff',
+      primaryTextColor: '#1e3a5f',
+      primaryBorderColor: '#bfdbfe',
+      lineColor: '#6b7280',
+      secondaryColor: '#f0fdf4',
+      tertiaryColor: '#f8f9fb',
+      edgeLabelBackground: '#ffffff',
+      fontSize: '13px'
+    },
+    flowchart: { useMaxWidth: true, htmlLabels: false, curve: 'basis', padding: 16 },
+    er: { useMaxWidth: true, diagramPadding: 24, entityPadding: 14 }
+  });
+
+  const darkMermaidVars = {
+    primaryColor: '#1c2130',
+    primaryTextColor: '#e6edf3',
+    primaryBorderColor: '#388bfd',
+    lineColor: '#8b949e',
+    secondaryColor: '#161b27',
+    tertiaryColor: '#0d1117',
+    edgeLabelBackground: '#1c2130',
+    fontSize: '13px'
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.mermaid').forEach(el => {
+      el.setAttribute('data-src', el.textContent.trim());
+    });
+    if (localStorage.getItem('pp-cust-theme') === 'dark') applyDark(false);
+    else applyLight(false);
+    mermaid.run({ querySelector: '.mermaid' });
+  });
+
+  function applyLight(rerender) {
+    document.body.classList.remove('dark');
+    document.getElementById('themeBtn').textContent = 'Dark mode';
+    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'base',
+      themeVariables: { primaryColor:'#eff6ff', primaryTextColor:'#1e3a5f', primaryBorderColor:'#bfdbfe',
+        lineColor:'#6b7280', secondaryColor:'#f0fdf4', tertiaryColor:'#f8f9fb',
+        edgeLabelBackground:'#ffffff', fontSize:'13px' }
+    });
+    if (rerender) rerenderAll();
+  }
+
+  function applyDark(rerender) {
+    document.body.classList.add('dark');
+    document.getElementById('themeBtn').textContent = 'Light mode';
+    mermaid.initialize({ ...mermaid.mermaidAPI.getConfig(), theme: 'dark',
+      themeVariables: darkMermaidVars
+    });
+    if (rerender) rerenderAll();
+  }
+
+  function toggleTheme() {
+    const isDark = document.body.classList.contains('dark');
+    localStorage.setItem('pp-cust-theme', isDark ? 'light' : 'dark');
+    if (isDark) applyLight(true); else applyDark(true);
+  }
+
+  function rerenderAll() {
+    document.querySelectorAll('.mermaid').forEach(el => {
+      el.removeAttribute('data-processed');
+      const src = el.getAttribute('data-src');
+      if (src) el.textContent = src;
+    });
+    mermaid.run({ querySelector: '.mermaid' });
+  }
+
+  function showTab(name, btn) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>

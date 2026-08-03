@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PayPulse - Create Payment (Wireframe)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse <span class="tag">Wireframe - Dummy Data</span></div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html" class="active">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Create Payment</h1>
+    <p>Select a source account you own, enter where the money is going, and submit. This is a click-through prototype - submitting creates an in-memory dummy payment (lost on page refresh).</p>
+  </div>
+
+  <div id="formNotice"></div>
+
+  <div class="card" id="formCard">
+    <h2>Payment Details</h2>
+    <form id="paymentForm">
+      <div class="form-row">
+        <label for="sourceAccount">Source Account *</label>
+        <select id="sourceAccount" required></select>
+        <div class="hint">Only your ACTIVE accounts are selectable. Currency below auto-matches this account.</div>
+      </div>
+
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label for="amount">Amount *</label>
+          <input type="number" id="amount" min="0.01" max="1000000" step="0.01" placeholder="e.g. 250.00" required />
+        </div>
+        <div class="form-row">
+          <label for="currency">Currency</label>
+          <input type="text" id="currency" readonly placeholder="auto-filled from source account" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="destinationAccount">Destination Account *</label>
+        <input type="text" id="destinationAccount" placeholder="e.g. ACC9998887" minlength="8" maxlength="20" required />
+        <div class="hint">8-20 alphanumeric characters. Must be different from the source account.</div>
+      </div>
+
+      <div class="form-row">
+        <label for="reference">Reference / Description (optional)</label>
+        <textarea id="reference" rows="2" maxlength="255" placeholder="e.g. Invoice #4471"></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="idempotencyKey">Idempotency Key (auto-generated, read-only)</label>
+        <input type="text" id="idempotencyKey" readonly aria-label="Idempotency Key" />
+        <div class="hint">Generated once when you click Submit, so an accidental double-click never creates two payments.</div>
+      </div>
+
+      <button type="submit" class="btn" id="submitBtn">Submit Payment</button>
+    </form>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none;">
+    <h2>Result</h2>
+    <div id="resultBody"></div>
+  </div>
+
+  <p class="footer-note">Data source: dummy JSON. In the real system, submitting this form calls <code>POST /payments</code> (see <code>../../docs/openapi.yaml</code>) and the payment automatically progresses through CREATED &rarr; VALIDATED &rarr; SENT &rarr; COMPLETED/FAILED.</p>
+</main>
+
+<script src="assets/dummy-data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  var sourceSelect = document.getElementById("sourceAccount");
+  window.DUMMY_DATA.accounts.forEach(function (acc) {
+    var opt = document.createElement("option");
+    opt.value = acc.id;
+    opt.textContent = acc.label + " - " + acc.accountNumber + " (" + acc.currency + ")" + (acc.status === "INACTIVE" ? " - INACTIVE" : "");
+    if (acc.status === "INACTIVE") opt.disabled = true;
+    sourceSelect.appendChild(opt);
+  });
+
+  function syncCurrency() {
+    var acc = findAccount(sourceSelect.value);
+    document.getElementById("currency").value = acc ? acc.currency : "";
+  }
+  sourceSelect.addEventListener("change", syncCurrency);
+  syncCurrency();
+
+  document.getElementById("idempotencyKey").value = generateIdempotencyKey();
+
+  document.getElementById("paymentForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    var sourceAccountId = sourceSelect.value;
+    var acc = findAccount(sourceAccountId);
+    var amount = parseFloat(document.getElementById("amount").value);
+    var destinationAccount = document.getElementById("destinationAccount").value.trim();
+    var reference = document.getElementById("reference").value.trim();
+    var noticeEl = document.getElementById("formNotice");
+    noticeEl.innerHTML = "";
+
+    // --- client-side validation mirroring 03-acceptance-criteria.md ---
+    if (!acc || acc.status !== "ACTIVE") {
+      return showNotice("error", "INVALID_ACCOUNT: selected source account is not active.");
+    }
+    if (!amount || amount <= 0 || amount > 1000000) {
+      return showNotice("error", "INVALID_AMOUNT: amount must be greater than 0 and no more than 1,000,000.");
+    }
+    if (destinationAccount.length < 8 || destinationAccount.length > 20) {
+      return showNotice("error", "INVALID_ACCOUNT: destination account must be 8-20 characters.");
+    }
+    if (destinationAccount === acc.accountNumber) {
+      return showNotice("error", "INVALID_ACCOUNT: source and destination accounts must differ.");
+    }
+
+    // --- simulate submit + auto-progression ---
+    document.getElementById("submitBtn").disabled = true;
+    document.getElementById("submitBtn").textContent = "Processing...";
+
+    setTimeout(function () {
+      var newId = generatePaymentId();
+      var willFail = destinationAccount.toUpperCase().indexOf("FAIL") !== -1; // demo trigger
+      var status = willFail ? "FAILED" : "COMPLETED";
+      var now = new Date().toISOString();
+
+      var newPayment = {
+        id: newId, sourceAccountId: sourceAccountId, destinationAccount: destinationAccount,
+        amount: amount, currency: acc.currency, reference: reference,
+        status: status,
+        errorCode: willFail ? "NETWORK_ERROR" : null,
+        errorMessage: willFail ? "Simulated network failure while transmitting payment" : null,
+        createdAt: now, updatedAt: now,
+        history: [
+          { previousStatus: null, newStatus: "CREATED", errorCode: null, errorMessage: null, occurredAt: now },
+          { previousStatus: "CREATED", newStatus: "VALIDATED", errorCode: null, errorMessage: null, occurredAt: now }
+        ]
+      };
+      if (willFail) {
+        newPayment.history.push({ previousStatus: "VALIDATED", newStatus: "FAILED", errorCode: "NETWORK_ERROR", errorMessage: "Simulated network failure while transmitting payment", occurredAt: now });
+      } else {
+        newPayment.history.push({ previousStatus: "VALIDATED", newStatus: "SENT", errorCode: null, errorMessage: null, occurredAt: now });
+        newPayment.history.push({ previousStatus: "SENT", newStatus: "COMPLETED", errorCode: null, errorMessage: null, occurredAt: now });
+      }
+
+      window.DUMMY_DATA.payments.unshift(newPayment);
+
+      var resultCard = document.getElementById("resultCard");
+      resultCard.style.display = "block";
+      document.getElementById("resultBody").innerHTML =
+        '<div class="notice ' + (willFail ? "error" : "success") + '">' +
+          (willFail ? "Payment failed: " + newPayment.errorMessage : "Payment completed successfully.") +
+        '</div>' +
+        '<dl class="field-list">' +
+          '<dt>Payment ID</dt><dd>' + newPayment.id + '</dd>' +
+          '<dt>Status</dt><dd>' + badgeHtml(newPayment.status) + '</dd>' +
+          '<dt>Amount</dt><dd>' + formatMoney(newPayment.amount, newPayment.currency) + '</dd>' +
+        '</dl>' +
+        '<p style="margin-top:14px;"><a class="btn ghost" href="payment-details.html?id=' + encodeURIComponent(newPayment.id) + '">View Payment Details &rarr;</a></p>';
+
+      document.getElementById("submitBtn").disabled = false;
+      document.getElementById("submitBtn").textContent = "Submit Payment";
+      document.getElementById("idempotencyKey").value = generateIdempotencyKey();
+      resultCard.scrollIntoView({ behavior: "smooth" });
+    }, 500);
+  });
+
+  function showNotice(type, msg) {
+    document.getElementById("formNotice").innerHTML = '<div class="notice ' + type + '">' + msg + '</div>';
+  }
+</script>
+</body>
+</html>
+
+

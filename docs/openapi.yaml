@@ -1,0 +1,603 @@
+openapi: 3.0.3
+info:
+  title: Payments Processing API
+  description: >
+    REST API for managing the full lifecycle of financial payments —
+    creation, validation, transmission, completion/failure — with a
+    complete audit trail of status transitions. The single operator owns
+    multiple accounts (INR/USD); a KPI/analytics dashboard and API rate
+    limiting are provided per the 31-Jul-2026 customer meeting.
+  version: "1.1.0"
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+tags:
+  - name: Accounts
+    description: List the operator's own accounts (source-account picker)
+  - name: Payments
+    description: Create, retrieve, and track payments
+  - name: Analytics
+    description: KPI dashboard and basic analytics
+
+paths:
+  /accounts:
+    get:
+      tags: [Accounts]
+      summary: List the operator's accounts
+      operationId: listAccounts
+      responses:
+        '200':
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /accounts/{id}:
+    get:
+      tags: [Accounts]
+      summary: Get a single account by ID
+      operationId: getAccountById
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Account found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments:
+    post:
+      tags: [Payments]
+      summary: Create a new payment
+      operationId: createPayment
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema:
+            type: string
+          description: Client-generated key to detect duplicate submissions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment created (final status reflected in body after auto-progression)
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '200':
+          description: Idempotency-Key matched an existing payment — returning it, no new resource created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Validation failed (field-level or business-rule, e.g. INVALID_ACCOUNT, INVALID_CURRENCY)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: sourceAccountId does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    get:
+      tags: [Payments]
+      summary: List / search / filter payments
+      operationId: listPayments
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/PaymentStatus'
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Matches against reference or payment ID (partial match)
+        - in: query
+          name: sourceAccountId
+          schema:
+            type: string
+            format: uuid
+          description: Filter to payments from a specific source account
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - in: query
+          name: sort
+          schema:
+            type: string
+            default: createdAt,desc
+      responses:
+        '200':
+          description: Paginated list of payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentPage'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get a payment by ID
+      operationId: getPaymentById
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Payment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/{id}/history:
+    get:
+      tags: [Payments]
+      summary: Get full status-transition audit trail for a payment
+      operationId: getPaymentHistory
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Ordered list of status transitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentHistoryResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/{id}/validate:
+    post:
+      tags: [Payments]
+      summary: Explicitly trigger CREATED -> VALIDATED transition
+      operationId: validatePayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Transition attempted (payment now VALIDATED or FAILED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Illegal transition attempted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Concurrent modification conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/{id}/send:
+    post:
+      tags: [Payments]
+      summary: Explicitly trigger VALIDATED -> SENT transition
+      operationId: sendPayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Transition attempted (payment now SENT or FAILED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Illegal transition attempted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Concurrent modification conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/{id}/complete:
+    post:
+      tags: [Payments]
+      summary: Explicitly trigger SENT -> COMPLETED transition
+      operationId: completePayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Transition attempted (payment now COMPLETED or FAILED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Illegal transition attempted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Concurrent modification conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /analytics/summary:
+    get:
+      tags: [Analytics]
+      summary: KPI dashboard summary — success/failure rate, avg processing time, throughput, volume
+      operationId: getAnalyticsSummary
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: KPI summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KpiSummaryResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /analytics/trend:
+    get:
+      tags: [Analytics]
+      summary: Time-bucketed trend of payment counts by status
+      operationId: getAnalyticsTrend
+      parameters:
+        - in: query
+          name: hours
+          schema:
+            type: integer
+            default: 24
+      responses:
+        '200':
+          description: Trend buckets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+components:
+  parameters:
+    PaymentId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    RateLimited:
+      description: Rate limit exceeded (token bucket exhausted)
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the client may retry
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+  schemas:
+    PaymentStatus:
+      type: string
+      enum: [CREATED, VALIDATED, SENT, COMPLETED, FAILED]
+
+    CurrencyCode:
+      type: string
+      enum: [INR, USD]
+      description: >
+        Only INR and USD are supported (customer-confirmed 31 Jul 2026).
+        No cross-currency conversion is performed.
+
+    AccountStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+
+    AccountResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "b2c3d4e5-1111-4a11-8a11-111111111111"
+        label:
+          type: string
+          example: "Primary INR Savings"
+        accountNumber:
+          type: string
+          example: ACC1000001
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+
+    CreatePaymentRequest:
+      type: object
+      required: [sourceAccountId, amount, currency, destinationAccount]
+      properties:
+        sourceAccountId:
+          type: string
+          format: uuid
+          example: "b2c3d4e5-1111-4a11-8a11-111111111111"
+          description: Must reference an existing, ACTIVE Account (see GET /accounts)
+        amount:
+          type: number
+          format: double
+          example: 250.00
+          minimum: 0.01
+          maximum: 1000000
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        destinationAccount:
+          type: string
+          minLength: 8
+          maxLength: 20
+          example: ACC2000002
+          description: Free-text, format-validated only (external party, not existence-checked)
+        reference:
+          type: string
+          maxLength: 255
+          nullable: true
+          example: "Invoice #4471"
+
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceAccountId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        destinationAccount:
+          type: string
+        reference:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentHistoryResponse:
+      type: object
+      properties:
+        previousStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+          nullable: true
+        newStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        triggeredBy:
+          type: string
+          example: SYSTEM
+        occurredAt:
+          type: string
+          format: date-time
+
+    PaymentPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentResponse'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    KpiSummaryResponse:
+      type: object
+      description: >
+        Business-meaningful metrics only (customer directive, MEM-019) —
+        no vanity/fancy metrics.
+      properties:
+        totalPayments:
+          type: integer
+          example: 1287
+        successRatePct:
+          type: number
+          format: double
+          example: 94.2
+        failureRatePct:
+          type: number
+          format: double
+          example: 5.8
+        avgProcessingTimeSeconds:
+          type: number
+          format: double
+          example: 0.84
+        throughputPerMinute:
+          type: number
+          format: double
+          example: 53.6
+        volumeByCurrency:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          example: { "INR": 1845200.00, "USD": 42310.50 }
+        topFailureReasons:
+          type: object
+          additionalProperties:
+            type: integer
+          example: { "NETWORK_ERROR": 41, "INVALID_CURRENCY": 12 }
+
+    TrendBucket:
+      type: object
+      properties:
+        periodStart:
+          type: string
+          format: date-time
+        created:
+          type: integer
+        completed:
+          type: integer
+        failed:
+          type: integer
+
+    TrendResponse:
+      type: object
+      properties:
+        buckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendBucket'
+
+    ApiError:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          example: INVALID_AMOUNT
+        message:
+          type: string
+          example: Amount must be greater than 0
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+          example: /api/v1/payments
+

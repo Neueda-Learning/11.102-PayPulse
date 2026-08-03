@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>PayPulse — Payment Details</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">P</span> PayPulse</div>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="accounts.html">Accounts</a>
+    <a href="create-payment.html">Create Payment</a>
+    <a href="payments.html">Payments</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Payment Details</h1>
+    <a href="payments.html" class="btn ghost" style="margin-top:8px;">← Back to Payments</a>
+  </div>
+
+  <div id="content">
+    <div class="card">
+      <div class="empty-state"><span class="spinner"></span> Loading payment...</div>
+    </div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+async function loadPaymentDetails() {
+  const id = getQueryParam('id');
+  const content = document.getElementById('content');
+
+  if (!id) {
+    content.innerHTML = '<div class="notice error">No payment ID specified.</div>';
+    return;
+  }
+
+  try {
+    const [payment, history] = await Promise.all([
+      Payments.getById(id),
+      Payments.getHistory(id)
+    ]);
+
+    // Try to resolve source account label
+    let accountLabel = payment.sourceAccountId;
+    try {
+      const acc = await Accounts.getById(payment.sourceAccountId);
+      accountLabel = `${acc.label} — ${acc.accountNumber} (${acc.currency})`;
+    } catch (_) {}
+
+    const errorBlock = payment.status === 'FAILED'
+      ? `<div class="notice error"><strong>${payment.errorCode}</strong>: ${payment.errorMessage || ''}</div>`
+      : '';
+
+    content.innerHTML = `
+      <div class="card">
+        <h2>Payment <code style="font-size:13px;">${payment.id}</code> &nbsp; ${badgeHtml(payment.status)}</h2>
+        ${errorBlock}
+        <dl class="field-list">
+          <dt>Source Account</dt><dd>${accountLabel}</dd>
+          <dt>Destination</dt>  <dd>${payment.destinationAccount}</dd>
+          <dt>Amount</dt>       <dd>${formatMoney(payment.amount, payment.currency)}</dd>
+          <dt>Currency</dt>     <dd>${payment.currency}</dd>
+          <dt>Reference</dt>    <dd>${payment.reference || '<span style="color:#9aa1ab;">(none)</span>'}</dd>
+          <dt>Created</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
+          <dt>Updated</dt>      <dd>${formatDateTime(payment.updatedAt)}</dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <h2>Status History (Audit Trail)</h2>
+        <ul class="timeline" id="timeline"></ul>
+      </div>
+    `;
+
+    const timeline = document.getElementById('timeline');
+    (history || []).forEach(h => {
+      const li = document.createElement('li');
+      const desc = h.previousStatus
+        ? `${h.previousStatus} → ${h.newStatus}`
+        : `Payment created (${h.newStatus})`;
+      const errPart = h.errorCode
+        ? ` <span style="color:#b91c1c;">(${h.errorCode}: ${h.errorMessage || ''})</span>`
+        : '';
+      li.innerHTML = `<span class="t-time">${formatDateTime(h.occurredAt)}</span><span>${desc}${errPart}</span>`;
+      timeline.appendChild(li);
+    });
+
+  } catch (err) {
+    if (err.errorCode === 'PAYMENT_NOT_FOUND') {
+      content.innerHTML = `<div class="card"><div class="notice error">PAYMENT_NOT_FOUND: No payment found with id <code>${id}</code>.</div></div>`;
+    } else {
+      content.innerHTML = `<div class="card"><div class="notice error">Could not load payment: ${err.message || 'Unknown error'}</div></div>`;
+    }
+  }
+}
+
+loadPaymentDetails();
+</script>
+</body>
+</html>
+
