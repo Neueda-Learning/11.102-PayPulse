@@ -1,5 +1,6 @@
 package com.paypulse.payment.api;
 
+import com.paypulse.common.error.ApiError;
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.PaymentStatusHistory;
@@ -7,6 +8,7 @@ import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.StatusTransitionEngine;
 import com.paypulse.payment.service.states.InvalidStatusTransitionException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -72,22 +74,24 @@ public class PaymentController {
     }
 
     @ExceptionHandler(PaymentNotFoundException.class)
-    public ResponseEntity<ErrorBody> handlePaymentNotFound(PaymentNotFoundException ex) {
+    public ResponseEntity<ApiError> handlePaymentNotFound(PaymentNotFoundException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorBody(ErrorCode.PAYMENT_NOT_FOUND.name(), ex.getMessage()));
+                .body(ApiError.of(ErrorCode.PAYMENT_NOT_FOUND, ex.getMessage(), req.getRequestURI()));
     }
 
     @ExceptionHandler(InvalidStatusTransitionException.class)
-    public ResponseEntity<ErrorBody> handleInvalidTransition(InvalidStatusTransitionException ex) {
+    public ResponseEntity<ApiError> handleInvalidTransition(InvalidStatusTransitionException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorBody(ErrorCode.INVALID_STATUS_TRANSITION.name(), ex.getMessage()));
+                .body(ApiError.of(ErrorCode.INVALID_STATUS_TRANSITION, ex.getMessage(), req.getRequestURI()));
     }
 
     @ExceptionHandler({OptimisticLockingFailureException.class, IllegalStateException.class})
-    public ResponseEntity<ErrorBody> handleConcurrency(Exception ex) {
+    public ResponseEntity<ApiError> handleConcurrency(Exception ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorBody(ErrorCode.PROCESSING_ERROR.name(), "Payment was concurrently modified, please retry"));
+                .body(ApiError.of(
+                        ErrorCode.PROCESSING_ERROR,
+                        "Payment was concurrently modified, please retry",
+                        req.getRequestURI()
+                ));
     }
-
-    public record ErrorBody(String errorCode, String message) {}
 }

@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface PaymentStatusHistoryRepository extends JpaRepository<PaymentStatusHistory, String> {
+public interface PaymentStatusHistoryRepository extends JpaRepository<PaymentStatusHistory, Long> {
     List<PaymentStatusHistory> findByPaymentIdOrderByOccurredAtAsc(String paymentId);
 }
