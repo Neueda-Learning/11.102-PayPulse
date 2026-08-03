@@ -72,7 +72,7 @@ com.team.payments
 
 ## 3. Request Flow Example (Create Payment, updated for Account selection)
 
-1. Request passes through `RateLimitFilter` first (Bucket4j token-bucket check) — if the bucket is empty, short-circuits with `429 RATE_LIMIT_EXCEEDED` before touching the controller (cheapest possible rejection point).
+1. Request passes through `RateLimitFilter` first (Bucket4j token buckets, Redis-backed (bucket4j-redis) for cross-instance correctness) — if the bucket is empty, short-circuits with `429 RATE_LIMIT_EXCEEDED` before touching the controller (cheapest possible rejection point).
 2. `PaymentController.create()` receives `CreatePaymentRequest` DTO (`sourceAccountId`, `destinationAccount`, `amount`, `currency`, ...), `@Valid` triggers field-level Bean Validation (format/required checks) → if invalid, Spring throws `MethodArgumentNotValidException` → caught by `GlobalExceptionHandler` → `400 VALIDATION_FAILED`.
 3. Controller calls `PaymentService.createPayment(request)`.
 4. `PaymentService` asks `IdempotencyService` to check for an existing payment with the given key → if found, **short-circuit, return existing** (MEM-006 → 200).
@@ -128,7 +128,7 @@ Frontend consumes the OpenAPI contract (Phase 4) directly — component structur
 - **Stateless services + horizontal scaling**: no session state in the app; any instance can serve any request, so a load balancer can distribute the 40k/min across N instances.
 - **Connection pooling**: HikariCP pool size tuned to (DB max connections ÷ number of app instances), avoiding both pool starvation and overwhelming MySQL.
 - **Indexing** (SRS §5): `status`, `created_at`, `source_account_id`, `idempotency_key` indexed — list/filter/analytics queries stay fast as row counts grow.
-- **Read-heavy endpoints** (`GET /payments`, `/analytics/*`) are natural candidates for a MySQL **read replica** in a real deployment — noted as a documented scale-out path, not required for the Sprint 1 demo.
+- **Read-heavy endpoints** (`GET /payments`, `/analytics/*`) are natural candidates for a MySQL **read replica** in a real deployment — noted as a documented scale-out path.
 
 ### 7.2 Concurrent users / concurrent requests (NFR-8)
 - Optimistic locking (`@Version`) already prevents two concurrent transitions on the *same* payment from corrupting state — a retry-on-conflict strategy (bounded, e.g. 1–2 retries) is applied at the service layer before surfacing a conflict to the client.
