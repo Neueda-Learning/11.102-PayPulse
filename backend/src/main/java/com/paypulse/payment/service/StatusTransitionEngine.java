@@ -1,22 +1,25 @@
 package com.paypulse.payment.service;
 
+import com.paypulse.common.error.ErrorCode;
+import com.paypulse.common.resilience.ResilienceConfig;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.PaymentStatusHistory;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
-import com.paypulse.payment.service.states.InvalidStatusTransitionException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import com.paypulse.payment.service.states.PaymentState;
 import com.paypulse.payment.service.states.PaymentStateFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
+import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +28,14 @@ public class StatusTransitionEngine {
     private final PaymentRepository paymentRepository;
     private final PaymentStatusHistoryRepository historyRepository;
     private final PaymentStateFactory stateFactory;
+    private final ResilienceConfig resilienceConfig;
+    private final Random simulationRandom;
+
+    @Value("${paypulse.simulation.failure-account-number:FAILTEST01}")
+    private String deterministicFailureAccount;
+
+    @Value("${paypulse.simulation.random-failure-rate:0.05}")
+    private double randomFailureRate;
 
     @Transactional(readOnly = true)
     public List<PaymentStatusHistory> getHistory(String paymentId) {
@@ -38,24 +49,60 @@ public class StatusTransitionEngine {
 
     @Transactional
     public Payment sendPayment(Payment payment, TriggeredBy triggeredBy) {
-        return transition(payment, Action.SEND, triggeredBy, null, null);
+        return transitionWithResilience(payment, Action.SEND, "paymentSend", triggeredBy);
     }
 
     @Transactional
     public Payment completePayment(Payment payment, TriggeredBy triggeredBy) {
-        return transition(payment, Action.COMPLETE, triggeredBy, null, null);
+        return transitionWithResilience(payment, Action.COMPLETE, "paymentComplete", triggeredBy);
     }
 
     @Transactional
     public Payment markFailed(Payment payment, TriggeredBy triggeredBy, String errorCode, String errorMessage) {
         PaymentStatus previous = payment.getStatus();
-        payment.setStatus(PaymentStatus.FAILED);
-        payment.setErrorCode(errorCode);
-        payment.setErrorMessage(errorMessage);
+        return persistTransition(payment, previous, PaymentStatus.FAILED, triggeredBy, errorCode, errorMessage);
+    }
 
-        Payment saved = savePayment(payment);
-        saveHistory(saved.getId(), previous, PaymentStatus.FAILED, errorCode, errorMessage, triggeredBy);
-        return saved;
+    private Payment transitionWithResilience(
+            Payment payment,
+            Action action,
+            String resilienceInstance,
+            TriggeredBy triggeredBy
+    ) {
+        PaymentStatus previous = payment.getStatus();
+        PaymentState state = stateFactory.from(previous);
+
+        PaymentStatus next = switch (action) {
+            case SEND -> state.send();
+            case COMPLETE -> state.complete();
+            default -> throw new IllegalArgumentException("Unsupported resilience transition action: " + action);
+        };
+
+        try {
+            resilienceConfig.execute(resilienceInstance, () -> {
+                simulateExternalStep(payment);
+                return Boolean.TRUE;
+            });
+            return persistTransition(payment, previous, next, triggeredBy, null, null);
+        } catch (CallNotPermittedException ex) {
+            return persistTransition(
+                    payment,
+                    previous,
+                    PaymentStatus.FAILED,
+                    triggeredBy,
+                    ErrorCode.PROCESSING_ERROR.name(),
+                    "Circuit breaker is open for transition " + action
+            );
+        } catch (RuntimeException ex) {
+            return persistTransition(
+                    payment,
+                    previous,
+                    PaymentStatus.FAILED,
+                    triggeredBy,
+                    ErrorCode.NETWORK_ERROR.name(),
+                    ex.getMessage()
+            );
+        }
     }
 
     private Payment transition(
@@ -74,6 +121,17 @@ public class StatusTransitionEngine {
             case COMPLETE -> state.complete();
         };
 
+        return persistTransition(payment, previous, next, triggeredBy, errorCode, errorMessage);
+    }
+
+    private Payment persistTransition(
+            Payment payment,
+            PaymentStatus previous,
+            PaymentStatus next,
+            TriggeredBy triggeredBy,
+            String errorCode,
+            String errorMessage
+    ) {
         payment.setStatus(next);
         payment.setErrorCode(errorCode);
         payment.setErrorMessage(errorMessage);
@@ -100,7 +158,6 @@ public class StatusTransitionEngine {
             TriggeredBy triggeredBy
     ) {
         PaymentStatusHistory row = PaymentStatusHistory.builder()
-                .id(UUID.randomUUID().toString())
                 .paymentId(paymentId)
                 .previousStatus(previous)
                 .newStatus(next)
@@ -115,5 +172,14 @@ public class StatusTransitionEngine {
 
     private enum Action {
         VALIDATE, SEND, COMPLETE
+    }
+
+    private void simulateExternalStep(Payment payment) {
+        if (deterministicFailureAccount != null && deterministicFailureAccount.equals(payment.getDestinationAccount())) {
+            throw new RuntimeException("Simulated network failure while transmitting payment");
+        }
+        if (randomFailureRate > 0.0d && simulationRandom.nextDouble() < randomFailureRate) {
+            throw new RuntimeException("Simulated transient network failure");
+        }
     }
 }
