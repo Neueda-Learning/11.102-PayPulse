@@ -1,5 +1,4 @@
 package com.paypulse.common.ratelimit;
-
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.BucketProxy;
@@ -105,3 +104,4 @@ public class RateLimitFilter extends HttpFilter {
         );
     }
 }
+
