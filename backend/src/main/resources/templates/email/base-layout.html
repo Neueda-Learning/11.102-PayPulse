@@ -6,7 +6,8 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
-    <title th:replace="${title}">PayPulse Notification</title>
+    <!-- FIXED: Changed th:replace to th:text to safely render the string variable -->
+    <title th:text="${title}">PayPulse Notification</title>
     <style>
         /* ── Reset ────────────────────────────────────────────────────────────── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -196,7 +197,7 @@
             </p>
             <p>This is an automated message — please do not reply directly.</p>
             <div class="company">
-                &copy; 2025 PayPulse. All rights reserved.<br/>
+                &copy; 2026 PayPulse. All rights reserved.<br/>
                 PayPulse Payment Processing Platform
             </div>
         </div>
