@@ -90,7 +90,7 @@ services:
     container_name: paypulse-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "8085:80"
     depends_on:
       - backend
     networks:
