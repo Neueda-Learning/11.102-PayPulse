@@ -3,6 +3,7 @@ package com.paypulse.payment.api;
 import com.paypulse.common.error.ApiError;
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
+import com.paypulse.payment.api.dto.PaymentHistoryResponse;
 import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.PaymentStatusHistory;
