@@ -37,6 +37,9 @@ class PaymentControllerTest {
     @MockBean
     private StatusTransitionEngine statusTransitionEngine;
 
+    @MockBean
+    private PaymentMapper paymentMapper;
+
     @Test
     void getHistory_whenPaymentMissing_returns404WithErrorCode() throws Exception {
         when(paymentRepository.findById("missing-id")).thenReturn(Optional.empty());
@@ -54,7 +57,8 @@ class PaymentControllerTest {
 
         when(paymentRepository.findById(payment.getId())).thenReturn(Optional.of(payment));
         when(statusTransitionEngine.validatePayment(eq(payment), eq(TriggeredBy.CLIENT))).thenReturn(updated);
-
+        when(paymentMapper.toResponse(updated)).thenReturn(
+                PaymentResponse.builder().id(updated.getId()).status(updated.getStatus()).build());
         mockMvc.perform(post("/api/v1/payments/{id}/validate", payment.getId())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

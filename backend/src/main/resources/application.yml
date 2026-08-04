@@ -102,9 +102,12 @@ resilience4j:
         retry-exceptions:
           - java.io.IOException
           - java.util.concurrent.TimeoutException
+          - com.paypulse.payment.service.SimulatedProcessingException
       paymentComplete:
         max-attempts: 2
         wait-duration: 200ms
+        retry-exceptions:
+          - com.paypulse.payment.service.SimulatedProcessingException
 
 # ── PayPulse App Config ────────────────────────────────────────────────────────
 paypulse:
