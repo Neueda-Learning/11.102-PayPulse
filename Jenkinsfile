@@ -25,19 +25,19 @@ pipeline {
 
         stage('Stop Existing Containers') {
             steps {
-                sh 'docker compose down || true'
+                sh 'docker-compose down || true'
             }
         }
 
         stage('Build Docker Images') {
             steps {
-                sh 'docker compose build --no-cache'
+                sh 'docker-compose build --no-cache'
             }
         }
 
         stage('Deploy (all containers incl. Redis, MySQL)') {
             steps {
-                sh 'docker compose up -d'
+               sh 'docker-compose up -d'
             }
         }
 
@@ -49,8 +49,8 @@ pipeline {
 
         stage('Verify Containers Running') {
             steps {
-                sh 'docker compose ps'
-                sh 'docker ps --format "table {{.Names}}\\t{{.Status}}"'
+               sh 'docker-compose ps'
+               sh 'docker ps --format "table {{.Names}}\\t{{.Status}}"'
             }
         }
 
@@ -63,10 +63,10 @@ pipeline {
 
     post {
         always {
-            sh 'docker compose ps'
+           sh 'docker-compose ps'
         }
         failure {
-            sh 'docker compose logs --tail=100'
+            sh 'docker-compose logs --tail=100'
         }
     }
 }
