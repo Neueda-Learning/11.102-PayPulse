@@ -164,7 +164,7 @@ public class EmailService {
 
             return EmailResult.success(notifLog.getNotificationId());
 
-        } catch (MessagingException | jakarta.mail.internet.UnsupportedEncodingException ex) {
+        } catch (MessagingException | java.io.UnsupportedEncodingException ex) {
             String reason = "SMTP delivery failure: " + ex.getMessage();
             log.error("Failed to send email notificationId={}: {}",
                     notifLog.getNotificationId(), ex.getMessage(), ex);
