@@ -6,7 +6,6 @@ import com.paypulse.payment.api.dto.CreatePaymentRequest;
 import com.paypulse.payment.api.dto.PaymentHistoryResponse;
 import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
-import com.paypulse.payment.domain.PaymentStatusHistory;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.PaymentCreationResult;

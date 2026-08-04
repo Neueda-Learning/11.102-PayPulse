@@ -36,6 +36,13 @@ public class AccountValidator implements PaymentValidator {
                     "Payment currency '" + request.getCurrency()
                             + "' does not match account currency '" + account.getCurrency() + "'");
         }
+
+        if (request.getDestinationAccount() != null
+                && account.getAccountNumber() != null
+                && request.getDestinationAccount().equalsIgnoreCase(account.getAccountNumber())) {
+            throw new PaymentException(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_ACCOUNT,
+                    "destinationAccount must differ from source account number");
+        }
     }
 }
 
