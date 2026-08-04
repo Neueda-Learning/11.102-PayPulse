@@ -35,6 +35,7 @@ services:
       retries: 5
     networks:
       - paypulse-net
+
   # ─── 2. Spring Boot Backend ───────────────────────────────────────────────────
   backend:
     build:
@@ -49,8 +50,19 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       SERVER_PORT: 8080
+
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME}
+      MAIL_ENABLED: ${MAIL_ENABLED}
+      APP_BASE_URL: ${APP_BASE_URL}
+
     ports:
       - "8088:8080"
     depends_on:
@@ -58,6 +70,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
     networks:
       - paypulse-net
     healthcheck:
@@ -66,6 +79,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 45s
+
+
 
   # ─── 3. Frontend (nginx serving plain HTML/CSS/JS) ────────────────────────────
   frontend:
