@@ -2,13 +2,20 @@ package com.paypulse.payment.api;
 
 import com.paypulse.common.error.ApiError;
 import com.paypulse.common.error.ErrorCode;
+import com.paypulse.payment.api.dto.CreatePaymentRequest;
+import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.PaymentStatusHistory;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
+import com.paypulse.payment.service.PaymentCreationResult;
+import com.paypulse.payment.service.PaymentService;
 import com.paypulse.payment.service.StatusTransitionEngine;
 import com.paypulse.payment.service.states.InvalidStatusTransitionException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -19,21 +26,40 @@ import java.util.List;
 
 /**
  * Shared controller file per team protocol.
+ * M3 owns:
+ * - POST /payments
  * M2 owns:
  * - GET  /payments/{id}/history
  * - POST /payments/{id}/validate
  * - POST /payments/{id}/send
  * - POST /payments/{id}/complete
+ * M4 will own:
+ * - GET /payments/{id}
+ * - GET /payments
  */
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
+@Tag(name = "Payments", description = "Create, retrieve, and track payments")
 public class PaymentController {
 
+    private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
     private final StatusTransitionEngine statusTransitionEngine;
 
+    @PostMapping
+    @Operation(summary = "Create a new payment")
+    public ResponseEntity<PaymentResponse> create(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody CreatePaymentRequest request) {
+
+        PaymentCreationResult result = paymentService.createPayment(idempotencyKey, request);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(result.payment());
+    }
+
     @GetMapping("/{id}/history")
+    @Operation(summary = "Get payment status-transition history")
     public ResponseEntity<List<PaymentStatusHistory>> getHistory(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
         List<PaymentStatusHistory> history = statusTransitionEngine.getHistory(payment.getId());
@@ -41,6 +67,7 @@ public class PaymentController {
     }
 
     @PostMapping("/{id}/validate")
+    @Operation(summary = "Trigger CREATED -> VALIDATED transition")
     public ResponseEntity<Payment> validatePayment(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
         Payment updated = statusTransitionEngine.validatePayment(payment, TriggeredBy.CLIENT);
@@ -48,6 +75,7 @@ public class PaymentController {
     }
 
     @PostMapping("/{id}/send")
+    @Operation(summary = "Trigger VALIDATED -> SENT transition")
     public ResponseEntity<Payment> sendPayment(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
         Payment updated = statusTransitionEngine.sendPayment(payment, TriggeredBy.CLIENT);
@@ -55,6 +83,7 @@ public class PaymentController {
     }
 
     @PostMapping("/{id}/complete")
+    @Operation(summary = "Trigger SENT -> COMPLETED transition")
     public ResponseEntity<Payment> completePayment(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
         Payment updated = statusTransitionEngine.completePayment(payment, TriggeredBy.CLIENT);
