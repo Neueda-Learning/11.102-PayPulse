@@ -8,6 +8,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.paypulse.payment.service.PaymentException;
+
 /**
  * Central exception → ApiError mapper.
  * NFR-14: never leaks stack traces or internal exception class names.
@@ -16,6 +18,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /** Domain/business errors from the payments flow. */
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<ApiError> handlePayment(PaymentException ex, HttpServletRequest req) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(ApiError.of(ex.getErrorCode(), ex.getMessage(), req.getRequestURI()));
+    }
 
     /** Bean Validation failures (field-level @Valid) */
     @ExceptionHandler(MethodArgumentNotValidException.class)
