@@ -1,0 +1,98 @@
+<!-- backend/src/main/resources/templates/email/payment-failed.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Payment Failed</title></head>
+<body>
+
+<th:block th:replace="~{email/base-layout :: layout(
+    'Payment Failed – Action Required – PayPulse',
+    ~{::main-content}
+)}">
+
+    <div th:fragment="main-content">
+
+        <!-- Failure banner -->
+        <div style="background:#fee2e2;border:1px solid #fecaca;border-radius:10px;
+                padding:20px 24px;margin-bottom:28px;text-align:center;">
+            <div style="font-size:36px;margin-bottom:8px;">❌</div>
+            <div style="font-size:18px;font-weight:700;color:#991b1b;">
+                Payment Failed
+            </div>
+            <div style="font-size:13px;color:#b91c1c;margin-top:4px;">
+                Your payment could not be processed. No funds have been deducted.
+            </div>
+        </div>
+
+        <p class="greeting">We couldn't process your payment</p>
+
+        <p class="lead">
+            Hi <strong th:text="${recipientName}">Valued Customer</strong>,<br/>
+            Unfortunately, your payment could not be completed.
+            <strong>No money has left your account.</strong>
+            Please review the details below and try again.
+        </p>
+
+        <div class="detail-card">
+            <div class="card-title">Failed Transaction Details</div>
+
+            <div class="detail-row">
+                <span class="detail-label">Payment ID</span>
+                <span class="detail-value" th:text="${paymentId}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Reference</span>
+                <span class="detail-value" th:text="${referenceId}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Amount</span>
+                <span class="detail-value"
+                      th:text="${currency} + ' ' + ${amount}">INR 0.00</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Failed At</span>
+                <span class="detail-value" th:text="${failedAt}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+          <span class="status-badge status-failed">Failed</span>
+        </span>
+            </div>
+        </div>
+
+        <!-- Failure Reason Box -->
+        <div style="background:#fff7ed;border-left:4px solid #f97316;
+                border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:28px;">
+            <div style="font-size:11px;font-weight:700;color:#c2410c;
+                  letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">
+                Reason for Failure
+            </div>
+            <div style="font-size:14px;color:#7c2d12;font-weight:600;"
+                 th:text="${failureReason}">
+                Unknown error
+            </div>
+            <div style="font-size:12px;color:#9a3412;margin-top:4px;">
+                Error Code: <code th:text="${errorCode}">ERR_UNKNOWN</code>
+            </div>
+        </div>
+
+        <div class="cta-block">
+            <a class="btn btn-danger"
+               th:href="${baseUrl} + '/create-payment.html'">
+                Retry Payment
+            </a>
+        </div>
+
+        <div class="divider"></div>
+        <p style="font-size:13px;color:#718096;line-height:1.7;">
+            If this failure was unexpected or keeps recurring, please reach out to our
+            support team at
+            <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}">support@paypulse.io</a>
+            with your Payment ID for priority assistance.
+        </p>
+
+    </div>
+
+</th:block>
+</body>
+</html>

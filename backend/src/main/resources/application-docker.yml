@@ -8,6 +8,17 @@ spring:
     show-sql: false
   flyway:
     enabled: true
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 paypulse:
   cors:
@@ -15,6 +26,11 @@ paypulse:
       - "http://localhost:3000"
       - "http://frontend"
       - "http://paypulse-frontend"
+    notification:
+      email:
+        from-address: ${MAIL_FROM_ADDRESS:noreply@paypulse.io}
+        from-name: ${MAIL_FROM_NAME:PayPulse Payments}
+        enabled: ${MAIL_ENABLED:true
 
 logging:
   level:
