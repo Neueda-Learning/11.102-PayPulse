@@ -1,10 +1,11 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jdk-alpine AS builder
+# Changed to an official Maven image so the 'mvn' command works natively
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
 WORKDIR /app
 
-# Copy Maven wrapper + pom first (layer-cached unless pom changes)
+# Copy only the pom.xml (removed the .mvn copy step)
 COPY pom.xml .
-COPY .mvn/ .mvn/
+
 # Download dependencies before copying source (cache-friendly)
 RUN --mount=type=cache,target=/root/.m2 \
     mvn dependency:go-offline -B 2>/dev/null || true
@@ -28,4 +29,3 @@ ENTRYPOINT ["java", \
   "-Djava.security.egd=file:/dev/./urandom", \
   "-Dspring.profiles.active=docker", \
   "-jar", "app.jar"]
-
