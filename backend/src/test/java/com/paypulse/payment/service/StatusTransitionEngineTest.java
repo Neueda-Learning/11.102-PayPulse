@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -43,6 +44,9 @@ class StatusTransitionEngineTest {
     @Mock
     private ResilienceConfig resilienceConfig;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private StatusTransitionEngine engine;
 
     @BeforeEach
@@ -52,7 +56,8 @@ class StatusTransitionEngineTest {
                 historyRepository,
                 stateFactory,
                 resilienceConfig,
-                new Random(7)
+                new Random(7),
+                eventPublisher
         );
 
         ReflectionTestUtils.setField(engine, "deterministicFailureAccount", "FAILTEST01");
@@ -76,6 +81,24 @@ class StatusTransitionEngineTest {
 
         assertThat(updated.getStatus()).isEqualTo(PaymentStatus.VALIDATED);
         verify(historyRepository).save(any());
+    }
+
+    @Test
+    void validatePayment_publishesPaymentStatusChangedEvent() {
+        Payment payment = paymentWithStatus(PaymentStatus.CREATED, "ACC2000002");
+
+        engine.validatePayment(payment, TriggeredBy.CLIENT);
+
+        ArgumentCaptor<PaymentStatusChangedEvent> eventCaptor =
+                ArgumentCaptor.forClass(PaymentStatusChangedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+        PaymentStatusChangedEvent event = eventCaptor.getValue();
+        assertThat(event.paymentId()).isEqualTo(payment.getId());
+        assertThat(event.previousStatus()).isEqualTo(PaymentStatus.CREATED);
+        assertThat(event.newStatus()).isEqualTo(PaymentStatus.VALIDATED);
+        assertThat(event.triggeredBy()).isEqualTo(TriggeredBy.CLIENT);
+        assertThat(event.occurredAt()).isNotNull();
     }
 
     @Test
@@ -112,6 +135,43 @@ class StatusTransitionEngineTest {
         verify(resilienceConfig).execute(eq("paymentComplete"), any(Supplier.class));
     }
 
+    @Test
+    void completePayment_whenDeterministicFailure_transitionsToFailedWithNetworkError() {
+        Payment payment = paymentWithStatus(PaymentStatus.SENT, "FAILTEST01");
+
+        Payment updated = engine.completePayment(payment, TriggeredBy.CLIENT);
+
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(updated.getErrorCode()).isEqualTo("NETWORK_ERROR");
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(resilienceConfig).execute(eq("paymentComplete"), any(Supplier.class));
+    }
+
+    @Test
+    void runAutomaticLifecycle_whenAllStepsSucceed_progressesToCompleted() {
+        Payment payment = paymentWithStatus(PaymentStatus.CREATED, "ACC2000002");
+
+        Payment result = engine.runAutomaticLifecycle(payment);
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        verify(historyRepository, org.mockito.Mockito.times(3)).save(any());
+    }
+
+    @Test
+    void runAutomaticLifecycle_whenSendFails_shortCircuitsAndNeverCallsComplete() {
+        Payment payment = paymentWithStatus(PaymentStatus.CREATED, "FAILTEST01");
+
+        Payment result = engine.runAutomaticLifecycle(payment);
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(result.getErrorCode()).isEqualTo("NETWORK_ERROR");
+        verify(resilienceConfig).execute(eq("paymentSend"), any(Supplier.class));
+        verify(resilienceConfig, org.mockito.Mockito.never()).execute(eq("paymentComplete"), any(Supplier.class));
+    }
+
     private Payment paymentWithStatus(PaymentStatus status, String destinationAccount) {
         return Payment.builder()
                 .id(UUID.randomUUID().toString())
@@ -124,4 +184,3 @@ class StatusTransitionEngineTest {
                 .build();
     }
 }
-

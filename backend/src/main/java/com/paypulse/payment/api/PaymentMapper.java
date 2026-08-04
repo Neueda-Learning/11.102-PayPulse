@@ -1,5 +1,6 @@
 package com.paypulse.payment.api;
-
+import com.paypulse.payment.api.dto.PaymentHistoryResponse;
+import com.paypulse.payment.domain.PaymentStatusHistory;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
 import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
@@ -21,6 +22,9 @@ public interface PaymentMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "version", ignore = true)
     Payment toEntity(CreatePaymentRequest request);
+
+    @Mapping(target = "triggeredBy", expression = "java(history.getTriggeredBy() != null ? history.getTriggeredBy().name() : null)")
+    PaymentHistoryResponse toHistoryResponse(PaymentStatusHistory history);
 
     PaymentResponse toResponse(Payment payment);
 }

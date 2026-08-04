@@ -42,54 +42,44 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Payments", description = "Create, retrieve, and track payments")
 public class PaymentController {
-
     private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
     private final StatusTransitionEngine statusTransitionEngine;
-
-    @PostMapping
-    @Operation(summary = "Create a new payment")
-    public ResponseEntity<PaymentResponse> create(
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @Valid @RequestBody CreatePaymentRequest request) {
-
-        PaymentCreationResult result = paymentService.createPayment(idempotencyKey, request);
-        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
-                .body(result.payment());
-    }
+    private final PaymentMapper paymentMapper;
 
     @GetMapping("/{id}/history")
     @Operation(summary = "Get payment status-transition history")
-    public ResponseEntity<List<PaymentStatusHistory>> getHistory(@PathVariable("id") String id) {
+    public ResponseEntity<List<PaymentHistoryResponse>> getHistory(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
-        List<PaymentStatusHistory> history = statusTransitionEngine.getHistory(payment.getId());
+        List<PaymentHistoryResponse> history = statusTransitionEngine.getHistory(payment.getId()).stream()
+                .map(paymentMapper::toHistoryResponse)
+                .toList();
         return ResponseEntity.ok(history);
     }
 
     @PostMapping("/{id}/validate")
     @Operation(summary = "Trigger CREATED -> VALIDATED transition")
-    public ResponseEntity<Payment> validatePayment(@PathVariable("id") String id) {
+    public ResponseEntity<PaymentResponse> validatePayment(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
         Payment updated = statusTransitionEngine.validatePayment(payment, TriggeredBy.CLIENT);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(paymentMapper.toResponse(updated));
     }
 
     @PostMapping("/{id}/send")
     @Operation(summary = "Trigger VALIDATED -> SENT transition")
-    public ResponseEntity<Payment> sendPayment(@PathVariable("id") String id) {
+    public ResponseEntity<PaymentResponse> sendPayment(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
         Payment updated = statusTransitionEngine.sendPayment(payment, TriggeredBy.CLIENT);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(paymentMapper.toResponse(updated));
     }
 
     @PostMapping("/{id}/complete")
     @Operation(summary = "Trigger SENT -> COMPLETED transition")
-    public ResponseEntity<Payment> completePayment(@PathVariable("id") String id) {
+    public ResponseEntity<PaymentResponse> completePayment(@PathVariable("id") String id) {
         Payment payment = findPaymentOrThrow(id);
         Payment updated = statusTransitionEngine.completePayment(payment, TriggeredBy.CLIENT);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(paymentMapper.toResponse(updated));
     }
-
     private Payment findPaymentOrThrow(String id) {
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new PaymentNotFoundException(id));
