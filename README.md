@@ -469,8 +469,7 @@ Only the changed layer is rebuilt — Docker layer caching means this is fast if
 | Host (from backend container) | `mysql` |
 | Port | `3306` |
 | Database | `paypulse` |
-| Username | `root` |
-| Password | `n3u3da!` |
+
 
 ---
 
