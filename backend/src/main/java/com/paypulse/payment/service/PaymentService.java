@@ -86,6 +86,7 @@ public class PaymentService {
         payment.setIdempotencyKey(normalizeIdempotencyKey(idempotencyKey));
         payment.setErrorCode(null);
         payment.setErrorMessage(null);
+        payment.setForcedFailureStage(request.getForceFailureStage());
 
         return paymentRepository.save(payment);
     }
@@ -102,6 +103,10 @@ public class PaymentService {
      * persisted, so retrying is not a duplicate).
      */
     private void simulateCreationFailure(CreatePaymentRequest request) {
+        if ("CREATE".equalsIgnoreCase(request.getForceFailureStage())) {
+            throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
+                    "Simulated failure while creating payment (UI-selected)");
+        }
         if (createFailureAccount != null && createFailureAccount.equals(request.getDestinationAccount())) {
             throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
                     "Simulated failure while creating payment (deterministic trigger)");

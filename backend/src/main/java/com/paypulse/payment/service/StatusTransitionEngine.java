@@ -203,6 +203,15 @@ public class StatusTransitionEngine {
     }
 
     private void simulateExternalStep(Action action, Payment payment) {
+        String forced = payment.getForcedFailureStage();
+        // COMPLETE can never be triggered by the UI-forced switch — only
+        // CREATE/VALIDATE/SEND are user-selectable (CreatePaymentRequest's
+        // @Pattern already restricts values, this is defense-in-depth).
+        if (forced != null && action != Action.COMPLETE && forced.equalsIgnoreCase(action.name())) {
+            throw new SimulatedProcessingException(
+                    "Simulated failure during " + action + " (UI-selected forced failure)");
+        }
+
         String trigger = switch (action) {
             case VALIDATE -> validateFailureAccount;
             case SEND -> sendFailureAccount;

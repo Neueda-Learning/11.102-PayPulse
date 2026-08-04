@@ -21,6 +21,7 @@ public interface PaymentMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "forcedFailureStage", ignore = true)
     Payment toEntity(CreatePaymentRequest request);
 
     @Mapping(target = "triggeredBy", expression = "java(history.getTriggeredBy() != null ? history.getTriggeredBy().name() : null)")

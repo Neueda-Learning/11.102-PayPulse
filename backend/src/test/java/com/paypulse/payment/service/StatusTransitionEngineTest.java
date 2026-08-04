@@ -138,6 +138,43 @@ class StatusTransitionEngineTest {
     }
 
     @Test
+    void sendPayment_whenForcedFailureStageIsSend_failsRegardlessOfDestinationAccount() {
+        Payment payment = paymentWithStatus(PaymentStatus.VALIDATED, "ACC2000002");
+        payment.setForcedFailureStage("SEND");
+
+        Payment updated = engine.sendPayment(payment, TriggeredBy.CLIENT);
+
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(updated.getErrorCode()).isEqualTo("NETWORK_ERROR");
+        verify(resilienceConfig).execute(eq("paymentSend"), any(Supplier.class));
+    }
+
+    @Test
+    void validatePayment_whenForcedFailureStageIsValidate_failsRegardlessOfDestinationAccount() {
+        Payment payment = paymentWithStatus(PaymentStatus.CREATED, "ACC2000002");
+        payment.setForcedFailureStage("VALIDATE");
+
+        Payment updated = engine.validatePayment(payment, TriggeredBy.CLIENT);
+
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(updated.getErrorCode()).isEqualTo("NETWORK_ERROR");
+    }
+
+    @Test
+    void completePayment_whenForcedFailureStageIsComplete_isIgnored_completesNormally() {
+        // Defense-in-depth: even if forcedFailureStage somehow reached "COMPLETE"
+        // (bypassing the @Pattern validation on CreatePaymentRequest), the engine
+        // must never let it force a completion failure.
+        Payment payment = paymentWithStatus(PaymentStatus.SENT, "ACC2000002");
+        payment.setForcedFailureStage("COMPLETE");
+
+        Payment updated = engine.completePayment(payment, TriggeredBy.CLIENT);
+
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(updated.getErrorCode()).isNull();
+    }
+
+    @Test
     void completePayment_whenValid_transitionsToCompleted() {
         Payment payment = paymentWithStatus(PaymentStatus.SENT, "ACC2000002");
 

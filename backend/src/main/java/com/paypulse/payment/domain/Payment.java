@@ -66,5 +66,13 @@ public class Payment {
     @Column(nullable = false)
     private Long version;
 
+    /**
+     * Not persisted — carries a UI-selected forced-failure stage
+     * (NONE/CREATE/VALIDATE/SEND) through the same-request automatic
+     * lifecycle (validate -> send -> complete) so StatusTransitionEngine
+     * can deterministically fail exactly where the caller asked.
+     */
+    @Transient
+    private String forcedFailureStage;
 
 }

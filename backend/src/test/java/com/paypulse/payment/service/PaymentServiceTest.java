@@ -90,6 +90,57 @@ class PaymentServiceTest {
     }
 
     @Test
+    void createPayment_whenForceFailureStageIsCreate_throwsServiceUnavailable_andNeverSaves() {
+        Account activeInr = account(AccountStatus.ACTIVE, "INR");
+        when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
+
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
+                .amount(new BigDecimal("250.00"))
+                .currency("INR")
+                .destinationAccount("ACC2000002")
+                .forceFailureStage("CREATE")
+                .build();
+
+        assertThatThrownBy(() -> paymentService.createPayment("key-2", request))
+                .isInstanceOf(PaymentException.class)
+                .satisfies(ex -> assertThat(((PaymentException) ex).getStatus())
+                        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+
+        verify(paymentRepository, never()).save(any());
+        verify(statusTransitionEngine, never()).recordCreation(any(), any());
+    }
+
+    @Test
+    void createPayment_whenForceFailureStageIsSend_propagatesOntoPersistedPayment() {
+        Account activeInr = account(AccountStatus.ACTIVE, "INR");
+        Payment mappedEntity = new Payment();
+        Payment saved = payment(PaymentStatus.CREATED);
+
+        when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
+        when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(mappedEntity);
+        when(paymentRepository.save(any(Payment.class))).thenReturn(saved);
+        when(statusTransitionEngine.runAutomaticLifecycle(saved)).thenReturn(saved);
+        when(paymentMapper.toResponse(saved)).thenReturn(PaymentResponse.builder().build());
+
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
+                .amount(new BigDecimal("250.00"))
+                .currency("INR")
+                .destinationAccount("ACC2000002")
+                .forceFailureStage("SEND")
+                .build();
+
+        paymentService.createPayment("attempt-3", request);
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getForcedFailureStage()).isEqualTo("SEND");
+    }
+
+    @Test
     void createPayment_whenIdempotencyKeyMatchesExisting_shortCircuitsAndDoesNotProgressLifecycle() {
         Payment existing = payment(PaymentStatus.COMPLETED);
         PaymentResponse existingResponse = PaymentResponse.builder()
