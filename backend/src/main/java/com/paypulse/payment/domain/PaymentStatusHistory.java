@@ -14,6 +14,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.jpa.repository.Query;
 
 import java.time.Instant;
 
@@ -58,4 +59,6 @@ public class PaymentStatusHistory {
 
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private Instant occurredAt;
+
+
 }

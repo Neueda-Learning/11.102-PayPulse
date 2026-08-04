@@ -1,6 +1,7 @@
 package com.paypulse.payment.api;
 
 import com.paypulse.payment.PaymentStatus;
+import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
