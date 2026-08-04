@@ -8,19 +8,20 @@ import com.paypulse.common.idempotency.IdempotencyService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.PaymentMapper;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
-import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.domain.Payment;
+import com.paypulse.payment.domain.TriggeredBy;
+import com.paypulse.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Orchestrates POST /payments: idempotency -> account validation -> persistence.
- * M2 state progression can be wired in later without changing the controller API.
+ * Orchestrates POST /payments: idempotency -> account validation -> persistence
+ * -> automatic lifecycle progression (FR-2.4, Feature #4, owned by M2's
+ * StatusTransitionEngine).
  */
 @Service
 @RequiredArgsConstructor
@@ -30,12 +31,20 @@ public class PaymentService {
     private final AccountRepository accountRepository;
     private final IdempotencyService idempotencyService;
     private final PaymentMapper paymentMapper;
+    private final StatusTransitionEngine statusTransitionEngine;
 
     @Transactional
     public PaymentCreationResult createPayment(String idempotencyKey, CreatePaymentRequest request) {
         return idempotencyService.findExisting(idempotencyKey)
                 .map(existing -> new PaymentCreationResult(paymentMapper.toResponse(existing), false))
-                .orElseGet(() -> new PaymentCreationResult(paymentMapper.toResponse(saveNewPayment(idempotencyKey, request)), true));
+                .orElseGet(() -> new PaymentCreationResult(
+                        paymentMapper.toResponse(createAndProgressPayment(idempotencyKey, request)), true));
+    }
+
+    private Payment createAndProgressPayment(String idempotencyKey, CreatePaymentRequest request) {
+        Payment created = saveNewPayment(idempotencyKey, request);
+        statusTransitionEngine.recordCreation(created, TriggeredBy.CLIENT);
+        return statusTransitionEngine.runAutomaticLifecycle(created);
     }
 
     private Payment saveNewPayment(String idempotencyKey, CreatePaymentRequest request) {
@@ -74,4 +83,3 @@ public class PaymentService {
         return (idempotencyKey == null || idempotencyKey.isBlank()) ? null : idempotencyKey.trim();
     }
 }
-

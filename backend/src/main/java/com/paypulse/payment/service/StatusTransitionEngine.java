@@ -16,6 +16,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,7 @@ public class StatusTransitionEngine {
     private final ResilienceConfig resilienceConfig;
     private final Random simulationRandom;
 
+    private final ApplicationEventPublisher eventPublisher;
     @Value("${paypulse.simulation.failure-account-number:FAILTEST01}")
     private String deterministicFailureAccount;
 
@@ -62,7 +64,39 @@ public class StatusTransitionEngine {
         PaymentStatus previous = payment.getStatus();
         return persistTransition(payment, previous, PaymentStatus.FAILED, triggeredBy, errorCode, errorMessage);
     }
+    /**
+     * Writes the initial null -> CREATED audit row. Payment is assumed to
+     * already be persisted with status CREATED by the caller (PaymentService) —
+     * this only records the audit trail entry, no state transition happens here.
+     */
+    @Transactional
+    public void recordCreation(Payment payment, TriggeredBy triggeredBy) {
+        Instant occurredAt = Instant.now();
+        saveHistory(payment.getId(), null, PaymentStatus.CREATED, null, null, triggeredBy, occurredAt);
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                payment.getId(), null, PaymentStatus.CREATED, null, null, triggeredBy, occurredAt));
+    }
 
+    /**
+     * Feature #4 — Automatic Payment Lifecycle Processing (FR-2.4).
+     * Runs validate -> send -> complete with TriggeredBy.SYSTEM, short-circuiting
+     * as soon as any step leaves the payment in a non-progressing state (FAILED).
+     * Returns the final Payment reflecting wherever the lifecycle stopped.
+     */
+    @Transactional
+    public Payment runAutomaticLifecycle(Payment payment) {
+        Payment current = validatePayment(payment, TriggeredBy.SYSTEM);
+        if (current.getStatus() != PaymentStatus.VALIDATED) {
+            return current;
+        }
+
+        current = sendPayment(current, TriggeredBy.SYSTEM);
+        if (current.getStatus() != PaymentStatus.SENT) {
+            return current;
+        }
+
+        return completePayment(current, TriggeredBy.SYSTEM);
+    }
     private Payment transitionWithResilience(
             Payment payment,
             Action action,
@@ -137,7 +171,10 @@ public class StatusTransitionEngine {
         payment.setErrorMessage(errorMessage);
 
         Payment saved = savePayment(payment);
-        saveHistory(saved.getId(), previous, next, errorCode, errorMessage, triggeredBy);
+        Instant occurredAt = Instant.now();
+        saveHistory(saved.getId(), previous, next, errorCode, errorMessage, triggeredBy, occurredAt);
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                saved.getId(), previous, next, errorCode, errorMessage, triggeredBy, occurredAt));
         return saved;
     }
 
@@ -155,7 +192,8 @@ public class StatusTransitionEngine {
             PaymentStatus next,
             String errorCode,
             String errorMessage,
-            TriggeredBy triggeredBy
+            TriggeredBy triggeredBy,
+            Instant occurredAt
     ) {
         PaymentStatusHistory row = PaymentStatusHistory.builder()
                 .paymentId(paymentId)
@@ -164,7 +202,7 @@ public class StatusTransitionEngine {
                 .errorCode(errorCode)
                 .errorMessage(errorMessage)
                 .triggeredBy(triggeredBy)
-                .occurredAt(Instant.now())
+                .occurredAt(occurredAt)
                 .build();
 
         historyRepository.save(row);
@@ -176,10 +214,10 @@ public class StatusTransitionEngine {
 
     private void simulateExternalStep(Payment payment) {
         if (deterministicFailureAccount != null && deterministicFailureAccount.equals(payment.getDestinationAccount())) {
-            throw new RuntimeException("Simulated network failure while transmitting payment");
+            throw new SimulatedProcessingException("Simulated network failure while transmitting payment");
         }
         if (randomFailureRate > 0.0d && simulationRandom.nextDouble() < randomFailureRate) {
-            throw new RuntimeException("Simulated transient network failure");
+            throw new SimulatedProcessingException("Simulated transient network failure");
         }
     }
 }
