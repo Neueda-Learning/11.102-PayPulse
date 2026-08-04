@@ -109,8 +109,8 @@ resilience4j:
 # ── PayPulse App Config ────────────────────────────────────────────────────────
 paypulse:
   rate-limit:
-    global-requests-per-minute: 1000   # NFR-10/11: ~667 req/sec ceiling 4000
-    per-client-requests-per-minute: 5 # fair-share per IP 2000
+    global-requests-per-minute: 40000   # NFR-10/11: ~667 req/sec ceiling 4000
+    per-client-requests-per-minute: 2000 # fair-share per IP 2000
   simulation:
     failure-account-number: FAILTEST01  # deterministic failure trigger (Q6)
     random-failure-rate: 0.05           # 5% random failure rate
