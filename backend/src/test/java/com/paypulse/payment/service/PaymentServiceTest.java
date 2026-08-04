@@ -18,9 +18,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.Random;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,7 +60,33 @@ class PaymentServiceTest {
     @BeforeEach
     void setup() {
         paymentService = new PaymentService(
-                paymentRepository, accountRepository, idempotencyService, paymentMapper, statusTransitionEngine);
+                paymentRepository, accountRepository, idempotencyService, paymentMapper,
+                statusTransitionEngine, new Random(42));
+        ReflectionTestUtils.setField(paymentService, "createFailureAccount", "FAILCREATE01");
+        ReflectionTestUtils.setField(paymentService, "randomFailureRate", 0.0d);
+    }
+
+    @Test
+    void createPayment_whenDeterministicCreationFailureAccount_throwsServiceUnavailable_andNeverSaves() {
+        Account activeInr = account(AccountStatus.ACTIVE, "INR");
+        when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
+
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
+                .amount(new BigDecimal("250.00"))
+                .currency("INR")
+                .destinationAccount("FAILCREATE01")
+                .reference("chaos-test")
+                .build();
+
+        assertThatThrownBy(() -> paymentService.createPayment("key-1", request))
+                .isInstanceOf(PaymentException.class)
+                .satisfies(ex -> assertThat(((PaymentException) ex).getStatus())
+                        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+
+        verify(paymentRepository, never()).save(any());
+        verify(statusTransitionEngine, never()).recordCreation(any(), any());
     }
 
     @Test

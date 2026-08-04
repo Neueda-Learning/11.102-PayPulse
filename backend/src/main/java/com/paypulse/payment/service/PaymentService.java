@@ -12,10 +12,12 @@ import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Random;
 import java.util.UUID;
 
 /**
@@ -32,6 +34,13 @@ public class PaymentService {
     private final IdempotencyService idempotencyService;
     private final PaymentMapper paymentMapper;
     private final StatusTransitionEngine statusTransitionEngine;
+    private final Random simulationRandom;
+
+    @Value("${paypulse.simulation.create-failure-account:FAILCREATE01}")
+    private String createFailureAccount;
+
+    @Value("${paypulse.simulation.random-failure-rate:0.05}")
+    private double randomFailureRate;
 
     @Transactional
     public PaymentCreationResult createPayment(String idempotencyKey, CreatePaymentRequest request) {
@@ -69,6 +78,8 @@ public class PaymentService {
                     "Payment currency must match the source account currency");
         }
 
+        simulateCreationFailure(request);
+
         Payment payment = paymentMapper.toEntity(request);
         payment.setId(UUID.randomUUID().toString());
         payment.setStatus(PaymentStatus.CREATED);
@@ -81,5 +92,23 @@ public class PaymentService {
 
     private String normalizeIdempotencyKey(String idempotencyKey) {
         return (idempotencyKey == null || idempotencyKey.isBlank()) ? null : idempotencyKey.trim();
+    }
+
+    /**
+     * Simulates an upstream/persistence failure at payment CREATION time,
+     * i.e. before any row exists. Unlike validate/send/complete, there's no
+     * Payment id yet to record FAILED against — the client simply gets a
+     * 503 and can safely retry with the same Idempotency-Key (nothing was
+     * persisted, so retrying is not a duplicate).
+     */
+    private void simulateCreationFailure(CreatePaymentRequest request) {
+        if (createFailureAccount != null && createFailureAccount.equals(request.getDestinationAccount())) {
+            throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
+                    "Simulated failure while creating payment (deterministic trigger)");
+        }
+        if (randomFailureRate > 0.0d && simulationRandom.nextDouble() < randomFailureRate) {
+            throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
+                    "Simulated transient failure while creating payment");
+        }
     }
 }

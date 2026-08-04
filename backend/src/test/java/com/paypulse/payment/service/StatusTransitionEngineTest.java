@@ -60,7 +60,9 @@ class StatusTransitionEngineTest {
                 eventPublisher
         );
 
-        ReflectionTestUtils.setField(engine, "deterministicFailureAccount", "FAILTEST01");
+        ReflectionTestUtils.setField(engine, "validateFailureAccount", "FAILVALIDATE01");
+        ReflectionTestUtils.setField(engine, "sendFailureAccount", "FAILTEST01");
+        ReflectionTestUtils.setField(engine, "completeFailureAccount", "FAILCOMPLETE01");
         ReflectionTestUtils.setField(engine, "randomFailureRate", 0.0d);
 
         doAnswer(invocation -> {
@@ -99,6 +101,17 @@ class StatusTransitionEngineTest {
         assertThat(event.newStatus()).isEqualTo(PaymentStatus.VALIDATED);
         assertThat(event.triggeredBy()).isEqualTo(TriggeredBy.CLIENT);
         assertThat(event.occurredAt()).isNotNull();
+    }
+
+    @Test
+    void validatePayment_whenDeterministicFailure_transitionsToFailedWithNetworkError() {
+        Payment payment = paymentWithStatus(PaymentStatus.CREATED, "FAILVALIDATE01");
+
+        Payment updated = engine.validatePayment(payment, TriggeredBy.CLIENT);
+
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(updated.getErrorCode()).isEqualTo("NETWORK_ERROR");
+        verify(resilienceConfig).execute(eq("paymentValidate"), any(Supplier.class));
     }
 
     @Test
