@@ -20,7 +20,11 @@
   <properties>
     <java.version>17</java.version>
     <mapstruct.version>1.5.5.Final</mapstruct.version>
+<<<<<<< HEAD
     <lombok.version>1.18.32</lombok.version>
+=======
+
+>>>>>>> e8046a6 (M2: add payment status history schema and state machine foundation)
     <springdoc.version>2.6.0</springdoc.version>
     <bucket4j.version>8.10.1</bucket4j.version>
     <resilience4j.version>2.2.0</resilience4j.version>
@@ -70,12 +74,21 @@
     </dependency>
 
     <!-- ── Lombok ────────────────────────────────────────────────── -->
+<<<<<<< HEAD
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
       <version>${lombok.version}</version>
       <optional>true</optional>
     </dependency>
+=======
+      <dependency>
+          <groupId>org.projectlombok</groupId>
+          <artifactId>lombok</artifactId>
+          <version>1.18.36</version>
+          <optional>true</optional>
+      </dependency>
+>>>>>>> e8046a6 (M2: add payment status history schema and state machine foundation)
 
     <!-- ── MapStruct (Entity ↔ DTO mapping) ──────────────────────── -->
     <dependency>
