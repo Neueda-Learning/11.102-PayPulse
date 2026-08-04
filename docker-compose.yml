@@ -21,6 +21,20 @@ services:
     networks:
       - paypulse-net
 
+  # ─── 1.1 Redis (distributed rate-limit bucket store) ───────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: paypulse-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - paypulse-net
   # ─── 2. Spring Boot Backend ───────────────────────────────────────────────────
   backend:
     build:
@@ -35,10 +49,14 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       SERVER_PORT: 8080
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
     ports:
       - "8080:8080"
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - paypulse-net
