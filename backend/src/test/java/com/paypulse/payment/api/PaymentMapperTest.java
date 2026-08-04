@@ -2,8 +2,11 @@ package com.paypulse.payment.api;
 
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
+import com.paypulse.payment.api.dto.PaymentHistoryResponse;
 import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
+import com.paypulse.payment.domain.PaymentStatusHistory;
+import com.paypulse.payment.domain.TriggeredBy;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -65,6 +68,28 @@ class PaymentMapperTest {
         assertThat(response.getStatus()).isEqualTo(payment.getStatus());
         assertThat(response.getCreatedAt()).isEqualTo(now);
         assertThat(response.getUpdatedAt()).isEqualTo(now);
+    }
+
+    @Test
+    void toHistoryResponse_mapsAuditEntry() {
+        Instant now = Instant.parse("2026-08-04T10:20:30Z");
+
+        PaymentStatusHistory history = PaymentStatusHistory.builder()
+                .paymentId("payment-1")
+                .previousStatus(PaymentStatus.CREATED)
+                .newStatus(PaymentStatus.VALIDATED)
+                .errorCode(null)
+                .errorMessage(null)
+                .triggeredBy(TriggeredBy.SYSTEM)
+                .occurredAt(now)
+                .build();
+
+        PaymentHistoryResponse response = mapper.toHistoryResponse(history);
+
+        assertThat(response.getPreviousStatus()).isEqualTo(PaymentStatus.CREATED);
+        assertThat(response.getNewStatus()).isEqualTo(PaymentStatus.VALIDATED);
+        assertThat(response.getTriggeredBy()).isEqualTo("SYSTEM");
+        assertThat(response.getOccurredAt()).isEqualTo(now);
     }
 }
 
