@@ -1,0 +1,76 @@
+<!-- backend/src/main/resources/templates/email/payment-created.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Payment Received</title></head>
+<body>
+
+<th:block th:replace="~{email/base-layout :: layout(
+    'Payment Received – PayPulse',
+    ~{::main-content}
+)}">
+
+    <div th:fragment="main-content">
+
+        <p class="greeting">Payment Received 📨</p>
+
+        <p class="lead">
+            Hi <strong th:text="${recipientName}">Valued Customer</strong>,<br/>
+            We've received your payment request and it's now being processed.
+            You'll get another update once it's on its way.
+        </p>
+
+        <div class="detail-card">
+            <div class="card-title">Payment Summary</div>
+
+            <div class="detail-row">
+                <span class="detail-label">Payment ID</span>
+                <span class="detail-value" th:text="${paymentId}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Reference</span>
+                <span class="detail-value" th:text="${referenceId}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Amount</span>
+                <span class="detail-value"
+                      th:text="${currency} + ' ' + ${amount}">INR 0.00</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">From Account</span>
+                <span class="detail-value" th:text="${sourceAccount}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">To Account</span>
+                <span class="detail-value" th:text="${destinationAccount}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Submitted At</span>
+                <span class="detail-value" th:text="${submittedAt}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+          <span class="status-badge status-created">Created</span>
+        </span>
+            </div>
+        </div>
+
+        <div class="cta-block">
+            <a class="btn btn-primary"
+               th:href="${baseUrl} + '/payment-details.html?id=' + ${paymentId}">
+                Track This Payment
+            </a>
+        </div>
+
+        <div class="divider"></div>
+        <p style="font-size:13px;color:#718096;line-height:1.7;">
+            Expected processing time is typically under 60 seconds.
+            If you did not initiate this payment, please contact us immediately at
+            <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}">support@paypulse.io</a>.
+        </p>
+
+    </div>
+
+</th:block>
+</body>
+</html>

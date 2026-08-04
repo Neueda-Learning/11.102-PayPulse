@@ -57,6 +57,23 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
 
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+    test-connection: false
+
 # ── Actuator (health endpoint used by Docker healthcheck) ─────────────────────
 management:
   endpoints:
@@ -119,4 +136,14 @@ paypulse:
     random-failure-rate: 0.05           # 5% random failure rate
   cors:
     allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:63342"
+
+  notification:
+    email:
+      from-address: ${MAIL_FROM_ADDRESS:noreply@paypulse.io}
+      from-name: ${MAIL_FROM_NAME:PayPulse Payments}
+      enabled: ${MAIL_ENABLED:true}
+      max-retry-attempts: 3
+      support-email: support@paypulse.io
+      logo-url: https://paypulse.io/assets/logo.png
+      base-url: ${APP_BASE_URL:http://localhost:3000}
 
