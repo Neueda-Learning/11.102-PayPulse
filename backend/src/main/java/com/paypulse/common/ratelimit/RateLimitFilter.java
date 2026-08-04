@@ -1,5 +1,4 @@
 package com.paypulse.common.ratelimit;
-
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.BucketProxy;
@@ -79,17 +78,12 @@ public class RateLimitFilter extends HttpFilter {
         return builder.build(key, configSupplier);
     }
 
-    private byte[] clientKey(HttpServletRequest request) throws IOException {
+    private byte[] clientKey(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank()) {
             ip = request.getRemoteAddr();
         }
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return ("rate-limit:client:" + digest.digest(ip.getBytes(StandardCharsets.UTF_8))).getBytes(StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return ("rate-limit:client:" + ip).getBytes(StandardCharsets.UTF_8);
-        }
+        return ("rate-limit:client:" + ip).getBytes(StandardCharsets.UTF_8);
     }
 
     private void reject(HttpServletResponse response, long nanosToWait, long limit, long remaining) throws IOException {
@@ -105,3 +99,4 @@ public class RateLimitFilter extends HttpFilter {
         );
     }
 }
+
