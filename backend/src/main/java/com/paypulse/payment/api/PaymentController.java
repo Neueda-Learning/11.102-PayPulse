@@ -96,6 +96,7 @@ public class PaymentController {
         return ResponseEntity.ok(history);
     }
 
+
     @PostMapping("/{id}/validate")
     @Operation(summary = "Trigger CREATED -> VALIDATED transition")
     public ResponseEntity<PaymentResponse> validatePayment(@PathVariable("id") String id) {

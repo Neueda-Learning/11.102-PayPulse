@@ -455,6 +455,16 @@ components:
           maxLength: 255
           nullable: true
           example: "Invoice #4471"
+        forceFailureStage:
+          type: string
+          enum: [ NONE, CREATE, VALIDATE, SEND ]
+          nullable: true
+          default: NONE
+          description: >
+            UI/QA-only switch to deterministically force this payment to fail
+            at a specific lifecycle stage. COMPLETE is intentionally excluded —
+            once a payment reaches SEND successfully, completion cannot be
+            forced to fail via this field (money has already moved by then).
 
     PaymentResponse:
       type: object

@@ -63,6 +63,17 @@
       </div>
 
       <div class="form-row">
+        <label for="forceFailureStage">Simulate Failure (demo/testing only)</label>
+        <select id="forceFailureStage">
+          <option value="NONE">No forced failure — process normally</option>
+          <option value="CREATE">Fail at Creation</option>
+          <option value="VALIDATE">Fail at Validation</option>
+          <option value="SEND">Fail at Send</option>
+        </select>
+        <div class="hint">Forces this payment to fail deterministically at the chosen stage. Completion cannot be force-failed from here.</div>
+      </div>
+
+      <div class="form-row">
         <label for="idempotencyKey">Idempotency Key (auto-generated)</label>
         <input type="text" id="idempotencyKey" readonly aria-label="Idempotency Key"/>
         <div class="hint">Generated once per submission. Prevents accidental double payments.</div>
@@ -120,6 +131,7 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
   const currency = document.getElementById('currency').value;
   const destinationAccount = document.getElementById('destinationAccount').value.trim();
   const reference = document.getElementById('reference').value.trim();
+  const forceFailureStage = document.getElementById('forceFailureStage').value;
   const idempotencyKey = document.getElementById('idempotencyKey').value;
 
   const submitBtn = document.getElementById('submitBtn');
@@ -128,7 +140,7 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
 
   try {
     const payment = await Payments.create(
-      { sourceAccountId, amount, currency, destinationAccount, reference },
+      { sourceAccountId, amount, currency, destinationAccount, reference, forceFailureStage },
       idempotencyKey
     );
 
@@ -150,6 +162,7 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
       </p>`;
     resultCard.scrollIntoView({ behavior: 'smooth' });
     refreshKey(); // new key for next submission
+    document.getElementById('forceFailureStage').value = 'NONE';
   } catch (err) {
     noticeEl.innerHTML = `<div class="notice error"><strong>${err.errorCode || 'ERROR'}</strong>: ${err.message || 'Submission failed.'}</div>`;
     // On validation error: discard key so user gets a new one when they fix + resubmit

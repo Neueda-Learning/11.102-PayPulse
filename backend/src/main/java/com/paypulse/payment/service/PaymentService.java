@@ -1,5 +1,6 @@
 package com.paypulse.payment.service;
 
+import com.paypulse.common.error.ErrorCode;
 import com.paypulse.common.idempotency.IdempotencyService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.PaymentMapper;
@@ -9,13 +10,16 @@ import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.validators.ValidationChain;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Random;
 import java.util.UUID;
 
 /**
- * Orchestrates POST /payments: idempotency -> account validation -> persistence
+ * Orchestrates POST /payments: idempotency -> validation chain -> persistence
  * -> automatic lifecycle progression (FR-2.4, Feature #4, owned by M2's
  * StatusTransitionEngine).
  */
@@ -28,6 +32,13 @@ public class PaymentService {
     private final PaymentMapper paymentMapper;
     private final ValidationChain validationChain;
     private final StatusTransitionEngine statusTransitionEngine;
+    private final Random simulationRandom;
+
+    @Value("${paypulse.simulation.create-failure-account:FAILCREATE01}")
+    private String createFailureAccount;
+
+    @Value("${paypulse.simulation.random-failure-rate:0.05}")
+    private double randomFailureRate;
 
     @Transactional
     public PaymentCreationResult createPayment(String idempotencyKey, CreatePaymentRequest request) {
@@ -46,6 +57,7 @@ public class PaymentService {
     }
 
     private Payment saveNewPayment(String idempotencyKey, CreatePaymentRequest request) {
+        simulateCreationFailure(request);
 
         Payment payment = paymentMapper.toEntity(request);
         payment.setId(UUID.randomUUID().toString());
@@ -53,11 +65,34 @@ public class PaymentService {
         payment.setIdempotencyKey(normalizeIdempotencyKey(idempotencyKey));
         payment.setErrorCode(null);
         payment.setErrorMessage(null);
+        payment.setForcedFailureStage(request.getForceFailureStage());
 
         return paymentRepository.save(payment);
     }
 
     private String normalizeIdempotencyKey(String idempotencyKey) {
         return (idempotencyKey == null || idempotencyKey.isBlank()) ? null : idempotencyKey.trim();
+    }
+
+    /**
+     * Simulates an upstream/persistence failure at payment CREATION time,
+     * i.e. before any row exists. Unlike validate/send/complete, there's no
+     * Payment id yet to record FAILED against — the client simply gets a
+     * 503 and can safely retry with the same Idempotency-Key (nothing was
+     * persisted, so retrying is not a duplicate).
+     */
+    private void simulateCreationFailure(CreatePaymentRequest request) {
+        if ("CREATE".equalsIgnoreCase(request.getForceFailureStage())) {
+            throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
+                    "Simulated failure while creating payment (UI-selected)");
+        }
+        if (createFailureAccount != null && createFailureAccount.equals(request.getDestinationAccount())) {
+            throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
+                    "Simulated failure while creating payment (deterministic trigger)");
+        }
+        if (randomFailureRate > 0.0d && simulationRandom.nextDouble() < randomFailureRate) {
+            throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
+                    "Simulated transient failure while creating payment");
+        }
     }
 }
