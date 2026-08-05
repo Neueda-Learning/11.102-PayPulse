@@ -5,16 +5,18 @@ import com.paypulse.payment.service.PaymentException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static com.paypulse.common.error.ErrorCode.INVALID_CURRENCY;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ValidationChainTest {
@@ -28,38 +30,32 @@ class ValidationChainTest {
     @Mock
     private AccountValidator accountValidator;
 
-    private ValidationChain chain() {
-        return new ValidationChain(currencyValidator, amountValidator, accountValidator);
-    }
+    @InjectMocks
+    private ValidationChain validationChain;
 
     @Test
-    void validate_runsAllValidatorsInOrder_currencyThenAmountThenAccount() {
+    void validate_runs_in_expected_order() {
         CreatePaymentRequest request = request();
 
-        chain().validate(request);
+        validationChain.validate(request);
 
-        InOrder inOrder = inOrder(currencyValidator, amountValidator, accountValidator);
-        inOrder.verify(currencyValidator).validate(request);
-        inOrder.verify(amountValidator).validate(request);
-        inOrder.verify(accountValidator).validate(request);
+        InOrder order = inOrder(currencyValidator, amountValidator, accountValidator);
+        order.verify(currencyValidator).validate(request);
+        order.verify(amountValidator).validate(request);
+        order.verify(accountValidator).validate(request);
     }
 
     @Test
-    void validate_whenCurrencyValidatorThrows_shortCircuitsBeforeAccountValidator() {
-        doThrow(new PaymentException(org.springframework.http.HttpStatus.BAD_REQUEST,
-                com.paypulse.common.error.ErrorCode.INVALID_CURRENCY, "bad currency"))
-                .when(currencyValidator).validate(any());
+    void validate_stops_on_first_failure() {
+        CreatePaymentRequest request = request();
+        doThrow(new PaymentException(HttpStatus.BAD_REQUEST, INVALID_CURRENCY, "bad currency"))
+                .when(currencyValidator).validate(request);
 
-        assertThatThrownBy(() -> chain().validate(request()))
-                .isInstanceOf(PaymentException.class);
+        assertThatThrownBy(() -> validationChain.validate(request))
+                .isInstanceOf(PaymentException.class)
+                .hasMessageContaining("bad currency");
 
-        verify(amountValidator, org.mockito.Mockito.never()).validate(any());
-        verify(accountValidator, org.mockito.Mockito.never()).validate(any());
-    }
-
-    @Test
-    void validate_whenAllPass_doesNotThrow() {
-        assertThatCode(() -> chain().validate(request())).doesNotThrowAnyException();
+        verifyNoInteractions(amountValidator, accountValidator);
     }
 
     private CreatePaymentRequest request() {

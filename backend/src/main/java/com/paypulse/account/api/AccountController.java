@@ -25,18 +25,19 @@ import java.util.List;
 public class AccountController {
 
     private final AccountRepository accountRepository;
+    private final AccountMapper accountMapper;
 
     @GetMapping
-    @Operation(summary = "List all accounts")
-    public ResponseEntity<List<Account>> listAccounts() {
-        return ResponseEntity.ok(accountRepository.findAll());
+    public ResponseEntity<List<AccountResponse>> listAccounts() {
+        List<AccountResponse> list = accountRepository.findAll().stream()
+                .map(accountMapper::toResponse).toList();
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a single account by ID")
     public ResponseEntity<?> getAccountById(@PathVariable String id, HttpServletRequest req) {
         return accountRepository.findById(id)
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .<ResponseEntity<?>>map(a -> ResponseEntity.ok(accountMapper.toResponse(a)))
                 .orElse(ResponseEntity.status(404)
                         .body(ApiError.of(ErrorCode.ACCOUNT_NOT_FOUND,
                                 "No account found with id " + id, req.getRequestURI())));

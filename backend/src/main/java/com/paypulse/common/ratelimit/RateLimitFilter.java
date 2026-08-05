@@ -86,6 +86,7 @@ public class RateLimitFilter extends HttpFilter {
         return ("rate-limit:client:" + ip).getBytes(StandardCharsets.UTF_8);
     }
 
+
     private void reject(HttpServletResponse response, long nanosToWait, long limit, long remaining) throws IOException {
         long retryAfterSeconds = Math.max(1, Duration.ofNanos(nanosToWait).toSeconds());
         response.setStatus(429);
@@ -99,4 +100,3 @@ public class RateLimitFilter extends HttpFilter {
         );
     }
 }
-
