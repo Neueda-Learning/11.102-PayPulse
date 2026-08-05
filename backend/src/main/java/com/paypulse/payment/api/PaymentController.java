@@ -3,9 +3,9 @@ package com.paypulse.payment.api;
 import com.paypulse.common.error.ApiError;
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
+import com.paypulse.payment.api.dto.PaymentHistoryResponse;
 import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
-import com.paypulse.payment.domain.PaymentStatusHistory;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.PaymentCreationResult;
@@ -55,6 +55,19 @@ public class PaymentController {
                 .map(paymentMapper::toHistoryResponse)
                 .toList();
         return ResponseEntity.ok(history);
+    }
+    @PostMapping
+    @Operation(summary = "Create a new payment (auto-progresses through the lifecycle)")
+    public ResponseEntity<PaymentResponse> createPayment(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody CreatePaymentRequest request) {
+        PaymentCreationResult result = paymentService.createPayment(idempotencyKey, request);
+        if (result.created()) {
+            return ResponseEntity
+                    .created(java.net.URI.create("/api/v1/payments/" + result.payment().getId()))
+                    .body(result.payment());
+        }
+        return ResponseEntity.ok(result.payment());
     }
 
     @PostMapping("/{id}/validate")

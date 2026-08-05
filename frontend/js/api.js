@@ -6,9 +6,7 @@
  * See frontend/nginx/nginx.conf for the proxy_pass rule.
  */
 
-//const API_BASE = '/api/v1';
-//⚠️ Remember to revert this before committing — in Docker, nginx proxies /api/v1 internally and this hardcoded URL will break it. Change it back to '/api/v1' before pushing.
-const API_BASE = 'http://localhost:8080/api/v1';
+const API_BASE = '/api/v1';
 
 // ── Shared fetch wrapper ──────────────────────────────────────────────────────
 

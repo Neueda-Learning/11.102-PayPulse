@@ -2,6 +2,7 @@ package com.paypulse.payment.api.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -24,13 +25,17 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class CreatePaymentRequest {
-
     @NotBlank(message = "sourceAccountId is required")
+    @Pattern(
+            regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            message = "sourceAccountId must be a valid UUID"
+    )
     private String sourceAccountId;
 
     @NotNull(message = "amount is required")
     @DecimalMin(value = "0.01", message = "amount must be >= 0.01")
     @DecimalMax(value = "1000000", message = "amount must be <= 1000000")
+    @Digits(integer = 10, fraction = 2, message = "amount must have at most 2 decimal places")
     private BigDecimal amount;
 
     @NotBlank(message = "currency is required")
@@ -39,6 +44,7 @@ public class CreatePaymentRequest {
 
     @NotBlank(message = "destinationAccount is required")
     @Size(min = 8, max = 20, message = "destinationAccount length must be 8-20")
+    @Pattern(regexp = "^[A-Za-z0-9]{8,20}$", message = "destinationAccount must be alphanumeric")
     private String destinationAccount;
 
     @Size(max = 255, message = "reference length must be <= 255")
@@ -55,4 +61,5 @@ public class CreatePaymentRequest {
             message = "forceFailureStage must be one of NONE, CREATE, VALIDATE, SEND")
     private String forceFailureStage;
 }
+
 

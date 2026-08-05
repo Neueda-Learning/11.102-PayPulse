@@ -1,0 +1,84 @@
+<!-- backend/src/main/resources/templates/email/welcome.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Welcome to PayPulse</title></head>
+<body>
+
+<th:block th:replace="~{email/base-layout :: layout(
+    'Welcome to PayPulse!',
+    ~{::main-content}
+)}">
+
+    <div th:fragment="main-content">
+
+        <!-- Welcome banner -->
+        <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);
+                border:1px solid #bfdbfe;border-radius:10px;
+                padding:28px 24px;margin-bottom:28px;text-align:center;">
+            <div style="font-size:48px;margin-bottom:8px;">🎉</div>
+            <div style="font-size:20px;font-weight:800;color:#1e40af;">
+                Welcome to PayPulse!
+            </div>
+            <div style="font-size:13px;color:#3b82f6;margin-top:6px;">
+                Your account is ready. Start sending payments instantly.
+            </div>
+        </div>
+
+        <p class="greeting">Hi <span th:text="${recipientName}">there</span>!</p>
+
+        <p class="lead">
+            Your PayPulse account has been set up successfully.
+            You can now send and receive payments in <strong th:text="${currency}">INR</strong>
+            with confidence — fast, secure, and always audited.
+        </p>
+
+        <div class="detail-card">
+            <div class="card-title">Your Account Details</div>
+            <div class="detail-row">
+                <span class="detail-label">Account Number</span>
+                <span class="detail-value" th:text="${accountNumber}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Currency</span>
+                <span class="detail-value" th:text="${currency}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+          <span class="status-badge status-success">Active</span>
+        </span>
+            </div>
+        </div>
+
+        <!-- Feature list -->
+        <div style="margin-bottom:28px;">
+            <div style="font-size:14px;font-weight:700;color:#1a202c;margin-bottom:12px;">
+                What you can do with PayPulse:
+            </div>
+            <div style="font-size:14px;color:#4a5568;line-height:2;">
+                ✅ &nbsp; Send instant payments in INR &amp; USD<br/>
+                ✅ &nbsp; Real-time payment status tracking<br/>
+                ✅ &nbsp; Full audit trail for every transaction<br/>
+                ✅ &nbsp; KPI dashboard with live analytics<br/>
+                ✅ &nbsp; Automatic failure detection &amp; alerts
+            </div>
+        </div>
+
+        <div class="cta-block">
+            <a class="btn btn-primary"
+               th:href="${baseUrl} + '/create-payment.html'">
+                Make Your First Payment
+            </a>
+        </div>
+
+        <div class="divider"></div>
+        <p style="font-size:13px;color:#718096;line-height:1.7;">
+            Need help getting started? Our team is always here:
+            <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}">support@paypulse.io</a>
+        </p>
+
+    </div>
+
+</th:block>
+</body>
+</html>

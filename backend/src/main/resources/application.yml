@@ -57,6 +57,23 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
 
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+    test-connection: false
+
 # ── Actuator (health endpoint used by Docker healthcheck) ─────────────────────
 management:
   endpoints:
@@ -83,10 +100,6 @@ springdoc:
 resilience4j:
   circuitbreaker:
     instances:
-      paymentValidate:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s
       paymentSend:
         sliding-window-size: 10
         failure-rate-threshold: 50
@@ -122,7 +135,7 @@ resilience4j:
 paypulse:
   rate-limit:
     global-requests-per-minute: 40000   # NFR-10/11: ~667 req/sec ceiling 4000
-    per-client-requests-per-minute: 2000         # 5% random failure rate
+    per-client-requests-per-minute: 2000 # fair-share per IP 2000         # 5% random failure rate
   cors:
     allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:63342"
   simulation:
@@ -131,3 +144,14 @@ paypulse:
     send-failure-account: FAILTEST01         # renamed usage of the existing property
     complete-failure-account: FAILCOMPLETE01 # NEW — fails SENT -> FAILED
     random-failure-rate: 0.05
+
+  notification:
+    email:
+      from-address: ${MAIL_FROM_ADDRESS:noreply@paypulse.io}
+      from-name: ${MAIL_FROM_NAME:PayPulse Payments}
+      enabled: ${MAIL_ENABLED:true}
+      max-retry-attempts: 3
+      support-email: support@paypulse.io
+      logo-url: https://paypulse.io/assets/logo.png
+      base-url: ${APP_BASE_URL:http://localhost:3000}
+

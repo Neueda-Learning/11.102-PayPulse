@@ -1,8 +1,5 @@
 package com.paypulse.payment.service;
 
-import com.paypulse.account.domain.Account;
-import com.paypulse.account.domain.AccountStatus;
-import com.paypulse.account.repository.AccountRepository;
 import com.paypulse.common.idempotency.IdempotencyService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.PaymentMapper;
@@ -11,6 +8,7 @@ import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
+import com.paypulse.payment.service.validators.ValidationChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +27,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -44,13 +42,13 @@ class PaymentServiceTest {
     private PaymentRepository paymentRepository;
 
     @Mock
-    private AccountRepository accountRepository;
-
-    @Mock
     private IdempotencyService idempotencyService;
 
     @Mock
     private PaymentMapper paymentMapper;
+
+    @Mock
+    private ValidationChain validationChain;
 
     @Mock
     private StatusTransitionEngine statusTransitionEngine;
@@ -60,7 +58,7 @@ class PaymentServiceTest {
     @BeforeEach
     void setup() {
         paymentService = new PaymentService(
-                paymentRepository, accountRepository, idempotencyService, paymentMapper,
+                paymentRepository, idempotencyService, paymentMapper, validationChain,
                 statusTransitionEngine, new Random(42));
         ReflectionTestUtils.setField(paymentService, "createFailureAccount", "FAILCREATE01");
         ReflectionTestUtils.setField(paymentService, "randomFailureRate", 0.0d);
@@ -68,9 +66,7 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenDeterministicCreationFailureAccount_throwsServiceUnavailable_andNeverSaves() {
-        Account activeInr = account(AccountStatus.ACTIVE, "INR");
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
 
         CreatePaymentRequest request = CreatePaymentRequest.builder()
                 .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
@@ -91,9 +87,7 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenForceFailureStageIsCreate_throwsServiceUnavailable_andNeverSaves() {
-        Account activeInr = account(AccountStatus.ACTIVE, "INR");
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
 
         CreatePaymentRequest request = CreatePaymentRequest.builder()
                 .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
@@ -114,12 +108,10 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenForceFailureStageIsSend_propagatesOntoPersistedPayment() {
-        Account activeInr = account(AccountStatus.ACTIVE, "INR");
         Payment mappedEntity = new Payment();
         Payment saved = payment(PaymentStatus.CREATED);
 
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
         when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(mappedEntity);
         when(paymentRepository.save(any(Payment.class))).thenReturn(saved);
         when(statusTransitionEngine.runAutomaticLifecycle(saved)).thenReturn(saved);
@@ -161,7 +153,7 @@ class PaymentServiceTest {
     @Test
     void createPayment_whenAccountUnknown_throwsAccountNotFound_andNeverTouchesEngine() {
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.empty());
+        doThrow(PaymentException.class).when(validationChain).validate(any());
 
         assertThatThrownBy(() -> paymentService.createPayment(null, validRequest()))
                 .isInstanceOf(PaymentException.class);
@@ -172,9 +164,8 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenAccountInactive_throwsInvalidAccount() {
-        Account inactive = account(AccountStatus.INACTIVE, "INR");
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(inactive));
+        doThrow(PaymentException.class).when(validationChain).validate(any());
 
         assertThatThrownBy(() -> paymentService.createPayment(null, validRequest()))
                 .isInstanceOf(PaymentException.class);
@@ -184,9 +175,8 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenCurrencyMismatch_throwsInvalidCurrency() {
-        Account usdAccount = account(AccountStatus.ACTIVE, "USD");
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(usdAccount));
+        doThrow(PaymentException.class).when(validationChain).validate(any());
 
         assertThatThrownBy(() -> paymentService.createPayment(null, validRequest()))
                 .isInstanceOf(PaymentException.class);
@@ -196,13 +186,12 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenNewPayment_recordsCreationThenRunsAutomaticLifecycle_inOrder() {
-        Account activeInr = account(AccountStatus.ACTIVE, "INR");
         Payment savedAsCreated = payment(PaymentStatus.CREATED);
         Payment finalCompleted = payment(PaymentStatus.COMPLETED);
         finalCompleted.setId(savedAsCreated.getId());
 
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
+        // validationChain.validate() returns void, so it will happily do nothing (pass) by default on a mock
         when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(new Payment());
         when(paymentRepository.save(any(Payment.class))).thenReturn(savedAsCreated);
         when(statusTransitionEngine.runAutomaticLifecycle(savedAsCreated)).thenReturn(finalCompleted);
@@ -222,12 +211,10 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenNewPayment_setsCreatedStatusAndClearsErrorFieldsBeforeSaving() {
-        Account activeInr = account(AccountStatus.ACTIVE, "INR");
         Payment mappedEntity = new Payment();
         Payment saved = payment(PaymentStatus.CREATED);
 
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
         when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(mappedEntity);
         when(paymentRepository.save(any(Payment.class))).thenReturn(saved);
         when(statusTransitionEngine.runAutomaticLifecycle(saved)).thenReturn(saved);
@@ -248,12 +235,10 @@ class PaymentServiceTest {
 
     @Test
     void createPayment_whenIdempotencyKeyBlank_normalizesToNull() {
-        Account activeInr = account(AccountStatus.ACTIVE, "INR");
         Payment mappedEntity = new Payment();
         Payment saved = payment(PaymentStatus.CREATED);
 
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
-        when(accountRepository.findById(ACTIVE_INR_ACCOUNT_ID)).thenReturn(Optional.of(activeInr));
         when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(mappedEntity);
         when(paymentRepository.save(any(Payment.class))).thenReturn(saved);
         when(statusTransitionEngine.runAutomaticLifecycle(saved)).thenReturn(saved);
@@ -273,16 +258,6 @@ class PaymentServiceTest {
                 .currency("INR")
                 .destinationAccount("ACC2000002")
                 .reference("Invoice #4471")
-                .build();
-    }
-
-    private Account account(AccountStatus status, String currency) {
-        return Account.builder()
-                .id(ACTIVE_INR_ACCOUNT_ID)
-                .label("Primary")
-                .accountNumber("ACC1000001")
-                .currency(currency)
-                .status(status)
                 .build();
     }
 
