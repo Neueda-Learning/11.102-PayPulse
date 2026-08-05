@@ -26,11 +26,13 @@ paypulse:
       - "http://localhost:3000"
       - "http://frontend"
       - "http://paypulse-frontend"
+      - "http://10.9.73.100:8085"
+      - "http://localhost:8085"
     notification:
       email:
         from-address: ${MAIL_FROM_ADDRESS:noreply@paypulse.io}
         from-name: ${MAIL_FROM_NAME:PayPulse Payments}
-        enabled: ${MAIL_ENABLED:true
+        enabled: ${MAIL_ENABLED:true}
 
 logging:
   level:
