@@ -55,8 +55,24 @@ async function loadPaymentDetails() {
       accountLabel = `${acc.label} — ${acc.accountNumber} (${acc.currency})`;
     } catch (_) {}
 
-    const errorBlock = payment.status === 'FAILED'
+          const errorBlock = payment.status === 'FAILED'
       ? `<div class="notice error"><strong>${payment.errorCode}</strong>: ${payment.errorMessage || ''}</div>`
+      : '';
+
+    const reversalLink = payment.reversalPaymentId
+      ? `<dt>Reversed By</dt><dd><a href="payment-details.html?id=${payment.reversalPaymentId}">${payment.reversalPaymentId}</a></dd>`
+      : '';
+
+    const reversalOfLink = payment.reversalOfPaymentId
+      ? `<dt>Reversal Of</dt><dd><a href="payment-details.html?id=${payment.reversalOfPaymentId}">${payment.reversalOfPaymentId}</a></dd>`
+      : '';
+
+    const cancelBtn = payment.status === 'CREATED'
+      ? `<button class="btn" id="cancel-btn" style="margin-top:12px;">Cancel Payment</button>`
+      : '';
+
+    const reverseBtn = (payment.status === 'COMPLETED' && !payment.reversed)
+      ? `<button class="btn" id="reverse-btn" style="margin-top:12px;">Reverse Payment</button>`
       : '';
 
     content.innerHTML = `
@@ -71,7 +87,11 @@ async function loadPaymentDetails() {
           <dt>Reference</dt>    <dd>${payment.reference || '<span style="color:#9aa1ab;">(none)</span>'}</dd>
           <dt>Created</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
           <dt>Updated</dt>      <dd>${formatDateTime(payment.updatedAt)}</dd>
+          ${reversalLink}
+          ${reversalOfLink}
         </dl>
+        ${cancelBtn}
+        ${reverseBtn}
       </div>
 
       <div class="card">
@@ -79,6 +99,24 @@ async function loadPaymentDetails() {
         <ul class="timeline" id="timeline"></ul>
       </div>
     `;
+
+    document.getElementById('cancel-btn')?.addEventListener('click', async () => {
+      try {
+        await Payments.cancel(id);
+        loadPaymentDetails();
+      } catch (err) {
+        alert(`Cancel failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
+      }
+    });
+
+    document.getElementById('reverse-btn')?.addEventListener('click', async () => {
+      try {
+        await Payments.reverse(id);
+        loadPaymentDetails();
+      } catch (err) {
+        alert(`Reverse failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
+      }
+    });
 
     const timeline = document.getElementById('timeline');
     (history || []).forEach(h => {

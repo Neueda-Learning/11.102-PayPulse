@@ -18,4 +18,9 @@ public abstract class AbstractPaymentState implements PaymentState {
     public PaymentStatus complete() {
         throw new InvalidStatusTransitionException(status(), "complete");
     }
+
+    @Override
+    public PaymentStatus cancel() {
+        throw new InvalidStatusTransitionException(status(), "cancel");
+    }
 }

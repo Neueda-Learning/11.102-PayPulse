@@ -1,5 +1,3 @@
-package com.paypulse.payment.api;
-
 import com.paypulse.common.error.ApiError;
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.PaymentStatus;
@@ -11,6 +9,7 @@ import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.PaymentCreationResult;
 import com.paypulse.payment.service.PaymentService;
+import com.paypulse.payment.service.ReversalService;
 import com.paypulse.payment.service.StatusTransitionEngine;
 import com.paypulse.payment.service.states.InvalidStatusTransitionException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +29,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 import java.util.List;
-
 /**
  * Shared controller file per team protocol.
  * M3 owns: POST /payments
@@ -47,7 +45,7 @@ public class PaymentController {
     private final PaymentRepository paymentRepository;
     private final StatusTransitionEngine statusTransitionEngine;
     private final PaymentMapper paymentMapper;
-
+    private final ReversalService reversalService;
     // ── M3 ──────────────────────────────────────────────────────────
     @PostMapping
     @Operation(summary = "Create a new payment")
@@ -102,6 +100,20 @@ public class PaymentController {
                 .map(paymentMapper::toHistoryResponse)
                 .toList();
         return ResponseEntity.ok(history);
+    }
+
+    @PostMapping("/{id}/cancel")
+    @Operation(summary = "Cancel a CREATED payment")
+    public ResponseEntity<PaymentResponse> cancel(@PathVariable("id") String id) {
+        Payment updated = paymentService.cancelPayment(id);
+        return ResponseEntity.ok(paymentMapper.toResponse(updated));
+    }
+
+    @PostMapping("/{id}/reverse")
+    @Operation(summary = "Reverse a COMPLETED payment")
+    public ResponseEntity<PaymentResponse> reverse(@PathVariable("id") String id) {
+        Payment reversal = reversalService.reverse(id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(paymentMapper.toResponse(reversal));
     }
 
 

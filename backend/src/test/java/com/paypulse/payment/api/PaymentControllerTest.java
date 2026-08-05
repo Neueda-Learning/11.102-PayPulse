@@ -54,6 +54,8 @@ class PaymentControllerTest {
 
     @MockBean
     private PaymentMapper paymentMapper;
+    @MockBean
+    private com.paypulse.payment.service.ReversalService reversalService;
 
     @Test
     void createPayment_success_returns201AndLocation() throws Exception {
@@ -188,6 +190,106 @@ class PaymentControllerTest {
                 .currency("INR")
                 .status(status)
                 .build();
+    }
+    @Test
+    void cancelPayment_whenValid_returns200WithCancelledStatus() throws Exception {
+        Payment payment = payment(PaymentStatus.CREATED);
+        Payment cancelled = payment(PaymentStatus.CANCELLED);
+        cancelled.setId(payment.getId());
+
+        when(paymentService.cancelPayment(payment.getId())).thenReturn(cancelled);
+        when(paymentMapper.toResponse(cancelled)).thenReturn(
+                PaymentResponse.builder().id(cancelled.getId()).status(cancelled.getStatus()).build());
+
+        mockMvc.perform(post("/api/v1/payments/{id}/cancel", payment.getId())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void cancelPayment_whenNotCancellable_returns409() throws Exception {
+        String id = UUID.randomUUID().toString();
+        when(paymentService.cancelPayment(id))
+                .thenThrow(new PaymentException(org.springframework.http.HttpStatus.CONFLICT,
+                        ErrorCode.PAYMENT_NOT_CANCELLABLE,
+                        "Payment cannot be cancelled from its current status"));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/cancel", id)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_NOT_CANCELLABLE"));
+    }
+
+    @Test
+    void cancelPayment_whenMissing_returns404() throws Exception {
+        String id = UUID.randomUUID().toString();
+        when(paymentService.cancelPayment(id))
+                .thenThrow(new PaymentException(org.springframework.http.HttpStatus.NOT_FOUND,
+                        ErrorCode.PAYMENT_NOT_FOUND,
+                        "No payment found with id " + id));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/cancel", id)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_NOT_FOUND"));
+    }
+
+    @Test
+    void reversePayment_whenValid_returns201WithNewPaymentId() throws Exception {
+        String originalId = UUID.randomUUID().toString();
+        Payment reversal = payment(PaymentStatus.COMPLETED);
+
+        when(reversalService.reverse(originalId)).thenReturn(reversal);
+        when(paymentMapper.toResponse(reversal)).thenReturn(
+                PaymentResponse.builder().id(reversal.getId()).status(reversal.getStatus()).build());
+
+        mockMvc.perform(post("/api/v1/payments/{id}/reverse", originalId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(reversal.getId()));
+    }
+
+    @Test
+    void reversePayment_whenNotCompleted_returns409() throws Exception {
+        String id = UUID.randomUUID().toString();
+        when(reversalService.reverse(id))
+                .thenThrow(new PaymentException(org.springframework.http.HttpStatus.CONFLICT,
+                        ErrorCode.PAYMENT_NOT_CANCELLABLE,
+                        "Only COMPLETED payments can be reversed"));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/reverse", id)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_NOT_CANCELLABLE"));
+    }
+
+    @Test
+    void reversePayment_whenAlreadyReversed_returns409() throws Exception {
+        String id = UUID.randomUUID().toString();
+        when(reversalService.reverse(id))
+                .thenThrow(new PaymentException(org.springframework.http.HttpStatus.CONFLICT,
+                        ErrorCode.PAYMENT_ALREADY_REVERSED,
+                        "Payment has already been reversed"));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/reverse", id)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_ALREADY_REVERSED"));
+    }
+
+    @Test
+    void reversePayment_whenMissing_returns404() throws Exception {
+        String id = UUID.randomUUID().toString();
+        when(reversalService.reverse(id))
+                .thenThrow(new PaymentException(org.springframework.http.HttpStatus.NOT_FOUND,
+                        ErrorCode.PAYMENT_NOT_FOUND,
+                        "No payment found with id " + id));
+
+        mockMvc.perform(post("/api/v1/payments/{id}/reverse", id)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_NOT_FOUND"));
     }
 }
 

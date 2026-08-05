@@ -62,6 +62,16 @@ public class Payment {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "reversed", nullable = false)
+    @Builder.Default
+    private boolean reversed = false;
+
+    @Column(name = "reversal_payment_id", length = 36)
+    private String reversalPaymentId;
+
+    @Column(name = "reversal_of_payment_id", length = 36)
+    private String reversalOfPaymentId;
+
     @Version
     @Column(nullable = false)
     private Long version;

@@ -112,6 +112,7 @@ public class StatusTransitionEngine {
             case VALIDATE -> state.validate();
             case SEND -> state.send();
             case COMPLETE -> state.complete();
+            case CANCEL -> state.cancel();
         };
 
         try {
@@ -143,6 +144,7 @@ public class StatusTransitionEngine {
             case VALIDATE -> state.validate();
             case SEND -> state.send();
             case COMPLETE -> state.complete();
+            case CANCEL -> state.cancel();
         };
 
         return persistTransition(payment, previous, next, triggeredBy, errorCode, errorMessage);
@@ -199,7 +201,7 @@ public class StatusTransitionEngine {
     }
 
     private enum Action {
-        VALIDATE, SEND, COMPLETE
+        VALIDATE, SEND, COMPLETE, CANCEL
     }
 
     private void simulateExternalStep(Action action, Payment payment) {
@@ -223,5 +225,9 @@ public class StatusTransitionEngine {
         if (randomFailureRate > 0.0d && simulationRandom.nextDouble() < randomFailureRate) {
             throw new SimulatedProcessingException("Simulated random failure during " + action);
         }
+    }
+    @Transactional
+    public Payment cancelPayment(Payment payment, TriggeredBy triggeredBy) {
+        return transition(payment, Action.CANCEL, triggeredBy, null, null);
     }
 }

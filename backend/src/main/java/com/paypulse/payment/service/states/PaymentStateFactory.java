@@ -17,6 +17,7 @@ public class PaymentStateFactory {
             case SENT -> new SentState();
             case COMPLETED -> new CompletedState();
             case FAILED -> new FailedState();
+            case CANCELLED -> new CancelledState();
         };
     }
 }
