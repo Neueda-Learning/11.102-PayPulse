@@ -5,6 +5,7 @@ import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
+import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
 import com.paypulse.payment.service.states.InvalidStatusTransitionException;
 import com.paypulse.payment.service.states.PaymentStateFactory;
 import org.junit.jupiter.api.BeforeEach;

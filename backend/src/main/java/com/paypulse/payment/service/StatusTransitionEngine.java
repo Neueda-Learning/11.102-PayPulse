@@ -7,6 +7,7 @@ import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.PaymentStatusHistory;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
+import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import com.paypulse.payment.service.states.PaymentState;
 import com.paypulse.payment.service.states.PaymentStateFactory;

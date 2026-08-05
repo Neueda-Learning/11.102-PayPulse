@@ -22,6 +22,7 @@ public class NotificationLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "notification_id", nullable = false, unique = true, updatable = false)
     private UUID notificationId = UUID.randomUUID();
 
@@ -38,7 +39,7 @@ public class NotificationLog {
     private String templateName;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "template_variables", columnDefinition = "jsonb")
+    @Column(name = "template_variables", columnDefinition = "json")
     private Map<String, Object> templateVariables;
 
     @Enumerated(EnumType.STRING)
@@ -48,6 +49,7 @@ public class NotificationLog {
     @Column(name = "failure_reason", columnDefinition = "TEXT")
     private String failureReason;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "payment_id")
     private UUID paymentId;
 

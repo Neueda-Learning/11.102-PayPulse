@@ -130,6 +130,7 @@ Frontend consumes the OpenAPI contract (Phase 4) directly — component structur
 - **Indexing** (SRS §5): `status`, `created_at`, `source_account_id`, `idempotency_key` indexed — list/filter/analytics queries stay fast as row counts grow.
 - **Read-heavy endpoints** (`GET /payments`, `/analytics/*`) are natural candidates for a MySQL **read replica** in a real deployment — noted as a documented scale-out path.
 
+
 ### 7.2 Concurrent users / concurrent requests (NFR-8)
 - Optimistic locking (`@Version`) already prevents two concurrent transitions on the *same* payment from corrupting state — a retry-on-conflict strategy (bounded, e.g. 1–2 retries) is applied at the service layer before surfacing a conflict to the client.
 - The idempotent-receiver pattern (MEM-006/007) is the primary defense against duplicate-submission races under concurrent load — re-validated, not redesigned, at the new scale target.

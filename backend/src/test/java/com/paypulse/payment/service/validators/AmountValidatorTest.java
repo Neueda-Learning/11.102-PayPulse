@@ -41,6 +41,13 @@ class AmountValidatorTest {
     }
 
     @Test
+    void more_than_two_decimal_places_throws() {
+        assertThatThrownBy(() -> validator.validate(request("INR", new BigDecimal("1.234"))))
+                .isInstanceOf(PaymentException.class)
+                .hasMessageContaining("2 decimal places");
+    }
+
+    @Test
     void exact_min_doesNotThrow() {
         assertThatCode(() -> validator.validate(request("INR", new BigDecimal("0.01"))))
                 .doesNotThrowAnyException();
