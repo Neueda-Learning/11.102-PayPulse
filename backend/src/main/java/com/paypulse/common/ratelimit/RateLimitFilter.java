@@ -86,18 +86,6 @@ public class RateLimitFilter extends HttpFilter {
         return ("rate-limit:client:" + ip).getBytes(StandardCharsets.UTF_8);
     }
 
-    private void reject(HttpServletResponse response, long nanosToWait, long limit, long remaining) throws IOException {
-        long retryAfterSeconds = Math.max(1, Duration.ofNanos(nanosToWait).toSeconds());
-        response.setStatus(429);
-        response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
-        response.setHeader("X-RateLimit-Limit", String.valueOf(limit));
-        response.setHeader("X-RateLimit-Remaining", String.valueOf(remaining));
-        response.setContentType("application/json");
-        response.getWriter().write(
-                "{\"errorCode\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests. Please retry after "
-                        + retryAfterSeconds + "s.\",\"timestamp\":\"" + java.time.Instant.now() + "\"}"
-        );
-    }
 
     private void reject(HttpServletResponse response, long nanosToWait, long limit, long remaining) throws IOException {
         long retryAfterSeconds = Math.max(1, Duration.ofNanos(nanosToWait).toSeconds());
