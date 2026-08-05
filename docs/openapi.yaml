@@ -448,8 +448,9 @@ components:
           type: string
           minLength: 8
           maxLength: 20
+          pattern: '^[A-Za-z0-9]{8,20}$'
           example: ACC2000002
-          description: Free-text, format-validated only (external party, not existence-checked)
+          description: 8–20 alphanumeric chars; must differ from source account number (format-validated only, external party not existence-checked)
         reference:
           type: string
           maxLength: 255

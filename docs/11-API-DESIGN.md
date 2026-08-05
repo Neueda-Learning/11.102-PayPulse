@@ -85,7 +85,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 **Field rules:**
 | Field | Type | Required | Rules |
 |---|---|---|---|
-| `sourceAccountId` | UUID | yes | Must reference an existing, `ACTIVE` `Account` (§3/§4) — unknown/inactive → `INVALID_ACCOUNT` |
+| `sourceAccountId` | UUID | yes | Must reference an existing, `ACTIVE` `Account` (§3/§4) — unknown → `404 ACCOUNT_NOT_FOUND`, inactive → `400 INVALID_ACCOUNT` |
 | `amount` | number | yes | > 0, <= 1,000,000, max 2 decimal places |
 | `currency` | string | yes | `INR` or `USD` only; **must equal the source account's currency** — mismatch → `INVALID_CURRENCY` |
 | `destinationAccount` | string | yes | 8–20 alphanumeric chars, must differ from the source account's `accountNumber` (format-only — external party, not existence-checked, MEM-017) |
