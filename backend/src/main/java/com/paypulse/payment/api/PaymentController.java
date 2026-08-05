@@ -74,6 +74,9 @@ public class PaymentController {
         return ResponseEntity.ok(paymentMapper.toResponse(payment));
     }
 
+    private static final java.util.Set<String> SORTABLE_FIELDS =
+            java.util.Set.of("createdAt", "amount", "status");
+
     @GetMapping
     @Operation(summary = "List/search/filter payments")
     public ResponseEntity<Page<PaymentResponse>> list(
@@ -86,7 +89,14 @@ public class PaymentController {
 
         size = Math.min(size, 100);
         String[] s = sort.split(",");
-        Sort sortObj = Sort.by(Sort.Direction.fromString(s.length > 1 ? s[1] : "desc"), s[0]);
+        String field = s[0];
+        if (!SORTABLE_FIELDS.contains(field)) {
+            throw new com.paypulse.payment.service.PaymentException(
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.VALIDATION_FAILED,
+                    "Invalid sort field '" + field + "'. Allowed: createdAt, amount, status");
+        }
+        Sort sortObj = Sort.by(Sort.Direction.fromString(s.length > 1 ? s[1] : "desc"), field);
         Pageable pageable = PageRequest.of(page, size, sortObj);
 
         Page<Payment> result = paymentRepository.search(status, search, sourceAccountId, pageable);

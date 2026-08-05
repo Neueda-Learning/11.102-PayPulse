@@ -42,16 +42,16 @@
 
   <div class="card" style="padding:0;">
     <table class="table">
-      <thead>
+        <thead>
         <tr>
-          <th>Payment ID</th>
-          <th>Source Account</th>
-          <th>Destination</th>
-          <th>Amount</th>
-          <th>Status</th>
-          <th>Created</th>
+            <th>Payment ID</th>
+            <th>Source Account</th>
+            <th>Destination</th>
+            <th class="sortable" data-field="amount" onclick="setSort('amount')" style="cursor:pointer;">Amount <span id="sort-amount"></span></th>
+            <th class="sortable" data-field="status" onclick="setSort('status')" style="cursor:pointer;">Status <span id="sort-status"></span></th>
+            <th class="sortable" data-field="createdAt" onclick="setSort('createdAt')" style="cursor:pointer;">Created <span id="sort-createdAt">▼</span></th>
         </tr>
-      </thead>
+        </thead>
       <tbody id="paymentsBody">
         <tr><td colspan="6" class="empty-state"><span class="spinner"></span> Loading...</td></tr>
       </tbody>
@@ -66,6 +66,27 @@
 let currentPage = 0;
 let totalPages = 0;
 let accountMap = {};
+
+let currentSort = 'createdAt';
+let currentDir = 'desc';
+
+function setSort(field) {
+  if (currentSort === field) {
+    currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSort = field;
+    currentDir = 'desc';
+  }
+  updateSortIndicators();
+  loadPayments(0);
+}
+
+function updateSortIndicators() {
+  ['amount','status','createdAt'].forEach(f => {
+    const el = document.getElementById('sort-' + f);
+    if (el) el.textContent = currentSort === f ? (currentDir === 'asc' ? '▲' : '▼') : '';
+  });
+}
 
 async function loadAccountMap() {
   try {
@@ -82,7 +103,7 @@ async function loadPayments(page = 0) {
   const search = document.getElementById('searchBox').value.trim();
 
   try {
-    const data = await Payments.list({ status, search, page, size: 20 });
+    const data = await Payments.list({ status, search, page, size: 20, sort: `${currentSort},${currentDir}` });
     currentPage = data.number;
     totalPages  = data.totalPages;
 

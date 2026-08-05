@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.paypulse.analytics.service.DashboardStreamService;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -17,8 +19,12 @@ public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
 
-    public AnalyticsController(AnalyticsService analyticsService) {
+    private final DashboardStreamService dashboardStreamService;
+
+    public AnalyticsController(AnalyticsService analyticsService,
+                               DashboardStreamService dashboardStreamService) {
         this.analyticsService = analyticsService;
+        this.dashboardStreamService = dashboardStreamService;
     }
 
     @GetMapping("/analytics/summary")
@@ -33,5 +39,11 @@ public class AnalyticsController {
     @Operation(summary = "Get hourly payment trend")
     public TrendResponse getTrend(@RequestParam(defaultValue = "24") int hours) {
         return analyticsService.getTrend(hours);
+    }
+
+    @GetMapping(value = "/analytics/stream", produces = "text/event-stream")
+    @Operation(summary = "SSE stream of live KPI updates")
+    public SseEmitter stream() {
+        return dashboardStreamService.subscribe();
     }
 }
