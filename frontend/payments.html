@@ -83,7 +83,7 @@ async function loadPayments(page = 0) {
 
   try {
     const data = await Payments.list({ status, search, page, size: 20 });
-    currentPage = data.page;
+    currentPage = data.number;
     totalPages  = data.totalPages;
 
     if (!data.content || !data.content.length) {

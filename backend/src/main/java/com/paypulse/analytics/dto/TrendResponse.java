@@ -1,31 +1,18 @@
 package com.paypulse.analytics.dto;
 
+import lombok.*;
+import java.time.Instant;
+import java.util.List;
+
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TrendResponse {
+    private List<Bucket> buckets;
 
-    private String date;
-    private long paymentCount;
-
-    public TrendResponse() {
-    }
-
-    public TrendResponse(String date, long paymentCount) {
-        this.date = date;
-        this.paymentCount = paymentCount;
-    }
-
-    public String getDate() {
-        return date;
-    }
-
-    public void setDate(String date) {
-        this.date = date;
-    }
-
-    public long getPaymentCount() {
-        return paymentCount;
-    }
-
-    public void setPaymentCount(long paymentCount) {
-        this.paymentCount = paymentCount;
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class Bucket {
+        private Instant periodStart;
+        private long created;
+        private long completed;
+        private long failed;
     }
 }
