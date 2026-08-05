@@ -9,6 +9,7 @@ import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.validators.ValidationChain;
+import com.paypulse.payment.service.states.InvalidStatusTransitionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
