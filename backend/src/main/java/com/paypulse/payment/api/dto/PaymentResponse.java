@@ -32,5 +32,8 @@ public class PaymentResponse {
     private String errorMessage;
     private Instant createdAt;
     private Instant updatedAt;
+    private boolean reversed;
+    private String reversalPaymentId;
+    private String reversalOfPaymentId;
 }
 

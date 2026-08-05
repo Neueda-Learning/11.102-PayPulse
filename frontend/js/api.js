@@ -54,9 +54,11 @@ const Payments = {
   create: (body, idempotencyKey) => apiFetch('/payments', {
     method: 'POST',
     headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
-    body: JSON.stringify(body)
-  }),
+    body: JSON.stringify(body),
 
+  }),
+  cancel:  (id) => apiFetch(`/payments/${id}/cancel`,  { method: 'POST' }),
+  reverse: (id) => apiFetch(`/payments/${id}/reverse`, { method: 'POST' }),
   getById: (id) => apiFetch(`/payments/${id}`),
 
   list: (params = {}) => {

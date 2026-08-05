@@ -222,6 +222,24 @@ class StatusTransitionEngineTest {
         verify(resilienceConfig, org.mockito.Mockito.never()).execute(eq("paymentComplete"), any(Supplier.class));
     }
 
+    @Test
+    void cancelPayment_transitionsCreatedToCancelled_andWritesHistory() {
+        Payment payment = paymentWithStatus(PaymentStatus.CREATED, "ACC2000002");
+
+        Payment updated = engine.cancelPayment(payment, TriggeredBy.CLIENT);
+
+        assertThat(updated.getStatus()).isEqualTo(PaymentStatus.CANCELLED);
+        verify(historyRepository).save(any());
+    }
+
+    @Test
+    void cancelPayment_whenNotCreated_throwsInvalidTransition() {
+        Payment payment = paymentWithStatus(PaymentStatus.VALIDATED, "ACC2000002");
+
+        assertThatThrownBy(() -> engine.cancelPayment(payment, TriggeredBy.CLIENT))
+                .isInstanceOf(InvalidStatusTransitionException.class);
+    }
+
     private Payment paymentWithStatus(PaymentStatus status, String destinationAccount) {
         return Payment.builder()
                 .id(UUID.randomUUID().toString())

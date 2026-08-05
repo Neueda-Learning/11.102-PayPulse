@@ -22,6 +22,14 @@ import java.util.UUID;
  * Orchestrates POST /payments: idempotency -> validation chain -> persistence
  * -> automatic lifecycle progression (FR-2.4, Feature #4, owned by M2's
  * StatusTransitionEngine).
+ *
+ * NOTE (Q15/MEM-029): createPayment() is deliberately NOT @Transactional at
+ * this top level. saveNewPayment() and recordCreation() each commit in their
+ * own transaction (Spring Data repositories / StatusTransitionEngine methods
+ * are independently @Transactional), so the CREATED row is durably visible
+ * to a concurrent POST /payments/{id}/cancel BEFORE runAutomaticLifecycle()
+ * races it forward. paypulse.processing.simulated-delay-ms controls the
+ * size of that real cancel window (0 = no delay, tests default to this).
  */
 @Service
 @RequiredArgsConstructor
@@ -40,7 +48,9 @@ public class PaymentService {
     @Value("${paypulse.simulation.random-failure-rate:0.05}")
     private double randomFailureRate;
 
-    @Transactional
+    @Value("${paypulse.processing.simulated-delay-ms:0}")
+    private long simulatedDelayMs;
+
     public PaymentCreationResult createPayment(String idempotencyKey, CreatePaymentRequest request) {
         return idempotencyService.findExisting(idempotencyKey)
                 .map(existing -> new PaymentCreationResult(paymentMapper.toResponse(existing), false))
@@ -51,9 +61,36 @@ public class PaymentService {
     private Payment createAndProgressPayment(String idempotencyKey, CreatePaymentRequest request) {
         validationChain.validate(request);
 
+        // Phase 1 — commits immediately (own transaction): the CREATED row
+        // and its audit history entry are now durably visible to any other
+        // request, including a concurrent /cancel call.
         Payment created = saveNewPayment(idempotencyKey, request);
         statusTransitionEngine.recordCreation(created, TriggeredBy.CLIENT);
-        return statusTransitionEngine.runAutomaticLifecycle(created);
+
+        awaitCancelWindow();
+
+        // Re-fetch: a concurrent cancel may have already moved this payment
+        // off CREATED during the window above. If so, respect that outcome
+        // instead of racing the automatic lifecycle over it.
+        Payment current = paymentRepository.findById(created.getId()).orElse(created);
+        if (current.getStatus() != PaymentStatus.CREATED) {
+            return current;
+        }
+
+        // Phase 2 — separate transaction (runAutomaticLifecycle is itself
+        // @Transactional on StatusTransitionEngine).
+        return statusTransitionEngine.runAutomaticLifecycle(current);
+    }
+
+    private void awaitCancelWindow() {
+        if (simulatedDelayMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(simulatedDelayMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private Payment saveNewPayment(String idempotencyKey, CreatePaymentRequest request) {
@@ -74,13 +111,6 @@ public class PaymentService {
         return (idempotencyKey == null || idempotencyKey.isBlank()) ? null : idempotencyKey.trim();
     }
 
-    /**
-     * Simulates an upstream/persistence failure at payment CREATION time,
-     * i.e. before any row exists. Unlike validate/send/complete, there's no
-     * Payment id yet to record FAILED against — the client simply gets a
-     * 503 and can safely retry with the same Idempotency-Key (nothing was
-     * persisted, so retrying is not a duplicate).
-     */
     private void simulateCreationFailure(CreatePaymentRequest request) {
         if ("CREATE".equalsIgnoreCase(request.getForceFailureStage())) {
             throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
@@ -94,5 +124,27 @@ public class PaymentService {
             throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
                     "Simulated transient failure while creating payment");
         }
+    }
+
+    @Transactional
+    public Payment cancelPayment(String id) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new PaymentException(HttpStatus.NOT_FOUND, ErrorCode.PAYMENT_NOT_FOUND,
+                        "No payment found with id " + id));
+        try {
+            return statusTransitionEngine.cancelPayment(payment, TriggeredBy.CLIENT);
+        } catch (InvalidStatusTransitionException ex) {
+            throw new PaymentException(HttpStatus.CONFLICT, ErrorCode.PAYMENT_NOT_CANCELLABLE,
+                    "Payment cannot be cancelled from its current status");
+        }
+    }
+
+    @Transactional
+    public Payment createReversalPayment(CreatePaymentRequest request, String originalPaymentId) {
+        Payment created = saveNewPayment(null, request);
+        created.setReversalOfPaymentId(originalPaymentId);
+        created = paymentRepository.save(created);
+        statusTransitionEngine.recordCreation(created, TriggeredBy.CLIENT);
+        return statusTransitionEngine.runAutomaticLifecycle(created);
     }
 }

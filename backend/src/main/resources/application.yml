@@ -133,6 +133,8 @@ resilience4j:
 
 # ── PayPulse App Config ────────────────────────────────────────────────────────
 paypulse:
+  processing:
+    simulated-delay-ms: 3000
   rate-limit:
     global-requests-per-minute: 40000   # NFR-10/11: ~667 req/sec ceiling 4000
     per-client-requests-per-minute: 2000 # fair-share per IP 2000         # 5% random failure rate
