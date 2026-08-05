@@ -34,6 +34,12 @@ public class Account {
     @Column(length = 3, nullable = false)
     private String currency;
 
+    @Column(name = "owner_email", length = 255)
+    private String ownerEmail;
+
+    @Column(name = "owner_name", length = 100)
+    private String ownerName;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
     private AccountStatus status;
