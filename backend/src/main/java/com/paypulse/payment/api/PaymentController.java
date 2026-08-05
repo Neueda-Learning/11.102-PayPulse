@@ -26,7 +26,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 /**
@@ -54,8 +56,14 @@ public class PaymentController {
             @Valid @RequestBody CreatePaymentRequest request) {
 
         PaymentCreationResult result = paymentService.createPayment(idempotencyKey, request);
-        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
-                .body(result.payment());
+        if (!result.created()) {
+            return ResponseEntity.ok(result.payment());
+        }
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(result.payment().getId())
+                .toUri();
+        return ResponseEntity.created(location).body(result.payment());
     }
 
     // ── M4 ──────────────────────────────────────────────────────────
