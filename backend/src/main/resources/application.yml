@@ -136,8 +136,8 @@ paypulse:
   rate-limit:
     global-requests-per-minute: 40000   # NFR-10/11: ~667 req/sec ceiling 4000
     per-client-requests-per-minute: 2000 # fair-share per IP 2000         # 5% random failure rate
-  cors:
-    allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:63342"
+    cors:
+      allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:63342,http://10.9.67.127:8085"
   simulation:
     create-failure-account: FAILCREATE01     # NEW — fails before any Payment row is persisted
     validate-failure-account: FAILVALIDATE01 # NEW — fails CREATED -> FAILED
