@@ -63,6 +63,17 @@
       </div>
 
       <div class="form-row">
+        <label for="forceFailureStage">Simulate Failure (demo/testing only)</label>
+        <select id="forceFailureStage">
+          <option value="NONE">No forced failure — process normally</option>
+          <option value="CREATE">Fail at Creation</option>
+          <option value="VALIDATE">Fail at Validation</option>
+          <option value="SEND">Fail at Send</option>
+        </select>
+        <div class="hint">Forces this payment to fail deterministically at the chosen stage. Completion cannot be force-failed from here.</div>
+      </div>
+
+      <div class="form-row">
         <label for="idempotencyKey">Idempotency Key (auto-generated)</label>
         <input type="text" id="idempotencyKey" readonly aria-label="Idempotency Key"/>
         <div class="hint">Generated once per submission. Prevents accidental double payments.</div>
@@ -138,8 +149,9 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
   const currency = document.getElementById('currency').value;
   const destinationAccount = document.getElementById('destinationAccount').value.trim();
   const reference = document.getElementById('reference').value.trim();
-  ensureSubmissionKey();
-  const idempotencyKey = currentSubmissionKey;
+const forceFailureStage = document.getElementById('forceFailureStage').value; // optional UI-only
+ensureSubmissionKey();
+const idempotencyKey = currentSubmissionKey;
 
   const submitBtn = document.getElementById('submitBtn');
   submitBtn.disabled = true;
@@ -147,9 +159,9 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
 
   try {
     const payment = await Payments.create(
-      { sourceAccountId, amount, currency, destinationAccount, reference },
-      idempotencyKey
-    );
+  { sourceAccountId, amount, currency, destinationAccount, reference },
+  idempotencyKey
+);
 
     const isOk = payment.status === 'COMPLETED';
     const resultCard = document.getElementById('resultCard');
@@ -168,8 +180,8 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
         <a class="btn ghost" href="payment-details.html?id=${encodeURIComponent(payment.id)}">View Full Details →</a>
       </p>`;
     resultCard.scrollIntoView({ behavior: 'smooth' });
-    // Success ends this submission attempt; next submit gets a fresh key.
-    clearSubmissionKey();
+clearSubmissionKey();
+document.getElementById('forceFailureStage').value = 'NONE';
   } catch (err) {
     noticeEl.innerHTML = `<div class="notice error"><strong>${err.errorCode || 'ERROR'}</strong>: ${err.message || 'Submission failed.'}</div>`;
 

@@ -16,9 +16,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.Random;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +58,78 @@ class PaymentServiceTest {
     @BeforeEach
     void setup() {
         paymentService = new PaymentService(
-                paymentRepository, idempotencyService, paymentMapper, validationChain, statusTransitionEngine);
+                paymentRepository, idempotencyService, paymentMapper, validationChain,
+                statusTransitionEngine, new Random(42));
+        ReflectionTestUtils.setField(paymentService, "createFailureAccount", "FAILCREATE01");
+        ReflectionTestUtils.setField(paymentService, "randomFailureRate", 0.0d);
+    }
+
+    @Test
+    void createPayment_whenDeterministicCreationFailureAccount_throwsServiceUnavailable_andNeverSaves() {
+        when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
+                .amount(new BigDecimal("250.00"))
+                .currency("INR")
+                .destinationAccount("FAILCREATE01")
+                .reference("chaos-test")
+                .build();
+
+        assertThatThrownBy(() -> paymentService.createPayment("key-1", request))
+                .isInstanceOf(PaymentException.class)
+                .satisfies(ex -> assertThat(((PaymentException) ex).getStatus())
+                        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+
+        verify(paymentRepository, never()).save(any());
+        verify(statusTransitionEngine, never()).recordCreation(any(), any());
+    }
+
+    @Test
+    void createPayment_whenForceFailureStageIsCreate_throwsServiceUnavailable_andNeverSaves() {
+        when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
+                .amount(new BigDecimal("250.00"))
+                .currency("INR")
+                .destinationAccount("ACC2000002")
+                .forceFailureStage("CREATE")
+                .build();
+
+        assertThatThrownBy(() -> paymentService.createPayment("key-2", request))
+                .isInstanceOf(PaymentException.class)
+                .satisfies(ex -> assertThat(((PaymentException) ex).getStatus())
+                        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+
+        verify(paymentRepository, never()).save(any());
+        verify(statusTransitionEngine, never()).recordCreation(any(), any());
+    }
+
+    @Test
+    void createPayment_whenForceFailureStageIsSend_propagatesOntoPersistedPayment() {
+        Payment mappedEntity = new Payment();
+        Payment saved = payment(PaymentStatus.CREATED);
+
+        when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+        when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(mappedEntity);
+        when(paymentRepository.save(any(Payment.class))).thenReturn(saved);
+        when(statusTransitionEngine.runAutomaticLifecycle(saved)).thenReturn(saved);
+        when(paymentMapper.toResponse(saved)).thenReturn(PaymentResponse.builder().build());
+
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
+                .amount(new BigDecimal("250.00"))
+                .currency("INR")
+                .destinationAccount("ACC2000002")
+                .forceFailureStage("SEND")
+                .build();
+
+        paymentService.createPayment("attempt-3", request);
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getForcedFailureStage()).isEqualTo("SEND");
     }
 
     @Test
@@ -118,7 +192,6 @@ class PaymentServiceTest {
 
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
         // validationChain.validate() returns void, so it will happily do nothing (pass) by default on a mock
-
         when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(new Payment());
         when(paymentRepository.save(any(Payment.class))).thenReturn(savedAsCreated);
         when(statusTransitionEngine.runAutomaticLifecycle(savedAsCreated)).thenReturn(finalCompleted);
