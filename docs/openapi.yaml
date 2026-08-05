@@ -5,9 +5,11 @@ info:
     REST API for managing the full lifecycle of financial payments —
     creation, validation, transmission, completion/failure — with a
     complete audit trail of status transitions. The single operator owns
-    multiple accounts (INR/USD); a KPI/analytics dashboard and API rate
-    limiting are provided per the 31-Jul-2026 customer meeting.
-  version: "1.1.0"
+    multiple accounts (INR/USD); a KPI/analytics dashboard (with live SSE
+    updates) and API rate limiting are provided per the 31-Jul-2026
+    customer meeting. V2 (05-Aug-2026) adds payment cancellation/reversal,
+    CSV export, notifications, and a display-only FX rate lookup.
+  version: "2.0.0"
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development
@@ -19,6 +21,10 @@ tags:
     description: Create, retrieve, and track payments
   - name: Analytics
     description: KPI dashboard and basic analytics
+  - name: Notifications
+    description: Email notification management and audit log (V2)
+  - name: FX
+    description: Display-only currency conversion rate (V2)
 
 paths:
   /accounts:
@@ -361,6 +367,265 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  # ── V2 additions (05 Aug 2026) ──────────────────────────────────────────
+
+  /payments/{id}/cancel:
+    post:
+      tags: [Payments]
+      summary: Cancel a CREATED payment (V2, feature #18)
+      operationId: cancelPayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Payment cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Payment is not in CREATED status — cannot be cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/{id}/reverse:
+    post:
+      tags: [Payments]
+      summary: Reverse a COMPLETED payment via a new, linked offsetting payment (V2, feature #19)
+      operationId: reversePayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '201':
+          description: New offsetting payment created; original flagged as reversed
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Payment is not COMPLETED, or has already been reversed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /payments/export:
+    get:
+      tags: [Payments]
+      summary: Stream the current filtered payment list as CSV (V2, feature #14)
+      operationId: exportPayments
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/PaymentStatus'
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: sourceAccountId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: sort
+          schema:
+            type: string
+            default: createdAt,desc
+            enum: ["createdAt,asc", "createdAt,desc", "amount,asc", "amount,desc", "status,asc", "status,desc"]
+      responses:
+        '200':
+          description: CSV file stream
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Filtered result exceeds the configured export row cap
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /analytics/stream:
+    get:
+      tags: [Analytics]
+      summary: Server-Sent Events stream of live KPI updates (V2) — replaces the 30s dashboard poll
+      operationId: streamAnalytics
+      responses:
+        '200':
+          description: text/event-stream — a KpiSummaryResponse pushed on each payment status transition (debounced)
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/KpiSummaryResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /fx/rate:
+    get:
+      tags: [FX]
+      summary: Display-only static FX conversion rate (V2, feature #20)
+      operationId: getFxRate
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+        - in: query
+          name: to
+          required: true
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      responses:
+        '200':
+          description: Static conversion rate (display-only, never affects settlement)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FxRateResponse'
+        '404':
+          description: Unsupported/unconfigured currency pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /notifications/send:
+    post:
+      tags: [Notifications]
+      summary: Send an ad-hoc email notification (V2, already implemented, now documented)
+      operationId: sendNotification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendNotificationRequest'
+      responses:
+        '200':
+          description: Email dispatched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailResult'
+        '500':
+          description: Email dispatch failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailResult'
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notification audit logs (V2)
+      operationId: listNotifications
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, SENT, FAILED]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated notification logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationLog'
+                  page:
+                    type: integer
+                  size:
+                    type: integer
+                  totalElements:
+                    type: integer
+                  totalPages:
+                    type: integer
+
+  /notifications/{notificationId}:
+    get:
+      tags: [Notifications]
+      summary: Get a single notification log by ID (V2)
+      operationId: getNotification
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification log found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationLog'
+        '404':
+          description: Not found
+
+  /notifications/by-payment/{paymentId}:
+    get:
+      tags: [Notifications]
+      summary: Get all notifications linked to a specific payment (V2)
+      operationId: getNotificationsByPayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: List of notification logs for the payment (may be empty)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationLog'
+
 components:
   parameters:
     PaymentId:
@@ -396,7 +661,9 @@ components:
   schemas:
     PaymentStatus:
       type: string
-      enum: [CREATED, VALIDATED, SENT, COMPLETED, FAILED]
+      enum: [CREATED, VALIDATED, SENT, COMPLETED, FAILED, CANCELLED]
+      description: >
+        CANCELLED added in V2 (feature #18) — terminal, reachable only from CREATED.
 
     CurrencyCode:
       type: string
@@ -489,6 +756,20 @@ components:
         updatedAt:
           type: string
           format: date-time
+        reversed:
+          type: boolean
+          default: false
+          description: V2 (feature #19) — true once this payment has been reversed
+        reversalPaymentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: V2 — set on the ORIGINAL payment, points to the new offsetting payment
+        reversalOfPaymentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: V2 — set on the NEW reversal payment, points back to the original
 
     PaymentHistoryResponse:
       type: object
@@ -600,4 +881,102 @@ components:
         path:
           type: string
           example: /api/v1/payments
+
+    # ── V2 schemas (05 Aug 2026) ────────────────────────────────────────────
+
+    FxRateResponse:
+      type: object
+      description: Display-only static conversion rate — never affects payment settlement (MEM-031)
+      properties:
+        from:
+          $ref: '#/components/schemas/CurrencyCode'
+        to:
+          $ref: '#/components/schemas/CurrencyCode'
+        rate:
+          type: number
+          format: double
+          example: 0.012
+        asOf:
+          type: string
+          format: date-time
+          description: Config reload timestamp — NOT a live market rate
+
+    NotificationStatus:
+      type: string
+      enum: [PENDING, SENT, FAILED]
+
+    NotificationLog:
+      type: object
+      description: Audit trail row for a single email notification attempt (V5__create_notification_log_table.sql)
+      properties:
+        id:
+          type: integer
+          format: int64
+        notificationId:
+          type: string
+          format: uuid
+        recipientEmail:
+          type: string
+        recipientName:
+          type: string
+          nullable: true
+        subject:
+          type: string
+        templateName:
+          type: string
+        status:
+          $ref: '#/components/schemas/NotificationStatus'
+        failureReason:
+          type: string
+          nullable: true
+        paymentId:
+          type: string
+          format: uuid
+          nullable: true
+        eventType:
+          type: string
+          example: PAYMENT_COMPLETED
+        attempts:
+          type: integer
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    SendNotificationRequest:
+      type: object
+      required: [recipientEmail, event]
+      properties:
+        recipientEmail:
+          type: string
+          format: email
+        recipientName:
+          type: string
+          nullable: true
+        event:
+          type: string
+          enum: [PAYMENT_CREATED, PAYMENT_COMPLETED, PAYMENT_FAILED, WELCOME]
+        paymentId:
+          type: string
+          format: uuid
+          nullable: true
+        variables:
+          type: object
+          additionalProperties: true
+
+    EmailResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        notificationId:
+          type: string
+          format: uuid
+          nullable: true
+        failureReason:
+          type: string
+          nullable: true
 

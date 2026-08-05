@@ -63,3 +63,51 @@ Using dedicated `CompletedState`/`FailedState` classes (rather than a single `if
 
 `Account.status` (`ACTIVE` / `INACTIVE`) is a simple flag, not a finite state machine — there's no lifecycle of transitions to enforce (no "pending", no automatic progression). It's checked as a **guard condition** by `AccountValidator` when a payment is created (an `INACTIVE` account cannot be used as a payment source), but it does not participate in the `PaymentState` hierarchy above. Keeping it a plain enum/flag rather than a second State-pattern hierarchy avoids over-engineering a concept that doesn't need one — consistent with the brief's "start small" guidance, now reapplied to the newly-added `Account` entity.
 
+---
+
+## 6. V2 State Machine Update — `CANCELLED` added (05 Aug 2026, feature #18, MEM-029)
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREATED : POST /payments
+
+    CREATED --> VALIDATED : validate() succeeds
+    CREATED --> FAILED : validate() fails\n(errorCode set)
+    CREATED --> CANCELLED : POST /payments/{id}/cancel
+
+    VALIDATED --> SENT : send() succeeds
+    VALIDATED --> FAILED : send() fails\n(NETWORK_ERROR/etc.)
+
+    SENT --> COMPLETED : complete() succeeds
+    SENT --> FAILED : complete() fails\n(PROCESSING_ERROR/etc.)
+
+    COMPLETED --> [*]
+    FAILED --> [*]
+    CANCELLED --> [*]
+
+    note right of CANCELLED
+        New terminal state (V2).
+        Reachable ONLY from CREATED,
+        via explicit client action.
+        No automatic/system transition
+        ever produces this state.
+    end note
+```
+
+### 6.1 Updated Transition Table
+
+| From \ To | CREATED | VALIDATED | SENT | COMPLETED | FAILED | CANCELLED |
+|---|---|---|---|---|---|---|
+| **CREATED** | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **VALIDATED** | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| **SENT** | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| **COMPLETED** | ❌ | ❌ | ❌ | ❌ (terminal) | ❌ | ❌ |
+| **FAILED** | ❌ | ❌ | ❌ | ❌ | ❌ (terminal) | ❌ |
+| **CANCELLED** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ (terminal) |
+
+Implemented as a new `CancelledState` class alongside the existing 5, per `08-UML-CLASS-DIAGRAM.md` §3 — zero changes to `StatusTransitionEngine`'s dispatch mechanism (Open/Closed, MEM-029).
+
+### 6.2 Payment Reversal (#19) — deliberately NOT a state transition
+
+Per MEM-030, reversing a `COMPLETED` payment does **not** add a `REVERSED` state or any outgoing transition from `COMPLETED` (which remains strictly terminal, unchanged from Core). Instead, reversal is modeled as: (a) a `reversed` boolean flag flipped on the original payment, and (b) a **brand-new**, independent `Payment` row (with `reversalOfPaymentId` linking back) that goes through this **exact same** state diagram from `CREATED` onward, like any other payment. This preserves the original state machine's documented terminal-state guarantee ("no scenario ever leaves `COMPLETED`") while still delivering the reversal feature.
+

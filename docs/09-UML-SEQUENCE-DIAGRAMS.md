@@ -251,3 +251,146 @@ sequenceDiagram
     Ctrl-->>Client: 200 OK + KpiSummaryResponse
     Note over Client: Rendered as the FIRST screen the user sees (customer directive)
 ```
+
+---
+
+## V2 Sequence Diagrams (05 Aug 2026 — MEM-023–034)
+
+## 10. Notification Dispatch on Payment Completion (new, MEM-025/026)
+
+```mermaid
+sequenceDiagram
+    participant Engine as StatusTransitionEngine
+    participant Bus as ApplicationEventPublisher
+    participant Listener as PaymentNotificationListener
+    participant AcctSvc as AccountService
+    participant NotifSvc as NotificationService
+    participant EmailSvc as EmailService
+    participant Log as NotificationLogRepository
+
+    Engine->>Bus: publish(PaymentStatusChangedEvent: →COMPLETED)
+    Note over Bus,Listener: @TransactionalEventListener(AFTER_COMMIT) — payment row already durably saved
+    Bus->>Listener: onPaymentStatusChanged(event)
+    Listener->>AcctSvc: getActiveAccount(payment.sourceAccountId)
+    AcctSvc-->>Listener: Account(ownerEmail, ownerName)
+    alt ownerEmail present
+        Listener->>NotifSvc: notifyPaymentCompleted(email, name, paymentId, vars)
+        NotifSvc->>EmailSvc: sendAsync(EmailRequest)
+        EmailSvc->>Log: save(NotificationLog status=SENT/FAILED)
+        EmailSvc-->>NotifSvc: EmailResult
+    else no email configured
+        Listener->>Listener: log warning, skip send
+    end
+    Note over Listener: Runs on notification-executor thread — never blocks the original request thread
+```
+
+## 11. Payment Cancellation (new, feature #18, MEM-029)
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant Svc as PaymentService
+    participant Repo as PaymentRepository
+    participant Engine as StatusTransitionEngine
+    participant State as CreatedState/CancelledState
+    participant HistRepo as PaymentStatusHistoryRepository
+
+    Client->>Ctrl: POST /payments/{id}/cancel
+    Ctrl->>Svc: cancelPayment(id)
+    Svc->>Repo: findById(id)
+    Repo-->>Svc: payment
+    alt status == CREATED
+        Svc->>Engine: cancel(payment)
+        Engine->>State: transition to CANCELLED
+        Engine->>Repo: save(payment status=CANCELLED)
+        Engine->>HistRepo: save(history: CREATED→CANCELLED, triggeredBy=CLIENT)
+        Engine-->>Svc: payment(CANCELLED)
+        Svc-->>Ctrl: payment(CANCELLED)
+        Ctrl-->>Client: 200 OK + PaymentResponse(status=CANCELLED)
+    else status != CREATED
+        Svc-->>Ctrl: throws PaymentNotCancellableException
+        Ctrl-->>Client: 409 Conflict + ApiError(PAYMENT_NOT_CANCELLABLE)
+    end
+```
+
+## 12. Payment Reversal (new, feature #19, MEM-030)
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant RevSvc as ReversalService
+    participant Repo as PaymentRepository
+    participant Svc as PaymentService
+
+    Client->>Ctrl: POST /payments/{id}/reverse
+    Ctrl->>RevSvc: reverse(id)
+    RevSvc->>Repo: findById(id)
+    Repo-->>RevSvc: original payment(status=COMPLETED, reversed=false)
+    alt eligible (COMPLETED and not already reversed)
+        RevSvc->>Svc: createPayment(swapped source/destination, reversalOfPaymentId=original.id)
+        Note over Svc: Normal create-payment pipeline — idempotency, validation, auto-progression, audit trail
+        Svc-->>RevSvc: newPayment (own lifecycle/status)
+        RevSvc->>Repo: save(original: reversed=true, reversalPaymentId=newPayment.id)
+        Note over Repo: original.status is NEVER changed — remains COMPLETED (audit integrity, NFR-2)
+        RevSvc-->>Ctrl: newPayment
+        Ctrl-->>Client: 201 Created + PaymentResponse(new reversal payment)
+    else already reversed
+        RevSvc-->>Ctrl: throws PaymentAlreadyReversedException
+        Ctrl-->>Client: 409 Conflict + ApiError(PAYMENT_ALREADY_REVERSED)
+    else not COMPLETED
+        RevSvc-->>Ctrl: throws InvalidStatusTransitionException
+        Ctrl-->>Client: 409 Conflict + ApiError(INVALID_STATUS_TRANSITION)
+    end
+```
+
+## 13. Dashboard Live Update via SSE (new, MEM-027)
+
+```mermaid
+sequenceDiagram
+    actor Client as Browser (EventSource)
+    participant Ctrl as AnalyticsController
+    participant Stream as DashboardStreamService
+    participant Bus as ApplicationEventPublisher
+    participant Svc as AnalyticsService
+
+    Client->>Ctrl: GET /analytics/stream (EventSource connect)
+    Ctrl->>Stream: subscribe()
+    Stream-->>Client: SseEmitter registered (connection stays open)
+
+    Note over Bus,Stream: Elsewhere: a payment transitions
+    Bus->>Stream: onPaymentStatusChanged(event)
+    Stream->>Stream: schedule debounced recompute (coalesce bursts, ≤1 push/2s)
+    Stream->>Svc: computeSummary(from, to)
+    Svc-->>Stream: KpiSummaryResponse
+    Stream-->>Client: SSE event: data: {KpiSummaryResponse JSON}
+    Note over Client: Dashboard updates in place — no polling, no page reload
+```
+
+## 14. CSV Export (new, feature #14, MEM-032)
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Ctrl as PaymentController
+    participant ExportSvc as PaymentCsvExportService
+    participant Repo as PaymentRepository
+
+    Client->>Ctrl: GET /payments/export?status=FAILED&sort=createdAt,desc
+    Ctrl->>ExportSvc: streamExport(filters, response.outputStream)
+    ExportSvc->>Repo: countByFilters(filters)
+    Repo-->>ExportSvc: rowCount
+    alt rowCount > max-rows
+        ExportSvc-->>Ctrl: throws ExportTooLargeException
+        Ctrl-->>Client: 400 Bad Request + ApiError(EXPORT_TOO_LARGE)
+    else within cap
+        ExportSvc->>Repo: streamByFilters(filters)  (Stream~Payment~, DB cursor)
+        loop each row (streamed, not buffered)
+            Repo-->>ExportSvc: Payment
+            ExportSvc->>Client: write CSV row directly to response OutputStream
+        end
+        Ctrl-->>Client: 200 OK, Content-Type: text/csv (streamed)
+    end
+```
+

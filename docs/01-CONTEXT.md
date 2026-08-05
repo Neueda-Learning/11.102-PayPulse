@@ -22,7 +22,9 @@ Source of truth for requirements: `payment_processing.md` (root of repo).
 
 ## 4. Scope
 
-### In scope (Core)
+> **Updated 05 Aug 2026 (V2):** Core (§4a below) is complete and shipped. §4b lists the V2 wave now in progress. §4c is the remaining, still-deferred backlog. See `02-MEMORY.md` MEM-023 for the full rationale.
+
+### 4a. In scope — Core (✅ shipped)
 - Create payment
 - Retrieve payment by ID
 - List/search/filter payments by status
@@ -32,17 +34,32 @@ Source of truth for requirements: `payment_processing.md` (root of repo).
 - Validation rules (amount, currency, account) with defined error codes
 - Simulated payment processing (no real payment gateway/network integration)
 - Swagger/OpenAPI documentation
-- React frontend covering the 5 prioritized user journeys (create, view status/details, view history, filter by status, view failure details)
+- `Account` entity, multi-account source picker, INR/USD currencies
+- KPI dashboard + basic analytics, ~40k req/min rate limiting, API security hardening
+- Frontend covering the 5 prioritized user journeys (create, view status/details, view history, filter by status, view failure details)
 
-### Explicitly Out of Scope (for now — revisit only if time remains, Appendix E)
-- Authentication / multi-user / account ownership
+### 4b. In scope — V2 (🚧 in progress, this wave)
+- **#21 Notifications** — wire the already-implemented `notification` module into the payment lifecycle (email on created/completed/failed)
+- **#16 Sortable Columns** — payment list table, click-to-sort
+- **Load testing v2** — extend existing load tests to new V2 endpoints
+- **Dashboard SSE** — replace the 30-second dashboard poll with a live `text/event-stream` push
+- **Create Payment frontend cross-check** — audit against the API contract (see MEM-028 finding)
+- **#18 Payment Cancellation** — cancel a `CREATED` payment before processing
+- **#19 Payment Reversal** — reverse a `COMPLETED` payment via a new, linked offsetting payment
+- **#13 Analytics/Trend View** — deepened beyond the existing dashboard bar chart
+- **#14 CSV Export** — download the current filtered payment list
+- **#17 Copy Payment ID / Deep Linking**
+- **#20 Multi-Currency Conversion** — **display-only** FX hint (static rates); no real cross-currency settlement (see MEM-031)
+
+### 4c. Explicitly Out of Scope (still deferred — revisit only if time remains)
+- **#15 Configurable Failure Simulation** — not assigned this wave
+- **#22 Batch/Bulk Payments**
+- **#23 Recurring/Scheduled Payments**
+- **#24 Full Authentication / multi-user / account ownership**
+- **#25 Account Management Screen** (create/edit/deactivate accounts from the UI)
 - Real payment network/gateway integration
-- Batch payments, scheduling/recurring payments
-- Notifications (email/webhook)
-- Reporting/analytics dashboards
-- Multi-currency conversion / FX rates
-- Payment reversal/cancellation
-- Optimistic/pessimistic concurrency locking (nice-to-have if time permits in Sprint 2+)
+- Real (non-display-only) multi-currency conversion / live FX rate feeds
+- Optimistic/pessimistic concurrency locking beyond the existing `@Version` (already sufficient per NFR-8)
 
 ## 5. Constraints
 

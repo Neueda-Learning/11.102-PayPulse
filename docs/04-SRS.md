@@ -271,5 +271,89 @@ This SRS was revised after the team's first customer meeting. Summary of every c
 
 ---
 
-**Status: Draft → defaults accepted for Sprint 1 planning purposes; revised 31 Jul 2026 post-customer-meeting (see MEM-006, MEM-007, MEM-017–022).** Proceeding to **Phase 2: Architecture & Design Patterns** update. Any of these can be revisited later at negligible cost if the instructor gives different guidance.
+## 12. V2 Requirements — Good-to-Have / Future Wave (added 05 Aug 2026)
+
+> Core (FR-0 through FR-13 above) is complete and unchanged. This section is a pure **addition** — traceable to `02-MEMORY.md` MEM-023–034 — covering the V2 wave: notifications, dashboard SSE, cancellation, reversal, analytics deepening, CSV export, sortable columns, copy/deep-linking, and display-only FX.
+
+### FR-14 — Payment Lifecycle Notifications (new, feature #21, MEM-025/026)
+- **FR-14.1** On a payment transitioning to `CREATED`, `COMPLETED`, or `FAILED`, the system asynchronously sends an email notification (via the existing `notification` module) to the **source account's** `owner_email`, if set.
+- **FR-14.2** If `owner_email` is not set on the source account, the system falls back to `paypulse.notifications.default-recipient-email` (config); if that is also unset, the notification is skipped and logged — **never** blocks or fails the payment itself.
+- **FR-14.3** Every notification attempt (success or failure) is recorded in `notification_log` (already exists, `V5__create_notification_log_table.sql`), queryable via the existing `GET /notifications`, `GET /notifications/{id}`, `GET /notifications/by-payment/{paymentId}` endpoints (implemented, now formally documented in `11-API-DESIGN.md`).
+- **FR-14.4** Notification dispatch is **fully decoupled** from the request thread (`@Async`) — a slow/unavailable email provider never adds latency to `POST /payments` or any transition endpoint.
+
+### FR-15 — Payment Cancellation (new, feature #18, MEM-029)
+- **FR-15.1** `POST /payments/{id}/cancel` transitions a payment from `CREATED` to the new terminal status `CANCELLED`. Legal **only** from `CREATED`.
+- **FR-15.2** Attempting to cancel a payment in any other status returns `409 Conflict` + new error code `PAYMENT_NOT_CANCELLABLE`.
+- **FR-15.3** A `CANCELLED` payment is terminal — no further transitions are legal (consistent with `COMPLETED`/`FAILED`).
+- **FR-15.4** The cancellation is recorded in `payment_status_history` exactly like any other transition (`triggeredBy = CLIENT`, since this is the one client-initiated, non-automatic terminal transition).
+
+### FR-16 — Payment Reversal (new, feature #19, MEM-030)
+- **FR-16.1** `POST /payments/{id}/reverse` is legal **only** for a `COMPLETED` payment that has not already been reversed.
+- **FR-16.2** On success: the original payment's `reversed` flag is set `true` and `reversal_payment_id` is set to the new payment's ID; the original's `status` **does not change** (remains `COMPLETED` — audit-trail integrity, NFR-2).
+- **FR-16.3** A new `Payment` is created with `reversal_of_payment_id` set to the original's ID, `sourceAccountId`/`destinationAccount` swapped, identical `amount`/`currency`, and enters the **normal** `CREATED→VALIDATED→SENT→COMPLETED/FAILED` lifecycle (full validation, idempotency, audit trail — no special-casing).
+- **FR-16.4** Reversing an already-reversed payment returns `409` + new error code `PAYMENT_ALREADY_REVERSED`. Reversing a non-`COMPLETED` payment returns `409` + `INVALID_STATUS_TRANSITION`.
+
+### FR-17 — Multi-Currency Conversion Display (new, feature #20, MEM-031 — display-only)
+- **FR-17.1** `GET /fx/rate?from=INR&to=USD` returns a static, config-driven conversion rate and the computed "as of" timestamp (config reload time, not live).
+- **FR-17.2** This rate is used **only** for a non-binding UI display hint (e.g. "≈ $3.00") — it never changes payment validation, currency-matching rules (FR-9, MEM-018 unchanged), or settlement.
+- **FR-17.3** No payment may actually be created/settled across a currency boundary — `currency` must still equal the source account's currency exactly.
+
+### FR-18 — CSV Export (new, feature #14, MEM-032)
+- **FR-18.1** `GET /payments/export` accepts the same filters as `GET /payments` (`status`, `search`, `sourceAccountId`, `sort`) but returns a streamed `text/csv` file of the **full filtered result set** (no pagination).
+- **FR-18.2** If the filtered result would exceed `paypulse.export.max-rows` (default 50,000), the request is rejected with `400` + new error code `EXPORT_TOO_LARGE` rather than silently truncating the file.
+- **FR-18.3** The export is generated via a streaming/cursor read (not loaded fully into memory) to keep memory usage bounded regardless of row count (up to the cap).
+
+### FR-19 — Sortable Columns (new, feature #16, MEM-033)
+- **FR-19.1** `GET /payments`'s existing `sort` parameter is restricted to an explicit allow-list: `createdAt`, `amount`, `status`. An unrecognized sort field returns `400 VALIDATION_FAILED` rather than being silently ignored or exposing internal column names.
+- **FR-19.2** The frontend payment list's column headers (Amount, Status, Created) are clickable, toggling ascending/descending sort with a visual indicator.
+
+### FR-20 — Copy Payment ID / Deep Linking (new, feature #17, MEM-034)
+- **FR-20.1** Every place a payment ID is displayed offers a one-click copy-to-clipboard affordance.
+- **FR-20.2** `payment-details.html?id=<uuid>` and `payments.html?status=<STATUS>` are formally documented, stable, supported deep-link URL contracts (already implemented; this is a documentation/stability commitment, not new code).
+
+### FR-21 — Dashboard Live Updates via SSE (new, MEM-027)
+- **FR-21.1** `GET /analytics/stream` (`text/event-stream`) pushes an updated `KpiSummaryResponse` to all connected clients whenever a payment status transition occurs, debounced/coalesced to at most one push per 2 seconds under burst load.
+- **FR-21.2** The frontend dashboard connects via `EventSource` on load and updates KPI cards/trend/failure-reason widgets in place, without a full page reload or fixed-interval polling.
+- **FR-21.3** If the SSE connection is unavailable or repeatedly drops, the frontend falls back to the previous 30-second poll behavior (graceful degradation — SSE is an enhancement, not a hard dependency for the dashboard to function).
+
+## 13. V2 Data Model Additions (supersedes nothing — pure additions to §5)
+
+### `account` — new columns (Flyway `V6__add_account_owner_contact.sql`)
+| Field | Type | Notes |
+|---|---|---|
+| `owner_email` | VARCHAR(255) | Nullable — notification recipient (FR-14) |
+| `owner_name` | VARCHAR(100) | Nullable — greeting name in notification emails |
+
+### `payment` — new columns (Flyway `V7__add_payment_cancellation_reversal.sql`)
+| Field | Type | Notes |
+|---|---|---|
+| `reversed` | BOOLEAN | Default `false` — set `true` when reversed (FR-16) |
+| `reversal_payment_id` | FK → `payment.id`, nullable | Points to the new offsetting payment (set on the original) |
+| `reversal_of_payment_id` | FK → `payment.id`, nullable | Points back to the original (set on the new reversal payment) |
+
+### `payment.status` — new enum values
+- `CANCELLED` — terminal, reachable only from `CREATED` (FR-15).
+- No new value needed for reversal — the original payment stays `COMPLETED` (FR-16.2); only the `reversed` flag changes.
+
+## 14. V2 Error Code Contract Additions
+
+| Error Code | Description | HTTP Status |
+|---|---|---|
+| `PAYMENT_NOT_CANCELLABLE` | Cancel attempted on a payment not in `CREATED` status | 409 |
+| `PAYMENT_ALREADY_REVERSED` | Reverse attempted on a payment already flagged `reversed=true` | 409 |
+| `EXPORT_TOO_LARGE` | CSV export filter would exceed `paypulse.export.max-rows` | 400 |
+| `FX_RATE_UNAVAILABLE` | Requested currency pair has no configured static rate | 404 |
+
+## 15. V2 Non-Functional Requirements
+
+| ID | Requirement |
+|---|---|
+| NFR-15 | **Notification resilience** — email dispatch failures/latency never affect payment processing correctness or latency (async, best-effort, fully logged). |
+| NFR-16 | **SSE scalability** — dashboard push events are debounced/coalesced (≤1 push/2s per connection) so event volume at the ~40k req/min scale (NFR-10) cannot flood connected clients or the emitter registry. |
+| NFR-17 | **Export memory-boundedness** — CSV export streams from the DB cursor and never buffers the full result set in application memory, regardless of row count up to the configured cap. |
+| NFR-18 | **Reversal audit integrity** — a reversal never mutates or deletes the original payment's historical status trail; it only adds a flag + a new, independently-audited payment (consistent with NFR-2). |
+
+---
+
+**Status: Core (FR-0–FR-13) shipped 05 Aug 2026. V2 (§12–§15 above, FR-14–FR-21) drafted 05 Aug 2026 — defaults accepted for this wave's planning purposes (see MEM-023–034); two items flagged for instructor confirmation if time allows: cancellation's meaningful demo window (MEM-029) and full (non-display-only) FX conversion appetite (MEM-031, `12-CLARIFICATION-QUESTIONS.md` Q16).**
 
