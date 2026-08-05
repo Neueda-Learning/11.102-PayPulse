@@ -54,3 +54,22 @@ public class ValidationChain {
 
 This will be formalized precisely in the **Class Diagram** (Phase 3, updated).
 
+---
+
+## V2 Pattern Additions (05 Aug 2026 — MEM-023–034)
+
+| # | Pattern | Where Used | Why |
+|---|---|---|---|
+| 14 | **Observer, extended reuse** | `PaymentNotificationListener` and `DashboardStreamService` both subscribe to the **same existing** `PaymentStatusChangedEvent` (pattern #11 above) — no new publish point is added to `StatusTransitionEngine`. | This is precisely why Observer was chosen in Core (Open/Closed) — adding two brand-new consumers (notifications, SSE) requires **zero** changes to the publisher or the state machine, only two new listener beans. Strongest validation yet of the original pattern choice. |
+| 15 | **State Pattern, extended** | `CancelledState` (new) added to the existing `PaymentState` hierarchy alongside `CreatedState`/`ValidatedState`/etc. | Cancellation is structurally identical to the existing terminal states (`CompletedState`/`FailedState`) — a new implementation of an existing interface, not a new mechanism. Confirms the Core design note in `10-UML-STATE-DIAGRAM.md` §4 about future extensions being "a one-class change." |
+| 16 | **Strategy Pattern (again)** | `FxRateService` interface (`getRate(from, to)`), currently backed by a static-config implementation. | Keeps the door open for swapping in a live FX provider later without touching `AccountResponse`/frontend display code — same Strategy rationale as the original validators (#2). |
+| 17 | **Command-ish orchestration, not a new GoF pattern** | `ReversalService.reverse(id)` — a single orchestration method that reuses `PaymentService.createPayment()` internally rather than duplicating creation logic. | Avoids duplicating the entire create-payment validation/idempotency/audit pipeline for what is, structurally, just "another payment" — DRY over introducing a parallel code path. |
+| 18 | **Server-Sent Events (push notification pattern)** | `DashboardStreamService` + `SseEmitter` registry, `GET /analytics/stream`. | The customer/team ask was specifically "no 30s poll" — SSE is the industry-standard, low-ceremony solution for a one-directional server→client live feed (vs. WebSockets' unnecessary bidirectionality here, MEM-027). |
+
+### Why these choices (V2)?
+
+- We deliberately **reused** existing patterns (Observer, State) wherever the new requirement was structurally identical to something already solved in Core — this is the entire point of having chosen extensible patterns (Strategy/State/Observer) in the first place, and it's a strong presentation talking point ("our Core architecture absorbed 4 new features with almost no structural change").
+- We considered a full **Command pattern** (`CancelPaymentCommand`, `ReversePaymentCommand` objects with `execute()`/`undo()`) for cancellation/reversal — rejected as unnecessary ceremony; these are simple, one-shot orchestrations, not operations that need queuing, undo, or macro-recording.
+- We considered **WebSockets** for the dashboard instead of SSE — rejected (MEM-027): the data flow is one-directional, and SSE's native browser reconnect + far simpler server code is the better fit, with WebSockets' extra bidirectional complexity buying nothing here.
+
+

@@ -376,3 +376,110 @@ classDiagram
 - **`RateLimitFilter`** *(new, MEM-020)* sits in front of all three controllers as a servlet filter, not a Spring bean the controllers call directly — shown here with a dependency arrow purely to convey "runs before," not a runtime object reference.
 - **`AnalyticsService`** *(new, MEM-019)* reads directly from `PaymentRepository`/`PaymentStatusHistoryRepository` via aggregation queries — it does not introduce a separate write model or event store (see `06-DESIGN-PATTERNS.md` "Why this combination").
 
+---
+
+## 3. V2 Class Diagram Additions (05 Aug 2026 — MEM-023–034)
+
+```mermaid
+classDiagram
+    direction TB
+
+    class CancelledState {
+        +validate(Payment, ValidationChain) TransitionResult
+        +send(Payment) TransitionResult
+        +complete(Payment) TransitionResult
+    }
+    PaymentState <|.. CancelledState
+
+    class PaymentNotificationListener {
+        -NotificationService notificationService
+        -AccountService accountService
+        +onPaymentStatusChanged(PaymentStatusChangedEvent) void
+    }
+    PaymentNotificationListener --> NotificationServiceRef : uses
+    PaymentNotificationListener ..> PaymentStatusChangedEvent
+
+    class NotificationServiceRef {
+        <<existing, notification package>>
+        +notifyPaymentCreated(...) CompletableFuture~EmailResult~
+        +notifyPaymentCompleted(...) CompletableFuture~EmailResult~
+        +notifyPaymentFailed(...) CompletableFuture~EmailResult~
+    }
+
+    class DashboardStreamService {
+        -Set~SseEmitter~ emitters
+        -AnalyticsService analyticsService
+        +subscribe() SseEmitter
+        +onPaymentStatusChanged(PaymentStatusChangedEvent) void
+        -pushToAll(KpiSummaryResponse) void
+    }
+    DashboardStreamService --> AnalyticsService
+    DashboardStreamService ..> PaymentStatusChangedEvent
+
+    class AnalyticsController {
+        +stream() SseEmitter
+    }
+    AnalyticsController --> DashboardStreamService
+
+    class ReversalService {
+        -PaymentRepository paymentRepository
+        -PaymentService paymentService
+        +reverse(UUID originalId) Payment
+    }
+    ReversalService --> PaymentRepository
+    ReversalService --> PaymentService
+
+    class FxRateService {
+        <<interface>>
+        +getRate(String from, String to) BigDecimal
+    }
+    class StaticConfigFxRateService {
+        -Map~String, BigDecimal~ configuredRates
+        +getRate(String from, String to) BigDecimal
+    }
+    FxRateService <|.. StaticConfigFxRateService
+
+    class FxController {
+        -FxRateService fxRateService
+        +getRate(String from, String to) ResponseEntity~FxRateResponse~
+    }
+    FxController --> FxRateService
+
+    class PaymentCsvExportService {
+        -PaymentRepository paymentRepository
+        +streamExport(filters, OutputStream) void
+    }
+    PaymentCsvExportService --> PaymentRepository
+
+    class PaymentController {
+        +cancel(UUID id) ResponseEntity~PaymentResponse~
+        +reverse(UUID id) ResponseEntity~PaymentResponse~
+        +export(filters, HttpServletResponse) void
+    }
+    PaymentController --> ReversalService
+    PaymentController --> PaymentCsvExportService
+
+    class Payment {
+        +boolean reversed
+        +UUID reversalPaymentId
+        +UUID reversalOfPaymentId
+    }
+
+    class Account {
+        +String ownerEmail
+        +String ownerName
+    }
+
+    class PaymentStatus {
+        CANCELLED
+    }
+```
+
+**Notes:**
+- `CancelledState` slots into the existing `PaymentState` hierarchy exactly like `CompletedState`/`FailedState` — no changes to `StatusTransitionEngine`'s dispatch logic.
+- `PaymentNotificationListener` and `DashboardStreamService` are both consumers of the **same, already-existing** `PaymentStatusChangedEvent` — neither requires any change to the publisher (`StatusTransitionEngine`).
+- `ReversalService` deliberately **depends on** `PaymentService` (reuses `createPayment()`) rather than duplicating validation/idempotency/audit logic for the reversal payment.
+- `Payment.reversed`/`reversalPaymentId`/`reversalOfPaymentId` and `Account.ownerEmail`/`ownerName` are additive fields on existing classes (Flyway `V6`/`V7` — see `04-SRS.md` §13).
+- `FxRateService` is shown as an interface specifically to signal the Strategy-pattern seam for swapping in a live provider later (`06-DESIGN-PATTERNS.md` V2 additions #16).
+
+

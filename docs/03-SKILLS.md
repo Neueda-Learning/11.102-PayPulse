@@ -27,8 +27,18 @@
 - **Routing:** React Router — default route is the **KPI Dashboard** (new, MEM-019)
 - **State/data-fetching:** React Query (TanStack Query) recommended for server state
 - **Charts (new, MEM-019):** a lightweight charting library (e.g. Recharts or Chart.js) for the KPI dashboard/trend view — team's choice, low ceremony
+- **Live updates (new, V2/MEM-027):** native browser `EventSource` API for the dashboard SSE stream — no extra library needed, graceful fallback to polling if unavailable
+- **CSV export (new, V2/MEM-032):** server streams `text/csv` directly — frontend just triggers a file download (`<a download>`/`Blob`), no client-side CSV library needed
+- **Clipboard (new, V2/MEM-034):** native `navigator.clipboard` API for Copy Payment ID, with `document.execCommand('copy')` fallback
 - **Styling:** Team's choice (plain CSS/Tailwind/MUI) — decide when frontend phase starts
 - **API mocking (for parallel work before backend is ready):** MSW (Mock Service Worker) or Swagger-driven mock, using `docs/openapi.yaml`
+
+> **Note:** The shipped Core frontend (`frontend/*.html` + `frontend/js/api.js`) is implemented as plain HTML/CSS/vanilla JS rather than a React SPA — a pragmatic deviation from the original plan that shipped successfully; V2 frontend work (SSE, sortable columns, CSV trigger, clipboard) continues in this same plain-JS style for consistency, not a React rewrite.
+
+### V2-only additions (backend)
+- **SSE (new, MEM-027):** Spring's built-in `org.springframework.web.servlet.mvc.method.annotation.SseEmitter` — no extra dependency; `DashboardStreamService` holds the emitter registry.
+- **CSV streaming (new, MEM-032):** plain `PrintWriter`/`StreamingResponseBody` over the servlet `OutputStream` — no extra dependency required (Apache Commons CSV is an acceptable alternative if row-escaping complexity grows).
+- **Async notification dispatch (new, MEM-025):** Spring's `@Async` + a dedicated `ThreadPoolTaskExecutor` bean (`notification-executor`) — isolates email latency from request threads.
 
 ### Tooling / Process
 - **Version control:** Git (feature branches + PRs, no direct pushes to `main`)
@@ -87,4 +97,17 @@ Assign real names against **M1–M4** below once you tell me who's who (I'll upd
 - Payment status lifecycle is a textbook **finite state machine** — good candidate to demonstrate the **State design pattern** (or Spring Statemachine library) in the presentation.
 - Idempotency is commonly solved via a unique DB constraint on `idempotency_key` + a lookup-before-insert check — simple, robust, and easy to explain live.
 - Keep the audit trail as an **append-only** table (`payment_status_history`) — never update/delete rows, only insert — mirrors real-world compliance systems and is easy to demo.
+
+## 5. V2 Work Distribution (05 Aug 2026 →)
+
+> Full detail: `docs/13-WORK-DISTRIBUTION-V2.md`. This section is a quick-reference summary only — the dedicated doc is the source of truth.
+
+| Member | V2 Ownership |
+|---|---|
+| **M1** | #21 Notifications wiring · #16 Sortable Columns · Load Test v2 · Dashboard SSE (replaces 30s poll) |
+| **M2** | Create-Payment frontend cross-check/audit · #18 Payment Cancellation · #19 Payment Reversal |
+| **M3** | #13 Analytics/Trend View (deepened) · #14 CSV Export |
+| **M4** | #17 Copy Payment ID / Deep Linking · #20 Multi-Currency Conversion (display-only FX) |
+
+**Rationale:** each member continues owning the module they built in Core (MEM-024) — M1 keeps cross-cutting/infra (rate limiting → SSE), M2 keeps the payment lifecycle/state machine (cancellation/reversal are state-machine-adjacent), M3/M4 keep read-side/reporting (analytics/export, list/FX display).
 

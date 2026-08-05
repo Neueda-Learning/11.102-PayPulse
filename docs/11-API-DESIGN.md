@@ -43,6 +43,15 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 | POST | `/payments/{id}/complete` | Explicitly trigger `SENT→COMPLETED` transition |
 | GET | `/analytics/summary` | KPI dashboard summary (success rate, failure rate, avg processing time, throughput, volume) *(new)* |
 | GET | `/analytics/trend` | Time-bucketed trend (payments per hour, last 24h, by status) *(new)* |
+| POST | `/payments/{id}/cancel` | **(V2)** Cancel a `CREATED` payment — feature #18 |
+| POST | `/payments/{id}/reverse` | **(V2)** Reverse a `COMPLETED` payment (creates a new, linked payment) — feature #19 |
+| GET | `/payments/export` | **(V2)** Stream the current filtered payment list as CSV — feature #14 |
+| GET | `/analytics/stream` | **(V2)** Server-Sent Events stream of live KPI updates — replaces the 30s dashboard poll |
+| GET | `/fx/rate` | **(V2)** Display-only static FX conversion rate — feature #20 |
+| POST | `/notifications/send` | **(V2, was already implemented, now documented)** Send an ad-hoc email notification |
+| GET | `/notifications` | **(V2, now documented)** List notification audit logs |
+| GET | `/notifications/{id}` | **(V2, now documented)** Get a single notification log |
+| GET | `/notifications/by-payment/{paymentId}` | **(V2, now documented)** List notifications for a payment |
 
 > Note (MEM-007): payments **auto-progress** through the full lifecycle immediately on creation for demo speed. The explicit `/validate`, `/send`, `/complete` endpoints exist for testing, manual control, and demonstrating rejection of illegal transitions — the frontend's primary flow only needs `GET /accounts` + `POST /payments` + polling/`GET`, not manual calls to these.
 
@@ -257,7 +266,11 @@ No request body. Behave exactly like the corresponding automatic step (§5), but
 | PROCESSING_ERROR | 500 (or 409 for lock conflicts) | Internal/simulated processing error, optimistic lock conflict |
 | NETWORK_ERROR | 503 *(reflected in payment body as-is; HTTP response for the *triggering* explicit endpoint call itself is 200 since the transition to FAILED succeeded as an operation)* | Simulated network failure |
 | INSUFFICIENT_FUNDS | 400 | Reserved — not actively triggered in core scope (no real balance ledger), available for a stretch enhancement |
-| **RATE_LIMIT_EXCEEDED** *(new)* | **429** | Token bucket exhausted (global or per-client) — MEM-020 |
+| RATE_LIMIT_EXCEEDED | 429 | Token bucket exhausted (global or per-client) — MEM-020 |
+| **PAYMENT_NOT_CANCELLABLE** *(new, V2)* | **409** | `POST /payments/{id}/cancel` attempted on a payment not in `CREATED` status — MEM-029 |
+| **PAYMENT_ALREADY_REVERSED** *(new, V2)* | **409** | `POST /payments/{id}/reverse` attempted on a payment already flagged `reversed=true` — MEM-030 |
+| **EXPORT_TOO_LARGE** *(new, V2)* | **400** | `GET /payments/export` filter would exceed `paypulse.export.max-rows` — MEM-032 |
+| **FX_RATE_UNAVAILABLE** *(new, V2)* | **404** | `GET /fx/rate` requested for an unsupported currency pair — MEM-031 |
 
 > **Important distinction:** For **explicit transition endpoints**, a "successful transition to FAILED" is still an HTTP `200` (the API call itself succeeded — it did what was asked: attempt the transition, and correctly recorded a failure). HTTP error statuses (`400/404/409/429/500/503`) are reserved for when the **API call itself** couldn't be honored (bad request shape, illegal transition, not found, conflict, rate-limited, internal fault) — not for "the payment's business outcome was a failure." This distinction is called out explicitly to avoid frontend confusion.
 
@@ -266,7 +279,7 @@ No request body. Behave exactly like the corresponding automatic step (§5), but
 - **Landing page is the KPI dashboard** (`GET /analytics/summary` + `/analytics/trend`), per customer directive — not the Create Payment form.
 - On the Create Payment screen, call `GET /accounts` first to populate the **source-account dropdown**; currency field auto-populates/locks to the selected account's currency (client-side convenience; server still validates independently).
 - Use `GET /payments/{id}` (short poll every 1–2s, or just once since auto-progression is synchronous in Sprint 1) to reflect final status after `POST /payments`.
-- Status badge color mapping (Appendix D): 🟢 `COMPLETED`, 🟡 `CREATED`/`VALIDATED`/`SENT`, 🔴 `FAILED`.
+- Status badge color mapping (Appendix D): 🟢 `COMPLETED`, 🟡 `CREATED`/`VALIDATED`/`SENT`, 🔴 `FAILED`, ⚪ `CANCELLED` *(new, V2)*.
 - **Handle `429` gracefully:** show a "please slow down" toast using the `Retry-After` header rather than a generic error (new, MEM-020).
 - **Idempotency-Key generation rule (see `04-SRS.md` §7a for full scenario table):**
   1. Generate the key (`crypto.randomUUID()`) **once**, at the moment the Submit button is clicked — store it in component state/ref tied to that submission attempt.
@@ -275,4 +288,107 @@ No request body. Behave exactly like the corresponding automatic step (§5), but
   4. On success, or on a **non-retryable** failure the user must fix (e.g. validation error — they'll edit the form and resubmit), **discard the key** — re-enable the form for a fresh submission, which will generate a **new** key next time.
   5. Do **NOT** compute the key from form field values (no hashing amount+accounts) — that would incorrectly block a user's legitimate, separate repeat payment. See worked scenario #4 in `04-SRS.md` §7a.
 
+---
+
+## V2 API Additions (05 Aug 2026 — MEM-023–034)
+
+## 14. `POST /payments/{id}/cancel` — Cancel a Payment (new, feature #18, MEM-029)
+
+No request body. Legal **only** while the payment is `CREATED`.
+
+**Responses:**
+- **`200 OK`** — payment now `CANCELLED` (same `PaymentResponse` shape as §6, `status: "CANCELLED"`).
+- **`409 Conflict`** — payment is not `CREATED`:
+```json
+{ "errorCode": "PAYMENT_NOT_CANCELLABLE", "message": "Payment ... is in status VALIDATED and can no longer be cancelled", "timestamp": "...", "path": "/api/v1/payments/.../cancel" }
+```
+- **`404 Not Found`** — unknown payment ID (`PAYMENT_NOT_FOUND`).
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
+
+## 15. `POST /payments/{id}/reverse` — Reverse a Completed Payment (new, feature #19, MEM-030)
+
+No request body. Legal **only** for a `COMPLETED` payment that has not already been reversed.
+
+**Responses:**
+- **`201 Created`** — a **new**, independent payment is created (offsetting the original — source/destination swapped, same amount/currency). Response body is the **new** payment's `PaymentResponse`, with an additional field `reversalOfPaymentId` pointing back to the original.
+  - Header: `Location: /api/v1/payments/{newId}`
+- **`409 Conflict`** — already reversed:
+```json
+{ "errorCode": "PAYMENT_ALREADY_REVERSED", "message": "Payment ... has already been reversed (see reversalPaymentId)", "timestamp": "...", "path": "..." }
+```
+- **`409 Conflict`** — original is not `COMPLETED`: `errorCode: INVALID_STATUS_TRANSITION`.
+- **`404 Not Found`** — unknown payment ID (`PAYMENT_NOT_FOUND`).
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
+
+> **`PaymentResponse` gains two new optional fields (V2, backward-compatible additions):** `reversed` (boolean, default `false`) and `reversalPaymentId`/`reversalOfPaymentId` (nullable UUID) — see updated schema in `openapi.yaml`.
+
+## 16. `GET /payments/export` — CSV Export (new, feature #14, MEM-032)
+
+**Query params:** identical to `GET /payments` (§7) — `status`, `search`, `sourceAccountId`, `sort` — **no `page`/`size`** (the full filtered set is exported, up to the row cap).
+
+**Responses:**
+- **`200 OK`** — `Content-Type: text/csv`, `Content-Disposition: attachment; filename="payments-export-<timestamp>.csv"`. Body streamed, columns: `id,sourceAccountId,destinationAccount,amount,currency,status,errorCode,createdAt,updatedAt`.
+- **`400 Bad Request`** — filtered result exceeds the configured cap:
+```json
+{ "errorCode": "EXPORT_TOO_LARGE", "message": "Filtered result (127,412 rows) exceeds the export limit of 50,000 — please narrow your filters", "timestamp": "...", "path": "/api/v1/payments/export" }
+```
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
+
+## 17. `GET /analytics/stream` — Live Dashboard Updates via SSE (new, MEM-027)
+
+`Content-Type: text/event-stream`. Client connects via `new EventSource('/api/v1/analytics/stream')`. Server pushes a `KpiSummaryResponse` (§10 shape) as a `data:` event whenever a payment status transition occurs, debounced to at most 1 push per 2 seconds. Connection stays open indefinitely (subject to the reverse proxy/nginx timeout config — see `frontend/nginx/nginx.conf`, which must disable proxy buffering for this route). No polling needed on the client once connected; frontend falls back to the previous 30s poll if the connection cannot be established or drops repeatedly.
+
+**Responses:**
+- **`200 OK`** — long-lived `text/event-stream` connection.
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED` (rejected before the stream opens, same as any other endpoint).
+
+## 18. `GET /fx/rate` — Display-Only FX Conversion Rate (new, feature #20, MEM-031)
+
+**Query params:** `from` (`INR`/`USD`), `to` (`INR`/`USD`).
+
+**Response `200 OK`:**
+```json
+{ "from": "INR", "to": "USD", "rate": 0.012, "asOf": "2026-08-05T00:00:00Z" }
+```
+- **`404 Not Found`** — unsupported/unconfigured pair: `errorCode: FX_RATE_UNAVAILABLE`.
+- **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
+
+> **This rate is display-only.** It never affects `POST /payments` validation — `currency` must still equal the source account's currency exactly (MEM-018 unchanged). Frontend uses it only to show a secondary, non-binding "≈ other currency" hint.
+
+## 19. Notification Endpoints (already implemented backend-side; formally documented here, V2)
+
+### `POST /notifications/send` — Send an Ad-Hoc Notification
+**Request Body:**
+```json
+{
+  "recipientEmail": "user@example.com",
+  "recipientName": "John Doe",
+  "event": "PAYMENT_COMPLETED",
+  "paymentId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "variables": { "amount": "1500.00", "currency": "INR", "referenceId": "PAY-REF-001" }
+}
+```
+- **`200 OK`** — `EmailResult { success: true, ... }`.
+- **`500 Internal Server Error`** — `EmailResult { success: false, ... }` (send failed — note: this endpoint's own error shape is `EmailResult`, not the standard `ApiError`, since it reflects the *email provider's* outcome, not an API request-validation failure).
+
+### `GET /notifications` — List Notification Audit Logs
+Query params: `status` (optional, `PENDING`/`SENT`/`FAILED`), `page`, `size`. Returns a paginated list of `NotificationLog` entries (see `V5__create_notification_log_table.sql` for the full shape).
+
+### `GET /notifications/{notificationId}` — Get a Single Notification Log
+`200 OK` + `NotificationLog`, or `404 Not Found` if unknown.
+
+### `GET /notifications/by-payment/{paymentId}` — All Notifications for a Payment
+`200 OK` + array of `NotificationLog` (empty array if none sent yet — e.g. no `owner_email` configured, MEM-026).
+
+## 20. Sortable Columns — Formal Sort Field Allow-List (new, feature #16, MEM-033)
+
+`GET /payments` and `GET /payments/export`'s `sort` parameter is restricted to: `createdAt`, `amount`, `status` (each combinable with `,asc` or `,desc`). Any other field value returns `400 VALIDATION_FAILED`. This was already an accepted parameter in Core (default `createdAt,desc`) — V2 simply formalizes the allow-list and wires the frontend's clickable column headers to it.
+
+## 21. Copy Payment ID / Deep Linking — Stable URL Contracts (new, feature #17, MEM-034)
+
+The following frontend URL patterns are formally committed as **stable, supported deep links** (no new backend endpoints):
+- `payment-details.html?id=<uuid>` — opens directly to a payment's detail view.
+- `payments.html?status=<CREATED|VALIDATED|SENT|COMPLETED|FAILED|CANCELLED>` — opens the payment list pre-filtered to that status.
+
+Copy-to-clipboard is a pure frontend affordance (no API involvement) using `navigator.clipboard.writeText(paymentId)`.
 

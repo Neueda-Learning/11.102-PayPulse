@@ -1,5 +1,7 @@
 # 👥 WORK-DISTRIBUTION.md — Final Work Allocation (Team of 4, Full-Stack Parallel)
 
+> **This document covers the CORE (MVP) build only (Features #1–#12) and is kept as-is for historical record — it is COMPLETE and shipped.** For the V2 wave (Good-to-Have/Future features #13–#21, in progress from 05 Aug 2026), see **`docs/13-WORK-DISTRIBUTION-V2.md`**.
+
 Related: `00-ROADMAP.md` (phases/dates), `01-CONTEXT.md`/`04-SRS.md` (requirements), `05-ARCHITECTURE.md` (package structure — read before starting), `06-DESIGN-PATTERNS.md`, `07-TESTING-STRATEGY.md` (test ownership), `11-API-DESIGN.md` + `openapi.yaml` (frozen API contract), `../chirag/04-wireframes/` (clickable HTML reference for every screen).
 
 > **Finalized 31 Jul 2026.** This supersedes the earlier "everyone-on-backend-first, split-to-frontend-later" plan. Every member now owns **one feature vertical, full-stack (backend + frontend + tests), in parallel, starting Day 1** — this is what lets all 4 people start working at the same time without waiting on each other. The API contract (`openapi.yaml`) is **frozen first** (see §0) so nobody blocks on anybody else's in-progress work.

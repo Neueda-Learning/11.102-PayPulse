@@ -3,10 +3,12 @@
 > **Rule of engagement:** We go ONE stage at a time. A stage is not "done" until reviewed & explicitly confirmed. This file is the single source of truth for progress. Check items off as we go — do not jump ahead.
 
 **Deadline:** Thursday, **6 Aug 2026**
-**Today:** 31 Jul 2026
+**Today:** 05 Aug 2026
 **Time available:** ~6 working days → we MUST stay lean, agile, and ruthlessly prioritize the CORE lifecycle first.
 
 > **31 Jul 2026 update:** First customer meeting held. New scope confirmed: `Account` entity (multi-account source picker), INR/USD-only currencies, KPI dashboard + basic analytics, ~40k req/min rate limiting, elevated concurrency/durability/reliability, and API security hardening. All design docs (Phases 0–4) have been revised accordingly — see `01-CONTEXT.md` §9 and `02-MEMORY.md` MEM-017–022. **No implementation code has been written yet, so this is a documentation-only revision, not a rework.**
+
+> **05 Aug 2026 update — Core (MVP) COMPLETE, V2 kicked off:** Features #1–#12 (`chirag/01-feature-list.md`) are implemented and shippable. The team now moves to **V2**: the "Good to Have" (#13–#17) and select "Future" (#18–#20) features, plus wiring the already-built `notification` module (#21) and replacing the dashboard's 30s poll with SSE. See `02-MEMORY.md` MEM-023–034 and the new `docs/13-WORK-DISTRIBUTION-V2.md` for full detail. Phases 0–8 below (Core build) are preserved as-is for history; **Phase 9 (new, below)** covers the V2 wave.
 
 ---
 
@@ -118,6 +120,26 @@
 ---
 
 ### ✅ Current Status
-**Phase 0 ✅ | Phase 1 (SRS) ✅ Revised 31 Jul | Phase 2 (Architecture, Patterns & Testing Strategy) ✅ Revised 31 Jul | Phase 3 (UML) ✅ Revised 31 Jul | Phase 4 (API Design/OpenAPI) ✅ Revised 31 Jul | We are now on: Phase 5 — Core Implementation (Backend Sprint 0/1), incorporating the customer-meeting scope update.**
+**Phase 0 ✅ | Phase 1 (SRS) ✅ | Phase 2 (Architecture, Patterns & Testing Strategy) ✅ | Phase 3 (UML) ✅ | Phase 4 (API Design/OpenAPI) ✅ | Phase 5–8 (Core Implementation, Frontend, Testing, Presentation Prep) ✅ COMPLETE — Features #1–#12 shipped. We are now on: Phase 9 — V2 Enhancement Wave (see below).**
 
-> ⏰ **Day check:** Today is Jul 31 (Day 2). First customer meeting completed same day; all design/documentation phases (0–4) revised in response before any implementation code was written — zero throwaway code, pure documentation update. Sprint 0 (project skeleton) begins Day 3 as planned, now against the updated contract.
+> ⏰ **Day check:** Today is 05 Aug 2026 (Day 7, 1 day before the presentation). Core MVP (Phases 0–8) is complete and demo-ready. Phase 9 (V2) covers additional Good-to-Have/Future features requested for this final push — see `13-WORK-DISTRIBUTION-V2.md` for the day-of breakdown against the 06 Aug deadline.
+
+---
+
+## 🚀 Phase 9 — V2 Enhancement Wave (05 Aug 2026 → deadline)
+
+> Full breakdown, ownership, and dependency notes: **`docs/13-WORK-DISTRIBUTION-V2.md`**. Decisions/rationale: `02-MEMORY.md` MEM-023–034. This phase follows the same gated discipline as Phases 0–8 — docs updated first, code follows.
+
+- [ ] **M1 — Notifications (#21) wiring:** `PaymentNotificationListener` (`@EventListener`, async) subscribed to `PaymentStatusChangedEvent`; `Account.owner_email`/`owner_name` migration (`V6__add_account_owner_contact.sql`); triggers `notifyPaymentCreated/Completed/Failed`.
+- [ ] **M1 — Sortable Columns (#16):** clickable column headers on `payments.html` (Amount/Status/Created), `sort` allow-list validation on `GET /payments`.
+- [ ] **M1 — Load Test v2:** extend `load-tests/` to cover cancellation/reversal/export endpoints alongside the existing create-payment burst scenario.
+- [ ] **M1 — Dashboard SSE:** `GET /analytics/stream` (`SseEmitter`), `DashboardStreamService`, frontend `EventSource` replacing `setInterval(loadDashboard, 30000)` in `frontend/index.html` (poll retained only as a fallback).
+- [ ] **M2 — Create Payment frontend cross-check:** audit `frontend/js/api.js`/`create-payment.html` against `04-SRS.md`/`11-API-DESIGN.md`; fix the known `API_BASE` hardcoding issue (MEM-028) as the first task.
+- [ ] **M2 — Payment Cancellation (#18):** new `CANCELLED` terminal status + `CancelledState`, `POST /payments/{id}/cancel` (legal only from `CREATED`).
+- [ ] **M2 — Payment Reversal (#19):** `POST /payments/{id}/reverse` (legal only from `COMPLETED`), creates a linked, direction-swapped payment; `reversed` flag + `reversal_payment_id`/`reversal_of_payment_id` columns.
+- [ ] **M3 — Analytics/Trend View (#13), deepened:** richer trend chart (configurable window, per-currency breakdown) beyond the existing MVP bar chart.
+- [ ] **M3 — CSV Export (#14):** `GET /payments/export`, streamed (not buffered), same filters as `GET /payments`, row-count cap (`EXPORT_TOO_LARGE`).
+- [ ] **M4 — Copy Payment ID / Deep Linking (#17):** copy-to-clipboard affordance; formalize `payment-details.html?id=` and `payments.html?status=` as documented stable deep-link contracts.
+- [ ] **M4 — Multi-Currency Conversion (#20), display-only:** `GET /fx/rate`, static config-driven `FxRateService`, frontend "≈ other currency" display hint (no real conversion/settlement).
+- [ ] **Gate:** All 4 verticals reviewed + merged + `openapi.yaml`/docs updated → V2 demo-ready before the 06 Aug presentation.
+

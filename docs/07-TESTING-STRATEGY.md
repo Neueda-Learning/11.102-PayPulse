@@ -136,3 +136,80 @@ A module (M1–M4's slice) is NOT considered done until:
 ---
 **This closes out the outstanding gap flagged before Phase 3** — testing is now planned per-layer, per-route, per-scenario, with explicit ownership, before a single line of production code is written, and now also covers the post-customer-meeting additions (accounts, analytics, rate limiting, resilience, security).
 
+---
+
+## 8. V2 Test Plan Additions (05 Aug 2026 — MEM-023–034)
+
+### 8.1 Notification Wiring (M1, #21)
+| Target | What to test |
+|---|---|
+| `PaymentNotificationListener` | Unit test (mock `NotificationService`): each event type (`CREATED`/`COMPLETED`/`FAILED`) triggers the correct `notifyX(...)` call; missing `owner_email` falls back to configured default; both null → notification is skipped (no exception thrown). |
+| Async isolation | Integration test: a `NotificationService` mocked to throw/hang does **not** delay or fail the `POST /payments` response (assert response time unaffected, payment still persists correctly). |
+| `notification_log` audit | Existing repository already covered; add a test confirming a log row is created for each of the 3 lifecycle events end-to-end. |
+
+### 8.2 Sortable Columns (M1, #16)
+| Target | What to test |
+|---|---|
+| `GET /payments?sort=` allow-list | Web-layer test: `sort=amount,asc`/`status,desc`/`createdAt,asc` all succeed; `sort=someInternalColumn,asc` → `400 VALIDATION_FAILED`. |
+| Frontend column click | Manual/E2E: clicking each header toggles asc/desc and re-fetches with the correct `sort` param. |
+
+### 8.3 Dashboard SSE (M1)
+| Target | What to test |
+|---|---|
+| `DashboardStreamService` | Unit test (no Spring context where feasible): a burst of N events within the debounce window results in exactly 1 push, not N. |
+| `GET /analytics/stream` | Web/integration test: client connects, a payment transition occurs, client receives an updated `KpiSummaryResponse` event within the debounce window. |
+| Frontend fallback | Manual test: simulate `EventSource` failure → confirm frontend falls back to the 30s poll rather than a silently broken dashboard. |
+
+### 8.4 Load Test v2 (M1)
+| Target | What to test |
+|---|---|
+| Cancellation/reversal/export under load | Extend `load-tests/payments-burst.js` (or a new script) with scenarios hitting `/cancel`, `/reverse`, `/export` alongside the existing create-payment burst — confirm rate limiting and circuit breaker behavior hold consistently across the new endpoints too. |
+
+### 8.5 Create Payment Frontend Cross-Check (M2)
+| Target | What to test |
+|---|---|
+| `API_BASE` fix | Manual/container test: run via `docker-compose up`, confirm `frontend/js/api.js` resolves through the nginx-proxied relative path, not a hardcoded `localhost:8080` (MEM-028). |
+| Contract conformance | Re-verify (as a checklist, not new automated tests): idempotency-key generation/discard lifecycle, error-shape handling, 429 handling, field names/types — all against `04-SRS.md`/`11-API-DESIGN.md`. |
+
+### 8.6 Payment Cancellation (M2, #18)
+| Target | What to test |
+|---|---|
+| `CancelledState` | Unit test: `CREATED→CANCELLED` succeeds; `CANCELLED` accepts no further transitions (all return/throw illegal-transition, mirroring `CompletedState`/`FailedState` tests). |
+| `POST /payments/{id}/cancel` | Web-layer test: success (200 + `CANCELLED`) from `CREATED`; `409 PAYMENT_NOT_CANCELLABLE` from any other status; `404` unknown ID. |
+| Integration | Create a payment, immediately cancel before auto-progression completes (may require a test-only artificial delay hook per MEM-029's flagged open question) — assert history shows `CREATED→CANCELLED`. |
+
+### 8.7 Payment Reversal (M2, #19)
+| Target | What to test |
+|---|---|
+| `ReversalService` | Unit test (mocked `PaymentRepository`/`PaymentService`): reversing a `COMPLETED` payment creates a new payment with swapped accounts + `reversalOfPaymentId` set, and flips `reversed=true`/`reversalPaymentId` on the original. |
+| `POST /payments/{id}/reverse` | Web-layer test: success path; `409 PAYMENT_ALREADY_REVERSED` on double-reversal; `409 INVALID_STATUS_TRANSITION` on a non-`COMPLETED` payment. |
+| Integration | Full round trip: create → reaches `COMPLETED` → reverse → assert both payments exist, original unchanged status, new payment independently reaches its own terminal status, history trails for both are intact and never overwritten. |
+
+### 8.8 Analytics/Trend Deepening (M3, #13)
+| Target | What to test |
+|---|---|
+| Deepened `AnalyticsService` trend logic | Unit tests for the new configurable-window/per-currency breakdown aggregation, including the existing zero-payments edge case. |
+
+### 8.9 CSV Export (M3, #14)
+| Target | What to test |
+|---|---|
+| `PaymentCsvExportService` | Unit test: correct CSV header row + escaping of commas/quotes/newlines in `reference` field. |
+| `GET /payments/export` | Web-layer test: `Content-Type: text/csv`, correct row count matching filters; a filter exceeding `max-rows` → `400 EXPORT_TOO_LARGE`. |
+| Memory-boundedness | Integration/manual: export a large seeded dataset and confirm (via profiler or a deliberately tiny test cap) that memory usage doesn't scale with row count beyond the streaming buffer. |
+
+### 8.10 Copy Payment ID / Deep Linking (M4, #17)
+| Target | What to test |
+|---|---|
+| Clipboard copy | Manual/E2E: clicking the copy icon populates the clipboard with the exact payment ID and shows the "Copied!" confirmation. |
+| Deep links | Manual/E2E: `payment-details.html?id=<uuid>` loads the correct payment directly; `payments.html?status=FAILED` pre-filters correctly on load (already implemented — this is a regression-confirmation test). |
+
+### 8.11 FX Display (M4, #20)
+| Target | What to test |
+|---|---|
+| `FxRateService` | Unit test: known pair returns the configured rate; unknown pair → `FX_RATE_UNAVAILABLE`. |
+| `GET /fx/rate` | Web-layer test: 200 + correct rate shape; 404 for an unsupported pair. |
+| Frontend display hint | Manual test: create-payment/details screens show the "≈ other currency" hint without affecting the actual submitted `currency` field. |
+
+## 9. V2 Definition of Done — Testing Add-on
+
+Same rules as §7 apply to every V2 item above: unit tests for business logic, a web-layer test per new/changed route (success + failure), at least one integration/E2E scenario, all green before opening a PR — **plus** an explicit manual click-through against the relevant wireframe/contract before marking a V2 item done, since this wave has a shorter cycle time than Core.
