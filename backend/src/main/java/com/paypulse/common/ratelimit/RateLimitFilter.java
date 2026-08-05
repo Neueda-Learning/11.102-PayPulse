@@ -1,4 +1,5 @@
 package com.paypulse.common.ratelimit;
+
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.BucketProxy;
@@ -14,16 +15,9 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.function.Supplier;
 
-/**
- * Distributed token-bucket rate limiter (FR-11, NFR-11).
- * One global system-wide bucket + one per-client-IP bucket, both backed by
- * Redis via Bucket4j's ProxyManager — state is shared across all app instances.
- * Owner: M1.
- */
 @Component
 public class RateLimitFilter extends HttpFilter {
 
@@ -51,18 +45,21 @@ public class RateLimitFilter extends HttpFilter {
 
         var globalProbe = globalBucket.tryConsumeAndReturnRemaining(1);
         if (!globalProbe.isConsumed()) {
-            reject(response, globalProbe.getNanosToWaitForRefill(), globalLimitPerMinute, 0);
+            reject(request, response, globalProbe.getNanosToWaitForRefill(), globalLimitPerMinute, 0);
             return;
         }
 
         var clientProbe = clientBucket.tryConsumeAndReturnRemaining(1);
         if (!clientProbe.isConsumed()) {
-            reject(response, clientProbe.getNanosToWaitForRefill(), perClientLimitPerMinute, 0);
+            reject(request, response, clientProbe.getNanosToWaitForRefill(), perClientLimitPerMinute, 0);
             return;
         }
 
+        long resetSeconds = 60; // fixed 1-minute window
         response.setHeader("X-RateLimit-Limit", String.valueOf(perClientLimitPerMinute));
         response.setHeader("X-RateLimit-Remaining", String.valueOf(clientProbe.getRemainingTokens()));
+        response.setHeader("X-RateLimit-Reset", String.valueOf(resetSeconds));
+
         chain.doFilter(request, response);
     }
 
@@ -82,21 +79,34 @@ public class RateLimitFilter extends HttpFilter {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank()) {
             ip = request.getRemoteAddr();
+        } else if (ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
         }
         return ("rate-limit:client:" + ip).getBytes(StandardCharsets.UTF_8);
     }
 
-
-    private void reject(HttpServletResponse response, long nanosToWait, long limit, long remaining) throws IOException {
+    private void reject(HttpServletRequest request,
+                        HttpServletResponse response,
+                        long nanosToWait,
+                        long limit,
+                        long remaining) throws IOException {
         long retryAfterSeconds = Math.max(1, Duration.ofNanos(nanosToWait).toSeconds());
+        long resetSeconds = retryAfterSeconds;
+
         response.setStatus(429);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
         response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
         response.setHeader("X-RateLimit-Limit", String.valueOf(limit));
         response.setHeader("X-RateLimit-Remaining", String.valueOf(remaining));
-        response.setContentType("application/json");
-        response.getWriter().write(
-                "{\"errorCode\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests. Please retry after "
-                        + retryAfterSeconds + "s.\",\"timestamp\":\"" + java.time.Instant.now() + "\"}"
-        );
+        response.setHeader("X-RateLimit-Reset", String.valueOf(resetSeconds));
+
+        String path = request.getRequestURI();
+        String body = "{\"errorCode\":\"RATE_LIMIT_EXCEEDED\","
+                + "\"message\":\"Too many requests. Please retry after " + retryAfterSeconds + "s.\","
+                + "\"timestamp\":\"" + java.time.Instant.now() + "\","
+                + "\"path\":\"" + path + "\"}";
+        response.getWriter().write(body);
     }
 }
