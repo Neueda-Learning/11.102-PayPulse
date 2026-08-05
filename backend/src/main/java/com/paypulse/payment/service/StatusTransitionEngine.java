@@ -218,6 +218,7 @@ public class StatusTransitionEngine {
             case VALIDATE -> validateFailureAccount;
             case SEND -> sendFailureAccount;
             case COMPLETE -> completeFailureAccount;
+            case CANCEL -> null;   // <-- add this: cancellation has no simulated-failure trigger account
         };
         if (trigger != null && trigger.equals(payment.getDestinationAccount())) {
             throw new SimulatedProcessingException("Simulated failure during " + action + " (deterministic trigger)");
