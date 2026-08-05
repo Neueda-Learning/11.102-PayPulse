@@ -1,3 +1,5 @@
+package com.paypulse.payment.api;
+
 import com.paypulse.common.error.ApiError;
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.PaymentStatus;

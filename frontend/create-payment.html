@@ -159,7 +159,7 @@ const idempotencyKey = currentSubmissionKey;
 
   try {
     const payment = await Payments.create(
-  { sourceAccountId, amount, currency, destinationAccount, reference },
+  { sourceAccountId, amount, currency, destinationAccount, reference, forceFailureStage },
   idempotencyKey
 );
 
