@@ -20,8 +20,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 /**
@@ -46,6 +48,25 @@ public class PaymentController {
     private final PaymentRepository paymentRepository;
     private final StatusTransitionEngine statusTransitionEngine;
     private final PaymentMapper paymentMapper;
+
+    @PostMapping
+    @Operation(summary = "Create a new payment")
+    public ResponseEntity<PaymentResponse> create(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody CreatePaymentRequest request) {
+
+        PaymentCreationResult result = paymentService.createPayment(idempotencyKey, request);
+        if (!result.created()) {
+            return ResponseEntity.ok(result.payment());
+        }
+
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(result.payment().getId())
+                .toUri();
+
+        return ResponseEntity.created(location).body(result.payment());
+    }
 
     @GetMapping("/{id}/history")
     @Operation(summary = "Get payment status-transition history")

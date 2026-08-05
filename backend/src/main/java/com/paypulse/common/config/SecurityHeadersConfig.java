@@ -42,8 +42,7 @@ public class SecurityHeadersConfig extends OncePerRequestFilter {
         response.setHeader("Pragma", "no-cache");
 
         // API-only CSP — no HTML served by backend
-//        response.setHeader("Content-Security-Policy", "default-src 'none'");
-        response.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;");
+        response.setHeader("Content-Security-Policy", "default-src 'none'");
 
         filterChain.doFilter(request, response);
     }
