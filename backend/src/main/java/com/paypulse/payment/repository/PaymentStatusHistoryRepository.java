@@ -19,7 +19,7 @@ public interface PaymentStatusHistoryRepository extends JpaRepository<PaymentSta
             "SELECT AVG(TIMESTAMPDIFF(SECOND, p.created_at, h.occurred_at)) " +
                     "FROM payment_status_history h " +
                     "JOIN payment p ON p.id = h.payment_id " +
-                    "WHERE h.status = 'COMPLETED' " +
+                    "WHERE h.new_status = 'COMPLETED' " +
                     "AND p.created_at BETWEEN :from AND :to",
             nativeQuery = true)
     Double avgProcessingTimeSeconds(@Param("from") Instant from, @Param("to") Instant to);

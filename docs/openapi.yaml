@@ -24,7 +24,7 @@ tags:
   - name: Notifications
     description: Email notification management and audit log (V2)
   - name: FX
-    description: Display-only currency conversion rate (V2)
+    description: Hardcoded currency conversion rate used for cross-currency payments (V2)
 
 paths:
   /accounts:
@@ -114,7 +114,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: sourceAccountId does not exist
+          description: sourceAccountId does not exist, or the requested FX pair has no configured hardcoded rate
           content:
             application/json:
               schema:
@@ -491,7 +491,7 @@ paths:
   /fx/rate:
     get:
       tags: [FX]
-      summary: Display-only static FX conversion rate (V2, feature #20)
+      summary: Hardcoded FX conversion rate (V2, feature #20)
       operationId: getFxRate
       parameters:
         - in: query
@@ -506,7 +506,7 @@ paths:
             $ref: '#/components/schemas/CurrencyCode'
       responses:
         '200':
-          description: Static conversion rate (display-only, never affects settlement)
+          description: Hardcoded conversion rate used both for preview and cross-currency payment creation
           content:
             application/json:
               schema:
@@ -670,7 +670,7 @@ components:
       enum: [INR, USD]
       description: >
         Only INR and USD are supported (customer-confirmed 31 Jul 2026).
-        No cross-currency conversion is performed.
+        Cross-currency payouts are allowed in V2 feature #20 using a hardcoded configured INR↔USD rate.
 
     AccountStatus:
       type: string
@@ -696,7 +696,7 @@ components:
 
     CreatePaymentRequest:
       type: object
-      required: [sourceAccountId, amount, currency, destinationAccount]
+      required: [sourceAccountId, amount, currency, targetCurrency, destinationAccount]
       properties:
         sourceAccountId:
           type: string
@@ -711,17 +711,30 @@ components:
           maximum: 1000000
         currency:
           $ref: '#/components/schemas/CurrencyCode'
+        targetCurrency:
+          $ref: '#/components/schemas/CurrencyCode'
         destinationAccount:
           type: string
           minLength: 8
           maxLength: 20
+          pattern: '^[A-Za-z0-9]{8,20}$'
           example: ACC2000002
-          description: Free-text, format-validated only (external party, not existence-checked)
+          description: 8–20 alphanumeric chars; must differ from source account number (format-validated only, external party not existence-checked)
         reference:
           type: string
           maxLength: 255
           nullable: true
           example: "Invoice #4471"
+        forceFailureStage:
+          type: string
+          enum: [ NONE, CREATE, VALIDATE, SEND ]
+          nullable: true
+          default: NONE
+          description: >
+            UI/QA-only switch to deterministically force this payment to fail
+            at a specific lifecycle stage. COMPLETE is intentionally excluded —
+            once a payment reaches SEND successfully, completion cannot be
+            forced to fail via this field (money has already moved by then).
 
     PaymentResponse:
       type: object
@@ -737,6 +750,16 @@ components:
           format: double
         currency:
           $ref: '#/components/schemas/CurrencyCode'
+        targetCurrency:
+          $ref: '#/components/schemas/CurrencyCode'
+        convertedAmount:
+          type: number
+          format: double
+          description: Final payout amount after conversion into targetCurrency
+        fxRate:
+          type: number
+          format: double
+          description: Hardcoded current conversion rate used for this payment (1.0 for same-currency)
         destinationAccount:
           type: string
         reference:
@@ -886,7 +909,7 @@ components:
 
     FxRateResponse:
       type: object
-      description: Display-only static conversion rate — never affects payment settlement (MEM-031)
+      description: Hardcoded current conversion rate used by both frontend preview and backend payment conversion (MEM-031)
       properties:
         from:
           $ref: '#/components/schemas/CurrencyCode'

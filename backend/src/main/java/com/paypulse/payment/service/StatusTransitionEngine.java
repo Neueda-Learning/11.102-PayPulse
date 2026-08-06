@@ -33,8 +33,14 @@ public class StatusTransitionEngine {
     private final Random simulationRandom;
 
     private final ApplicationEventPublisher eventPublisher;
-    @Value("${paypulse.simulation.failure-account-number:FAILTEST01}")
-    private String deterministicFailureAccount;
+    @Value("${paypulse.simulation.validate-failure-account:FAILVALIDATE01}")
+    private String validateFailureAccount;
+
+    @Value("${paypulse.simulation.send-failure-account:FAILTEST01}")
+    private String sendFailureAccount;
+
+    @Value("${paypulse.simulation.complete-failure-account:FAILCOMPLETE01}")
+    private String completeFailureAccount;
 
     @Value("${paypulse.simulation.random-failure-rate:0.05}")
     private double randomFailureRate;
@@ -46,7 +52,7 @@ public class StatusTransitionEngine {
 
     @Transactional
     public Payment validatePayment(Payment payment, TriggeredBy triggeredBy) {
-        return transition(payment, Action.VALIDATE, triggeredBy, null, null);
+        return transitionWithResilience(payment, Action.VALIDATE, "paymentValidate", triggeredBy);
     }
 
     @Transactional
@@ -98,44 +104,29 @@ public class StatusTransitionEngine {
         return completePayment(current, TriggeredBy.SYSTEM);
     }
     private Payment transitionWithResilience(
-            Payment payment,
-            Action action,
-            String resilienceInstance,
-            TriggeredBy triggeredBy
-    ) {
+            Payment payment, Action action, String resilienceInstance, TriggeredBy triggeredBy) {
         PaymentStatus previous = payment.getStatus();
         PaymentState state = stateFactory.from(previous);
 
         PaymentStatus next = switch (action) {
+            case VALIDATE -> state.validate();
             case SEND -> state.send();
             case COMPLETE -> state.complete();
-            default -> throw new IllegalArgumentException("Unsupported resilience transition action: " + action);
+            case CANCEL -> state.cancel();
         };
 
         try {
             resilienceConfig.execute(resilienceInstance, () -> {
-                simulateExternalStep(payment);
+                simulateExternalStep(action, payment);
                 return Boolean.TRUE;
             });
             return persistTransition(payment, previous, next, triggeredBy, null, null);
         } catch (CallNotPermittedException ex) {
-            return persistTransition(
-                    payment,
-                    previous,
-                    PaymentStatus.FAILED,
-                    triggeredBy,
-                    ErrorCode.PROCESSING_ERROR.name(),
-                    "Circuit breaker is open for transition " + action
-            );
+            return persistTransition(payment, previous, PaymentStatus.FAILED, triggeredBy,
+                    ErrorCode.PROCESSING_ERROR.name(), "Circuit breaker is open for transition " + action);
         } catch (RuntimeException ex) {
-            return persistTransition(
-                    payment,
-                    previous,
-                    PaymentStatus.FAILED,
-                    triggeredBy,
-                    ErrorCode.NETWORK_ERROR.name(),
-                    ex.getMessage()
-            );
+            return persistTransition(payment, previous, PaymentStatus.FAILED, triggeredBy,
+                    ErrorCode.NETWORK_ERROR.name(), ex.getMessage());
         }
     }
 
@@ -153,6 +144,7 @@ public class StatusTransitionEngine {
             case VALIDATE -> state.validate();
             case SEND -> state.send();
             case COMPLETE -> state.complete();
+            case CANCEL -> state.cancel();
         };
 
         return persistTransition(payment, previous, next, triggeredBy, errorCode, errorMessage);
@@ -209,15 +201,34 @@ public class StatusTransitionEngine {
     }
 
     private enum Action {
-        VALIDATE, SEND, COMPLETE
+        VALIDATE, SEND, COMPLETE, CANCEL
     }
 
-    private void simulateExternalStep(Payment payment) {
-        if (deterministicFailureAccount != null && deterministicFailureAccount.equals(payment.getDestinationAccount())) {
-            throw new SimulatedProcessingException("Simulated network failure while transmitting payment");
+    private void simulateExternalStep(Action action, Payment payment) {
+        String forced = payment.getForcedFailureStage();
+        // COMPLETE can never be triggered by the UI-forced switch — only
+        // CREATE/VALIDATE/SEND are user-selectable (CreatePaymentRequest's
+        // @Pattern already restricts values, this is defense-in-depth).
+        if (forced != null && action != Action.COMPLETE && forced.equalsIgnoreCase(action.name())) {
+            throw new SimulatedProcessingException(
+                    "Simulated failure during " + action + " (UI-selected forced failure)");
+        }
+
+        String trigger = switch (action) {
+            case VALIDATE -> validateFailureAccount;
+            case SEND -> sendFailureAccount;
+            case COMPLETE -> completeFailureAccount;
+            case CANCEL -> null;   // <-- add this: cancellation has no simulated-failure trigger account
+        };
+        if (trigger != null && trigger.equals(payment.getDestinationAccount())) {
+            throw new SimulatedProcessingException("Simulated failure during " + action + " (deterministic trigger)");
         }
         if (randomFailureRate > 0.0d && simulationRandom.nextDouble() < randomFailureRate) {
-            throw new SimulatedProcessingException("Simulated transient network failure");
+            throw new SimulatedProcessingException("Simulated random failure during " + action);
         }
+    }
+    @Transactional
+    public Payment cancelPayment(Payment payment, TriggeredBy triggeredBy) {
+        return transition(payment, Action.CANCEL, triggeredBy, null, null);
     }
 }

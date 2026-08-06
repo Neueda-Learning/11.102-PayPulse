@@ -13,4 +13,9 @@ public class CreatedState extends AbstractPaymentState {
     public PaymentStatus validate() {
         return PaymentStatus.VALIDATED;
     }
+
+    @Override
+    public PaymentStatus cancel() {
+        return PaymentStatus.CANCELLED;
+    }
 }

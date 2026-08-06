@@ -19,7 +19,7 @@ Per `02-MEMORY.md` MEM-024, **every member continues owning the module they buil
 - **M1** kept cross-cutting/infrastructure ownership (Core: Accounts, Idempotency, Rate Limiting) → V2: Notifications wiring, Sortable Columns, Load Test v2, Dashboard SSE.
 - **M2** kept the payment lifecycle/state-machine ownership (Core: State Machine, Audit Trail, Resilience) → V2: Create-Payment frontend audit, Cancellation, Reversal (both are state-machine-adjacent).
 - **M3** kept validation/create-payment ownership in Core but the V2 assignment shifts to the **read/reporting side** (deepening analytics, adding export) to balance load with M2 taking on two state-machine features.
-- **M4** kept read/list/KPI ownership (Core: Read/List/Search, KPI Dashboard, Analytics) → V2: Copy/Deep-Linking (a natural extension of the list/details screens they already own), FX display (a natural extension of the account/currency display they already own).
+- **M4** kept read/list/KPI ownership (Core: Read/List/Search, KPI Dashboard, Analytics) → V2: Copy/Deep-Linking (a natural extension of the list/details screens they already own), plus full feature #20 cross-currency conversion using a hardcoded present USD rate instead of a live lookup.
 
 Everyone reviews everyone's PRs — same lightweight process as Core (`13-WORK-DISTRIBUTION.md` §1).
 
@@ -64,14 +64,14 @@ Feature numbers refer to `../chirag/01-feature-list.md`.
 | **Depends on** | Nothing new — extends existing `AnalyticsService`/`PaymentRepository` from Core |
 | **Blocks** | Nothing downstream |
 
-### 🟧 M4 — Copy Payment ID / Deep Linking, Multi-Currency Conversion (Display-Only)
+### 🟧 M4 — Copy Payment ID / Deep Linking, Multi-Currency Conversion (Hardcoded Current USD Rate)
 
 | | |
 |---|---|
-| **Features owned** | #17 Copy Payment ID / Deep Linking · #20 Multi-Currency Conversion (display-only FX) |
-| **Backend files** | `fx/api/FxController.java` (new — `GET /fx/rate`) · `fx/service/FxRateService.java` (interface) + `StaticConfigFxRateService.java` (impl, reads `@ConfigurationProperties(prefix = "paypulse.fx")`) · `fx/dto/FxRateResponse.java` · `common/error/ErrorCode.java` — add `FX_RATE_UNAVAILABLE` (404) · `application.yml` — `paypulse.fx.rates.INR-USD: 0.012` (and reverse pair) |
-| **Frontend files** | `frontend/payment-details.html`, `frontend/payments.html` — copy-to-clipboard icon next to every displayed Payment ID (`navigator.clipboard.writeText`, with "Copied!" confirmation + `execCommand` fallback) · `frontend/create-payment.html` — "≈ other currency" display hint next to the amount field, calling `GET /fx/rate` (clearly labeled as an estimate, not affecting the submitted `currency`) · confirm/regression-test existing `payment-details.html?id=` and `payments.html?status=` deep links still work (already implemented, per MEM-028 audit) |
-| **Tests** | `FxRateServiceTest` (unit — known pair, unknown pair) · web-layer test: `GET /fx/rate` (200/404) · manual/E2E: clipboard copy confirmation, deep-link regression check |
+| **Features owned** | #17 Copy Payment ID / Deep Linking · #20 Multi-Currency Conversion (real cross-currency payout support using a hardcoded present USD rate instead of any live/looked-up provider) |
+| **Backend files** | `fx/api/FxController.java` (new — `GET /fx/rate`) · `fx/service/FxRateService.java` (interface) + `StaticConfigFxRateService.java` (impl, reads `@ConfigurationProperties(prefix = "paypulse.fx")`) · `fx/dto/FxRateResponse.java` · `payment/api/dto/{CreatePaymentRequest,PaymentResponse}.java` (add `targetCurrency`, `convertedAmount`, `fxRate`) · `payment/api/PaymentMapper.java` · `payment/service/PaymentService.java` / validation flow for applying the hardcoded rate during create · `common/error/ErrorCode.java` — add `FX_RATE_UNAVAILABLE` (404) · `application.yml` — `paypulse.fx.rates.INR-USD: 0.012` (and reverse pair) |
+| **Frontend files** | `frontend/payment-details.html`, `frontend/payments.html` — copy-to-clipboard icon next to every displayed Payment ID (`navigator.clipboard.writeText`, with "Copied!" confirmation + `execCommand` fallback) · `frontend/create-payment.html` — actual multi-currency conversion flow: source/debit currency locked to the selected account, separate `targetCurrency` choice, converted payout preview via `GET /fx/rate`, and submission of the cross-currency payment request · confirm/regression-test existing `payment-details.html?id=` and `payments.html?status=` deep links still work (already implemented, per MEM-028 audit) |
+| **Tests** | `FxRateServiceTest` (unit — known pair, unknown pair) · web-layer test: `GET /fx/rate` (200/404) · payment-create tests for same-currency and cross-currency success cases, correct `convertedAmount`/`fxRate`, and `FX_RATE_UNAVAILABLE` on an unconfigured pair · manual/E2E: clipboard copy confirmation, deep-link regression check |
 | **Depends on** | Nothing new |
 | **Blocks** | Nothing downstream |
 
@@ -98,9 +98,9 @@ Given the V2 wave starts the same day as the original deadline target, this is a
 
 | Time block | M1 | M2 | M3 | M4 |
 |---|---|---|---|---|
-| **Morning** | `V6` migration + `Account` fields; `PaymentNotificationListener` skeleton | **Fix `API_BASE` bug first** (MEM-028); verify via Docker; `V7` migration + `Payment` fields | `AnalyticsService` trend deepening | `FxRateService` + `FxController` |
+| **Morning** | `V6` migration + `Account` fields; `PaymentNotificationListener` skeleton | **Fix `API_BASE` bug first** (MEM-028); verify via Docker; `V7` migration + `Payment` fields | `AnalyticsService` trend deepening | `FxRateService` + `FxController` + payment contract updates for cross-currency create flow |
 | **Midday** | Sortable columns (frontend + backend allow-list) | `CancelledState` + `cancel()` endpoint + frontend button | `PaymentCsvExportService` + `export()` endpoint | Copy-to-clipboard affordance |
-| **Afternoon** | Dashboard SSE (backend `DashboardStreamService` + frontend `EventSource`) | `ReversalService` + `reverse()` endpoint + frontend button | Frontend CSV export button + deepened trend chart UI | FX display hint on Create Payment screen; deep-link regression check |
+| **Afternoon** | Dashboard SSE (backend `DashboardStreamService` + frontend `EventSource`) | `ReversalService` + `reverse()` endpoint + frontend button | Frontend CSV export button + deepened trend chart UI | Cross-currency Create Payment UI polish (preview + submit using hardcoded rate); deep-link regression check |
 | **Evening** | nginx SSE config; load-test v2 extension (needs M2's endpoints) | Integration tests: cancel + reverse round trips | Tests: analytics deepening + CSV export | Tests: FX + clipboard/deep-link |
 | **End-of-day — Integration Checkpoint** | **All 4:** merge to `main`, run full backend + frontend test suites, click through every V2 feature end-to-end, update `openapi.yaml`/docs if any contract drifted during implementation, walk through `04-SRS.md` §12–15 as a checklist | | | |
 
@@ -133,5 +133,5 @@ Same as Core (`13-WORK-DISTRIBUTION.md` §6) — backend + frontend + unit tests
 | M1 | _TBD_ | Notifications wiring, Sortable Columns, Load Test v2, Dashboard SSE |
 | M2 | _TBD_ | Create-Payment frontend audit, Payment Cancellation, Payment Reversal |
 | M3 | _TBD_ | Analytics/Trend View (deepened), CSV Export |
-| M4 | _TBD_ | Copy Payment ID/Deep Linking, Multi-Currency Conversion (display-only) |
+| M4 | _TBD_ | Copy Payment ID/Deep Linking, Multi-Currency Conversion (hardcoded current USD rate) |
 

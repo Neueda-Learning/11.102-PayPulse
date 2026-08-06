@@ -25,7 +25,6 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class CreatePaymentRequest {
-
     @NotBlank(message = "sourceAccountId is required")
     @Pattern(
             regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
@@ -50,5 +49,17 @@ public class CreatePaymentRequest {
 
     @Size(max = 255, message = "reference length must be <= 255")
     private String reference;
+
+    /**
+     * Optional, UI/QA-only switch to deterministically force a payment to fail
+     * at a specific lifecycle stage. COMPLETE is intentionally excluded from
+     * the choices — a payment cannot be forced to fail at completion via this
+     * switch (it can still fail there through the existing account-based /
+     * random chaos-testing config, just not via this explicit UI control).
+     */
+    @Pattern(regexp = "NONE|CREATE|VALIDATE|SEND",
+            message = "forceFailureStage must be one of NONE, CREATE, VALIDATE, SEND")
+    private String forceFailureStage;
 }
+
 

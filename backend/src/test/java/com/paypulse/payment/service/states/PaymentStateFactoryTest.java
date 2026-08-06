@@ -50,5 +50,34 @@ class PaymentStateFactoryTest {
         assertThatThrownBy(failed::send).isInstanceOf(InvalidStatusTransitionException.class);
         assertThatThrownBy(failed::complete).isInstanceOf(InvalidStatusTransitionException.class);
     }
+
+    @Test
+    void created_alsoAllowsCancel() {
+        PaymentState created = factory.from(PaymentStatus.CREATED);
+
+        assertThat(created.cancel()).isEqualTo(PaymentStatus.CANCELLED);
+    }
+
+    @Test
+    void validated_sent_completed_failed_doNotAllowCancel() {
+        assertThatThrownBy(factory.from(PaymentStatus.VALIDATED)::cancel)
+                .isInstanceOf(InvalidStatusTransitionException.class);
+        assertThatThrownBy(factory.from(PaymentStatus.SENT)::cancel)
+                .isInstanceOf(InvalidStatusTransitionException.class);
+        assertThatThrownBy(factory.from(PaymentStatus.COMPLETED)::cancel)
+                .isInstanceOf(InvalidStatusTransitionException.class);
+        assertThatThrownBy(factory.from(PaymentStatus.FAILED)::cancel)
+                .isInstanceOf(InvalidStatusTransitionException.class);
+    }
+
+    @Test
+    void cancelled_isTerminal() {
+        PaymentState cancelled = factory.from(PaymentStatus.CANCELLED);
+
+        assertThatThrownBy(cancelled::validate).isInstanceOf(InvalidStatusTransitionException.class);
+        assertThatThrownBy(cancelled::send).isInstanceOf(InvalidStatusTransitionException.class);
+        assertThatThrownBy(cancelled::complete).isInstanceOf(InvalidStatusTransitionException.class);
+        assertThatThrownBy(cancelled::cancel).isInstanceOf(InvalidStatusTransitionException.class);
+    }
 }
 

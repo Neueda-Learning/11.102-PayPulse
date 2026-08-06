@@ -53,13 +53,24 @@
       <div class="form-row">
         <label for="destinationAccount">Destination Account *</label>
         <input type="text" id="destinationAccount" placeholder="e.g. ACC9998887"
-               minlength="8" maxlength="20" required/>
+               minlength="8" maxlength="20" pattern="^[A-Za-z0-9]{8,20}$" required/>
         <div class="hint">8–20 alphanumeric characters. Must differ from your source account.</div>
       </div>
 
       <div class="form-row">
         <label for="reference">Reference / Description (optional)</label>
         <textarea id="reference" rows="2" maxlength="255" placeholder="e.g. Invoice #4471"></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="forceFailureStage">Simulate Failure (demo/testing only)</label>
+        <select id="forceFailureStage">
+          <option value="NONE">No forced failure — process normally</option>
+          <option value="CREATE">Fail at Creation</option>
+          <option value="VALIDATE">Fail at Validation</option>
+          <option value="SEND">Fail at Send</option>
+        </select>
+        <div class="hint">Forces this payment to fail deterministically at the chosen stage. Completion cannot be force-failed from here.</div>
       </div>
 
       <div class="form-row">
@@ -81,6 +92,7 @@
 <script src="js/api.js"></script>
 <script>
 let accounts = [];
+let currentSubmissionKey = null;
 
 async function loadAccounts() {
   const sel = document.getElementById('sourceAccount');
@@ -104,11 +116,28 @@ function syncCurrency() {
 
 document.getElementById('sourceAccount').addEventListener('change', syncCurrency);
 
-// Generate idempotency key on page load (refreshed after each submission)
-function refreshKey() {
-  document.getElementById('idempotencyKey').value = generateIdempotencyKey();
+function showCurrentKey() {
+  document.getElementById('idempotencyKey').value = currentSubmissionKey || '';
 }
-refreshKey();
+
+function ensureSubmissionKey() {
+  if (!currentSubmissionKey) {
+    currentSubmissionKey = generateIdempotencyKey();
+  }
+  showCurrentKey();
+}
+
+function clearSubmissionKey() {
+  currentSubmissionKey = null;
+  showCurrentKey();
+}
+
+function isRetryableError(err) {
+  const retryableCodes = new Set(['NETWORK_ERROR', 'RATE_LIMIT_EXCEEDED', 'PROCESSING_ERROR', 'UNKNOWN']);
+  return retryableCodes.has((err && err.errorCode) || 'UNKNOWN');
+}
+
+showCurrentKey();
 
 document.getElementById('paymentForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -120,7 +149,9 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
   const currency = document.getElementById('currency').value;
   const destinationAccount = document.getElementById('destinationAccount').value.trim();
   const reference = document.getElementById('reference').value.trim();
-  const idempotencyKey = document.getElementById('idempotencyKey').value;
+const forceFailureStage = document.getElementById('forceFailureStage').value; // optional UI-only
+ensureSubmissionKey();
+const idempotencyKey = currentSubmissionKey;
 
   const submitBtn = document.getElementById('submitBtn');
   submitBtn.disabled = true;
@@ -128,9 +159,9 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
 
   try {
     const payment = await Payments.create(
-      { sourceAccountId, amount, currency, destinationAccount, reference },
-      idempotencyKey
-    );
+  { sourceAccountId, amount, currency, destinationAccount, reference, forceFailureStage },
+  idempotencyKey
+);
 
     const isOk = payment.status === 'COMPLETED';
     const resultCard = document.getElementById('resultCard');
@@ -149,11 +180,18 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
         <a class="btn ghost" href="payment-details.html?id=${encodeURIComponent(payment.id)}">View Full Details →</a>
       </p>`;
     resultCard.scrollIntoView({ behavior: 'smooth' });
-    refreshKey(); // new key for next submission
+clearSubmissionKey();
+document.getElementById('forceFailureStage').value = 'NONE';
   } catch (err) {
     noticeEl.innerHTML = `<div class="notice error"><strong>${err.errorCode || 'ERROR'}</strong>: ${err.message || 'Submission failed.'}</div>`;
-    // On validation error: discard key so user gets a new one when they fix + resubmit
-    refreshKey();
+
+    if (!isRetryableError(err)) {
+      // Non-retryable failures require user edits; next submit gets a new key.
+      clearSubmissionKey();
+    } else {
+      // Retryable failures keep the same key to preserve idempotency on retry.
+      showCurrentKey();
+    }
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Submit Payment';

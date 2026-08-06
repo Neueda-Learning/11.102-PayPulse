@@ -113,6 +113,11 @@ resilience4j:
         wait-duration-in-open-state: 10s
   retry:
     instances:
+      paymentValidate:
+        max-attempts: 2
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.paypulse.payment.service.SimulatedProcessingException
       paymentSend:
         max-attempts: 2
         wait-duration: 200ms
@@ -128,14 +133,19 @@ resilience4j:
 
 # ── PayPulse App Config ────────────────────────────────────────────────────────
 paypulse:
+  processing:
+    simulated-delay-ms: 3000
   rate-limit:
     global-requests-per-minute: 40000   # NFR-10/11: ~667 req/sec ceiling 4000
-    per-client-requests-per-minute: 2000 # fair-share per IP 2000
+    per-client-requests-per-minute: 2000 # fair-share per IP 2000         # 5% random failure rate
+    cors:
+      allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:63342,http://10.9.67.127:8085"
   simulation:
-    failure-account-number: FAILTEST01  # deterministic failure trigger (Q6)
-    random-failure-rate: 0.05           # 5% random failure rate
-  cors:
-    allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:63342"
+    create-failure-account: FAILCREATE01     # NEW — fails before any Payment row is persisted
+    validate-failure-account: FAILVALIDATE01 # NEW — fails CREATED -> FAILED
+    send-failure-account: FAILTEST01         # renamed usage of the existing property
+    complete-failure-account: FAILCOMPLETE01 # NEW — fails SENT -> FAILED
+    random-failure-rate: 0.05
 
   export:
     max-rows: 50000   # feature #14 (CSV export) — reject filters exceeding this with EXPORT_TOO_LARGE

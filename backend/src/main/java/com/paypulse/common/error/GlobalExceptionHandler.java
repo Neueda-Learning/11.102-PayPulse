@@ -2,6 +2,7 @@ package com.paypulse.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -24,6 +25,25 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handlePayment(PaymentException ex, HttpServletRequest req) {
         return ResponseEntity.status(ex.getStatus())
                 .body(ApiError.of(ex.getErrorCode(), ex.getMessage(), req.getRequestURI()));
+    }
+
+    /**
+     * Race-condition duplicate detection (Q15 follow-up): since
+     * PaymentService.createPayment() is no longer wrapped in one top-level
+     * transaction (needed to make cancellation reachable — see PaymentService
+     * Javadoc), two concurrent requests with the same Idempotency-Key can
+     * both pass the findExisting() check before either commits. The DB's
+     * uq_payment_idempotency_key unique constraint is the real safety net —
+     * this maps that constraint violation to the same DUPLICATE_PAYMENT
+     * error code/shape the client already understands, instead of a raw 500.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDuplicateKey(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("Data integrity violation at {}: {}", req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(ErrorCode.DUPLICATE_PAYMENT,
+                        "A payment with this idempotency key is already being processed. Please retry.",
+                        req.getRequestURI()));
     }
 
     /** Bean Validation failures (field-level @Valid) */
@@ -50,4 +70,3 @@ public class GlobalExceptionHandler {
                         req.getRequestURI()));
     }
 }
-

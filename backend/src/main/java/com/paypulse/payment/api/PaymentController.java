@@ -12,6 +12,7 @@ import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.PaymentCreationResult;
 import com.paypulse.payment.service.PaymentService;
+import com.paypulse.payment.service.ReversalService;
 import com.paypulse.payment.service.StatusTransitionEngine;
 import com.paypulse.payment.service.states.InvalidStatusTransitionException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,10 +29,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.io.IOException;
+import java.net.URI;
 import java.util.List;
-
 /**
  * Shared controller file per team protocol.
  * M3 owns: POST /payments, GET /payments/export (V2, feature #14)
@@ -48,8 +49,7 @@ public class PaymentController {
     private final PaymentRepository paymentRepository;
     private final StatusTransitionEngine statusTransitionEngine;
     private final PaymentMapper paymentMapper;
-    private final PaymentCsvExportService csvExportService;
-
+    private final ReversalService reversalService;
     // ── M3 ──────────────────────────────────────────────────────────
     @PostMapping
     @Operation(summary = "Create a new payment")
@@ -58,8 +58,14 @@ public class PaymentController {
             @Valid @RequestBody CreatePaymentRequest request) {
 
         PaymentCreationResult result = paymentService.createPayment(idempotencyKey, request);
-        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
-                .body(result.payment());
+        if (!result.created()) {
+            return ResponseEntity.ok(result.payment());
+        }
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(result.payment().getId())
+                .toUri();
+        return ResponseEntity.created(location).body(result.payment());
     }
 
     // ── M3 (V2, feature #14 — CSV Export) ─────────────────────────────
@@ -99,6 +105,9 @@ public class PaymentController {
         return ResponseEntity.ok(paymentMapper.toResponse(payment));
     }
 
+    private static final java.util.Set<String> SORTABLE_FIELDS =
+            java.util.Set.of("createdAt", "amount", "status");
+
     @GetMapping
     @Operation(summary = "List/search/filter payments")
     public ResponseEntity<Page<PaymentResponse>> list(
@@ -111,8 +120,14 @@ public class PaymentController {
 
         size = Math.min(size, 100);
         String[] s = sort.split(",");
-        PaymentCsvExportService.validateSortField(s[0]); // MEM-033: same allow-list as export
-        Sort sortObj = Sort.by(Sort.Direction.fromString(s.length > 1 ? s[1] : "desc"), s[0]);
+        String field = s[0];
+        if (!SORTABLE_FIELDS.contains(field)) {
+            throw new com.paypulse.payment.service.PaymentException(
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.VALIDATION_FAILED,
+                    "Invalid sort field '" + field + "'. Allowed: createdAt, amount, status");
+        }
+        Sort sortObj = Sort.by(Sort.Direction.fromString(s.length > 1 ? s[1] : "desc"), field);
         Pageable pageable = PageRequest.of(page, size, sortObj);
 
         Page<Payment> result = paymentRepository.search(status, search, sourceAccountId, pageable);
@@ -129,6 +144,21 @@ public class PaymentController {
                 .toList();
         return ResponseEntity.ok(history);
     }
+
+    @PostMapping("/{id}/cancel")
+    @Operation(summary = "Cancel a CREATED payment")
+    public ResponseEntity<PaymentResponse> cancel(@PathVariable("id") String id) {
+        Payment updated = paymentService.cancelPayment(id);
+        return ResponseEntity.ok(paymentMapper.toResponse(updated));
+    }
+
+    @PostMapping("/{id}/reverse")
+    @Operation(summary = "Reverse a COMPLETED payment")
+    public ResponseEntity<PaymentResponse> reverse(@PathVariable("id") String id) {
+        Payment reversal = reversalService.reverse(id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(paymentMapper.toResponse(reversal));
+    }
+
 
     @PostMapping("/{id}/validate")
     @Operation(summary = "Trigger CREATED -> VALIDATED transition")

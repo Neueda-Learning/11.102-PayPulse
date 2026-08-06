@@ -13,7 +13,7 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 - All request/response bodies are `application/json`.
 - All timestamps are ISO-8601 UTC, e.g. `2026-07-30T14:23:01Z`.
 - `id` fields are UUID strings.
-- **Supported currencies: `INR` and `USD` only** (customer-confirmed 31 Jul 2026, MEM-018). A payment's `currency` must equal its `sourceAccountId`'s currency.
+- **Supported currencies: `INR` and `USD` only** (customer-confirmed 31 Jul 2026, MEM-018). A payment's source/debit `currency` must equal its `sourceAccountId`'s currency. V2 feature #20 adds an optional cross-currency payout via `targetCurrency`, using a **hardcoded current INR↔USD rate** (not a live lookup).
 - Idempotency key is passed as a request **header**: `Idempotency-Key: <client-generated-string>` (preferred over body field — standard REST convention, keeps it out of the domain payload). *(Supersedes earlier SRS draft that showed it as a body field — see MEM-013.)* **Important:** this key identifies a single *submission attempt*, not the payment's business content — it must be generated fresh (e.g. `crypto.randomUUID()`) client-side once per attempt, never derived from `amount`/`sourceAccountId` fields. Full rationale + worked scenarios: `04-SRS.md` §7a / FR-1.1a.
 - Pagination: query params `page` (0-based, default `0`), `size` (default `20`, max `100`), response wrapped in a `Page` envelope.
 - **Rate limiting (new, MEM-020):** every response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers. Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header (seconds) and the standard error body below, `errorCode: RATE_LIMIT_EXCEEDED`.
@@ -47,7 +47,7 @@ Related: `04-SRS.md`, `09-UML-SEQUENCE-DIAGRAMS.md`, `openapi.yaml` (machine-rea
 | POST | `/payments/{id}/reverse` | **(V2)** Reverse a `COMPLETED` payment (creates a new, linked payment) — feature #19 |
 | GET | `/payments/export` | **(V2)** Stream the current filtered payment list as CSV — feature #14 |
 | GET | `/analytics/stream` | **(V2)** Server-Sent Events stream of live KPI updates — replaces the 30s dashboard poll |
-| GET | `/fx/rate` | **(V2)** Display-only static FX conversion rate — feature #20 |
+| GET | `/fx/rate` | **(V2)** Hardcoded FX conversion rate used for feature #20 |
 | POST | `/notifications/send` | **(V2, was already implemented, now documented)** Send an ad-hoc email notification |
 | GET | `/notifications` | **(V2, now documented)** List notification audit logs |
 | GET | `/notifications/{id}` | **(V2, now documented)** Get a single notification log |
@@ -86,6 +86,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
   "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111",
   "amount": 250.00,
   "currency": "INR",
+  "targetCurrency": "USD",
   "destinationAccount": "ACC2000002",
   "reference": "Invoice #4471"
 }
@@ -94,9 +95,10 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 **Field rules:**
 | Field | Type | Required | Rules |
 |---|---|---|---|
-| `sourceAccountId` | UUID | yes | Must reference an existing, `ACTIVE` `Account` (§3/§4) — unknown/inactive → `INVALID_ACCOUNT` |
+| `sourceAccountId` | UUID | yes | Must reference an existing, `ACTIVE` `Account` (§3/§4) — unknown → `404 ACCOUNT_NOT_FOUND`, inactive → `400 INVALID_ACCOUNT` |
 | `amount` | number | yes | > 0, <= 1,000,000, max 2 decimal places |
-| `currency` | string | yes | `INR` or `USD` only; **must equal the source account's currency** — mismatch → `INVALID_CURRENCY` |
+| `currency` | string | yes | Source/debit currency. `INR` or `USD` only; **must equal the source account's currency** — mismatch → `INVALID_CURRENCY` |
+| `targetCurrency` | string | yes | Payout currency. `INR` or `USD` only; may equal or differ from `currency`. If different, backend converts using the current hardcoded INR↔USD rate. |
 | `destinationAccount` | string | yes | 8–20 alphanumeric chars, must differ from the source account's `accountNumber` (format-only — external party, not existence-checked, MEM-017) |
 | `reference` | string | no | max 255 chars |
 
@@ -110,6 +112,9 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
   "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111",
   "amount": 250.00,
   "currency": "INR",
+  "targetCurrency": "USD",
+  "convertedAmount": 3.00,
+  "fxRate": 0.012,
   "destinationAccount": "ACC2000002",
   "reference": "Invoice #4471",
   "status": "COMPLETED",
@@ -121,7 +126,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 ```
 - **`200 OK`** — `Idempotency-Key` matched an existing payment; body = the existing payment (MEM-006), no new resource created.
 - **`400 Bad Request`** — field-level or business-rule validation failure (`VALIDATION_FAILED`, `INVALID_AMOUNT`, `INVALID_CURRENCY`, `INVALID_ACCOUNT`).
-- **`404 Not Found`** — `sourceAccountId` doesn't exist at all (`ACCOUNT_NOT_FOUND`) — distinguished from `INVALID_ACCOUNT` (400) which covers an account that exists but is `INACTIVE`, or a malformed `destinationAccount`.
+- **`404 Not Found`** — `sourceAccountId` doesn't exist at all (`ACCOUNT_NOT_FOUND`), or the requested FX pair has no configured hardcoded rate (`FX_RATE_UNAVAILABLE`). Distinguished from `INVALID_ACCOUNT` (400) which covers an account that exists but is `INACTIVE`, or a malformed `destinationAccount`.
 - **`429 Too Many Requests`** — rate limit exceeded (`RATE_LIMIT_EXCEEDED`, new).
 
 ---
@@ -136,6 +141,9 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
   "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111",
   "amount": 250.00,
   "currency": "INR",
+  "targetCurrency": "USD",
+  "convertedAmount": 3.00,
+  "fxRate": 0.012,
   "destinationAccount": "ACC2000002",
   "reference": "Invoice #4471",
   "status": "FAILED",
@@ -171,7 +179,7 @@ Used by the frontend to populate the **source-account dropdown** on the Create P
 ```json
 {
   "content": [
-    { "id": "...", "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111", "amount": 250.00, "currency": "INR", "status": "FAILED", "errorCode": "NETWORK_ERROR", "createdAt": "..." }
+    { "id": "...", "sourceAccountId": "b2c3d4e5-1111-4a11-8a11-111111111111", "amount": 250.00, "currency": "INR", "targetCurrency": "USD", "convertedAmount": 3.00, "fxRate": 0.012, "status": "FAILED", "errorCode": "NETWORK_ERROR", "createdAt": "..." }
   ],
   "page": 0,
   "size": 20,
@@ -258,7 +266,7 @@ No request body. Behave exactly like the corresponding automatic step (§5), but
 | VALIDATION_FAILED | 400 | Generic field-level validation |
 | INVALID_ACCOUNT | 400 | Unknown/inactive `sourceAccountId`, bad `destinationAccount` format, or source==destination |
 | ACCOUNT_NOT_FOUND | 404 | `GET /accounts/{id}` with unknown ID *(new)* |
-| INVALID_CURRENCY | 400 | Currency not `INR`/`USD`, or ≠ source account's currency |
+| INVALID_CURRENCY | 400 | Source or target currency not `INR`/`USD`, or source/debit `currency` ≠ source account's currency |
 | INVALID_AMOUNT | 400 | Amount <= 0, > max, or wrong decimal precision |
 | DUPLICATE_PAYMENT | *(reserved, not used by default — see MEM-006)* | Would apply only if strict-reject mode chosen instead of 200+existing |
 | INVALID_STATUS_TRANSITION | 400 | Illegal transition attempted |
@@ -270,14 +278,14 @@ No request body. Behave exactly like the corresponding automatic step (§5), but
 | **PAYMENT_NOT_CANCELLABLE** *(new, V2)* | **409** | `POST /payments/{id}/cancel` attempted on a payment not in `CREATED` status — MEM-029 |
 | **PAYMENT_ALREADY_REVERSED** *(new, V2)* | **409** | `POST /payments/{id}/reverse` attempted on a payment already flagged `reversed=true` — MEM-030 |
 | **EXPORT_TOO_LARGE** *(new, V2)* | **400** | `GET /payments/export` filter would exceed `paypulse.export.max-rows` — MEM-032 |
-| **FX_RATE_UNAVAILABLE** *(new, V2)* | **404** | `GET /fx/rate` requested for an unsupported currency pair — MEM-031 |
+| **FX_RATE_UNAVAILABLE** *(new, V2)* | **404** | `GET /fx/rate` or `POST /payments` requested a currency pair with no configured hardcoded rate — MEM-031 |
 
 > **Important distinction:** For **explicit transition endpoints**, a "successful transition to FAILED" is still an HTTP `200` (the API call itself succeeded — it did what was asked: attempt the transition, and correctly recorded a failure). HTTP error statuses (`400/404/409/429/500/503`) are reserved for when the **API call itself** couldn't be honored (bad request shape, illegal transition, not found, conflict, rate-limited, internal fault) — not for "the payment's business outcome was a failure." This distinction is called out explicitly to avoid frontend confusion.
 
 ## 13. Frontend Integration Notes
 
 - **Landing page is the KPI dashboard** (`GET /analytics/summary` + `/analytics/trend`), per customer directive — not the Create Payment form.
-- On the Create Payment screen, call `GET /accounts` first to populate the **source-account dropdown**; currency field auto-populates/locks to the selected account's currency (client-side convenience; server still validates independently).
+- On the Create Payment screen, call `GET /accounts` first to populate the **source-account dropdown**; the source/debit `currency` auto-populates/locks to the selected account's currency, while `targetCurrency` may be chosen separately for cross-currency payouts. Use `GET /fx/rate` to preview the hardcoded conversion before submit; the backend recomputes the official `convertedAmount`/`fxRate` on create.
 - Use `GET /payments/{id}` (short poll every 1–2s, or just once since auto-progression is synchronous in Sprint 1) to reflect final status after `POST /payments`.
 - Status badge color mapping (Appendix D): 🟢 `COMPLETED`, 🟡 `CREATED`/`VALIDATED`/`SENT`, 🔴 `FAILED`, ⚪ `CANCELLED` *(new, V2)*.
 - **Handle `429` gracefully:** show a "please slow down" toast using the `Retry-After` header rather than a generic error (new, MEM-020).
@@ -342,7 +350,7 @@ No request body. Legal **only** for a `COMPLETED` payment that has not already b
 - **`200 OK`** — long-lived `text/event-stream` connection.
 - **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED` (rejected before the stream opens, same as any other endpoint).
 
-## 18. `GET /fx/rate` — Display-Only FX Conversion Rate (new, feature #20, MEM-031)
+## 18. `GET /fx/rate` — Hardcoded FX Conversion Rate (new, feature #20, MEM-031)
 
 **Query params:** `from` (`INR`/`USD`), `to` (`INR`/`USD`).
 
@@ -353,7 +361,7 @@ No request body. Legal **only** for a `COMPLETED` payment that has not already b
 - **`404 Not Found`** — unsupported/unconfigured pair: `errorCode: FX_RATE_UNAVAILABLE`.
 - **`429 Too Many Requests`** — `RATE_LIMIT_EXCEEDED`.
 
-> **This rate is display-only.** It never affects `POST /payments` validation — `currency` must still equal the source account's currency exactly (MEM-018 unchanged). Frontend uses it only to show a secondary, non-binding "≈ other currency" hint.
+> **This rate is hardcoded/configured, not live.** It is used both for frontend preview and for backend conversion when `targetCurrency` differs from source `currency`, so the preview and persisted `convertedAmount` stay aligned.
 
 ## 19. Notification Endpoints (already implemented backend-side; formally documented here, V2)
 

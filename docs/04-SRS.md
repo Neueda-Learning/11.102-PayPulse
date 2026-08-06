@@ -293,10 +293,12 @@ This SRS was revised after the team's first customer meeting. Summary of every c
 - **FR-16.3** A new `Payment` is created with `reversal_of_payment_id` set to the original's ID, `sourceAccountId`/`destinationAccount` swapped, identical `amount`/`currency`, and enters the **normal** `CREATED→VALIDATED→SENT→COMPLETED/FAILED` lifecycle (full validation, idempotency, audit trail — no special-casing).
 - **FR-16.4** Reversing an already-reversed payment returns `409` + new error code `PAYMENT_ALREADY_REVERSED`. Reversing a non-`COMPLETED` payment returns `409` + `INVALID_STATUS_TRANSITION`.
 
-### FR-17 — Multi-Currency Conversion Display (new, feature #20, MEM-031 — display-only)
-- **FR-17.1** `GET /fx/rate?from=INR&to=USD` returns a static, config-driven conversion rate and the computed "as of" timestamp (config reload time, not live).
-- **FR-17.2** This rate is used **only** for a non-binding UI display hint (e.g. "≈ $3.00") — it never changes payment validation, currency-matching rules (FR-9, MEM-018 unchanged), or settlement.
-- **FR-17.3** No payment may actually be created/settled across a currency boundary — `currency` must still equal the source account's currency exactly.
+### FR-17 — Multi-Currency Conversion (new, feature #20, MEM-031 — hardcoded current-rate variant)
+- **FR-17.1** `POST /payments` accepts both a source/debit `currency` and a `targetCurrency`. `currency` must still equal the selected source account's currency exactly; `targetCurrency` may be the same or different.
+- **FR-17.2** When `targetCurrency != currency`, the backend computes the payout using a **hardcoded present INR↔USD rate** (no live provider / no third-party lookup) and persists the resulting `convertedAmount` plus the `fxRate` used.
+- **FR-17.3** When `targetCurrency == currency`, the payment behaves as a same-currency payment: `convertedAmount == amount` and `fxRate == 1.0`.
+- **FR-17.4** `GET /fx/rate?from=INR&to=USD` returns the same currently configured hardcoded rate and `asOf` timestamp used by the backend so the frontend can preview the conversion before submit.
+- **FR-17.5** If a requested conversion pair has no configured hardcoded rate, the lookup endpoint and any attempted cross-currency payment creation fail with `FX_RATE_UNAVAILABLE`.
 
 ### FR-18 — CSV Export (new, feature #14, MEM-032)
 - **FR-18.1** `GET /payments/export` accepts the same filters as `GET /payments` (`status`, `search`, `sourceAccountId`, `sort`) but returns a streamed `text/csv` file of the **full filtered result set** (no pagination).
@@ -342,7 +344,7 @@ This SRS was revised after the team's first customer meeting. Summary of every c
 | `PAYMENT_NOT_CANCELLABLE` | Cancel attempted on a payment not in `CREATED` status | 409 |
 | `PAYMENT_ALREADY_REVERSED` | Reverse attempted on a payment already flagged `reversed=true` | 409 |
 | `EXPORT_TOO_LARGE` | CSV export filter would exceed `paypulse.export.max-rows` | 400 |
-| `FX_RATE_UNAVAILABLE` | Requested currency pair has no configured static rate | 404 |
+| `FX_RATE_UNAVAILABLE` | Requested conversion pair has no configured hardcoded rate | 404 |
 
 ## 15. V2 Non-Functional Requirements
 
