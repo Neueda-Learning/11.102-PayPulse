@@ -1,277 +1,327 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<title>PayPulse — Create Payment</title>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<link rel="stylesheet" href="css/style.css"/>
+    <meta charset="UTF-8"/>
+    <title>PayPulse — New Payment</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="logo">P</span> PayPulse</div>
-  <nav class="nav">
-    <a href="index.html">Dashboard</a>
-    <a href="accounts.html">Accounts</a>
-    <a href="create-payment.html">Create Payment</a>
-    <a href="payments.html">Payments</a>
-  </nav>
+    <div class="brand">
+        <span class="logo">P</span>
+        <span class="brand-name">PayPulse</span>
+        <span class="tag">LIVE</span>
+    </div>
+    <nav class="nav">
+        <a href="index.html">Dashboard</a>
+        <a href="accounts.html">Accounts</a>
+        <a href="create-payment.html">New Payment</a>
+        <a href="payments.html">Payments</a>
+    </nav>
+    <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
+    </div>
 </header>
 
 <main>
-  <div class="page-head">
-    <h1>Create Payment</h1>
-    <p>Select your source account, enter the destination, and submit. The payment will be automatically processed.</p>
-  </div>
-
-  <div id="formNotice"></div>
-
-  <div class="card" id="formCard">
-    <h2>Payment Details</h2>
-    <form id="paymentForm">
-
-      <div class="form-row">
-        <label for="sourceAccount">Source Account *</label>
-        <select id="sourceAccount" required>
-          <option value="">Loading accounts...</option>
-        </select>
-        <div class="hint">Only your ACTIVE accounts are shown. Currency auto-matches.</div>
-      </div>
-
-      <div class="form-row-inline">
-        <div class="form-row">
-          <label for="amount">Amount *</label>
-          <input type="number" id="amount" min="0.01" max="1000000" step="0.01"
-                 placeholder="e.g. 250.00" required/>
+    <div class="page-head">
+        <div class="page-head-text">
+            <h1>New Payment</h1>
+            <p>Initiate an outbound payment from one of your active accounts. Review the FX conversion before submitting.</p>
         </div>
-        <div class="form-row">
-          <label for="currency">Currency</label>
-          <input type="text" id="currency" readonly placeholder="auto-filled"/>
-        </div>
-        <div class="form-row">
-          <label for="targetCurrency">Payout Currency *</label>
-          <select id="targetCurrency" required>
-            <option value="INR">INR</option>
-            <option value="USD">USD</option>
-          </select>
-        </div>
-      </div>
+    </div>
 
-      <div class="form-row">
-        <label>Conversion Preview</label>
-        <div id="conversionPreview" class="conversion-preview">Choose source account, amount, and payout currency to preview conversion.</div>
-      </div>
+    <div id="formNotice"></div>
 
-      <div class="form-row">
-        <label for="destinationAccount">Destination Account *</label>
-        <input type="text" id="destinationAccount" placeholder="e.g. ACC9998887"
-               minlength="8" maxlength="20" pattern="^[A-Za-z0-9]{8,20}$" required/>
-        <div class="hint">8–20 alphanumeric characters. Must differ from your source account.</div>
-      </div>
+    <div class="card" id="formCard">
+        <form id="paymentForm" novalidate>
 
-      <div class="form-row">
-        <label for="reference">Reference / Description (optional)</label>
-        <textarea id="reference" rows="2" maxlength="255" placeholder="e.g. Invoice #4471"></textarea>
-      </div>
+            <!-- Section 1: Source -->
+            <div class="form-section">
+                <div class="form-section-title">Source Account</div>
+                <div class="form-row">
+                    <label for="sourceAccount">Debit Account <span class="required-mark">*</span></label>
+                    <select id="sourceAccount" required>
+                        <option value="">Loading accounts…</option>
+                    </select>
+                    <div class="hint">Only ACTIVE accounts are listed. The source currency is auto-populated.</div>
+                </div>
+            </div>
 
-      <div class="form-row">
-        <label for="forceFailureStage">Simulate Failure (demo/testing only)</label>
-        <select id="forceFailureStage">
-          <option value="NONE">No forced failure — process normally</option>
-          <option value="CREATE">Fail at Creation</option>
-          <option value="VALIDATE">Fail at Validation</option>
-          <option value="SEND">Fail at Send</option>
-        </select>
-        <div class="hint">Forces this payment to fail deterministically at the chosen stage. Completion cannot be force-failed from here.</div>
-      </div>
+            <!-- Section 2: Amount & Currency -->
+            <div class="form-section">
+                <div class="form-section-title">Amount &amp; Currency</div>
+                <div class="form-row-inline">
+                    <div class="form-row">
+                        <label for="amount">Payment Amount <span class="required-mark">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-prefix" id="currencyPrefix">—</span>
+                            <input type="number" id="amount" min="0.01" max="1000000" step="0.01"
+                                   placeholder="0.00" required/>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="currency">Source Currency</label>
+                        <input type="text" id="currency" readonly placeholder="Auto-filled" aria-label="Source currency (read only)"/>
+                    </div>
+                    <div class="form-row">
+                        <label for="targetCurrency">Payout Currency <span class="required-mark">*</span></label>
+                        <select id="targetCurrency" required>
+                            <option value="INR">INR — Indian Rupee</option>
+                            <option value="USD">USD — US Dollar</option>
+                        </select>
+                    </div>
+                </div>
 
-      <div class="form-row">
-        <label for="idempotencyKey">Idempotency Key (auto-generated)</label>
-        <input type="text" id="idempotencyKey" readonly aria-label="Idempotency Key"/>
-        <div class="hint">Generated once per submission. Prevents accidental double payments.</div>
-      </div>
+                <div class="form-row">
+                    <label>FX Conversion Preview</label>
+                    <div id="conversionPreview" class="conversion-preview">Select a source account and enter an amount to preview the FX conversion.</div>
+                </div>
+            </div>
 
-      <button type="submit" class="btn" id="submitBtn">Submit Payment</button>
-    </form>
-  </div>
+            <!-- Section 3: Beneficiary -->
+            <div class="form-section">
+                <div class="form-section-title">Beneficiary</div>
+                <div class="form-row">
+                    <label for="destinationAccount">Destination Account Number <span class="required-mark">*</span></label>
+                    <input type="text" id="destinationAccount" placeholder="e.g. ACC9998887"
+                           minlength="8" maxlength="20" pattern="^[A-Za-z0-9]{8,20}$" required
+                           autocomplete="off" spellcheck="false"/>
+                    <div class="hint">8–20 alphanumeric characters. Must differ from your source account.</div>
+                </div>
 
-  <div class="card" id="resultCard" style="display:none;">
-    <h2>Result</h2>
-    <div id="resultBody"></div>
-  </div>
+                <div class="form-row">
+                    <label for="reference">Payment Reference / Narration</label>
+                    <textarea id="reference" rows="2" maxlength="255"
+                              placeholder="e.g. Invoice #4471 — Vendor settlement"></textarea>
+                    <div class="hint">Optional. Appears on statements and audit trail (max 255 characters).</div>
+                </div>
+            </div>
+
+            <!-- Section 4: Controls -->
+            <div class="form-section">
+                <div class="form-section-title">Processing Controls</div>
+                <div class="form-row">
+                    <label for="forceFailureStage">Simulate Failure Stage</label>
+                    <select id="forceFailureStage">
+                        <option value="NONE">None — Process normally</option>
+                        <option value="CREATE">Fail at Creation</option>
+                        <option value="VALIDATE">Fail at Validation</option>
+                        <option value="SEND">Fail at Send</option>
+                    </select>
+                    <div class="hint">Testing only. Forces a deterministic failure at the specified processing stage.</div>
+                </div>
+
+                <div class="form-row">
+                    <label for="idempotencyKey">Idempotency Key <span class="text-muted text-sm" style="font-weight:400;">(auto-generated)</span></label>
+                    <input type="text" id="idempotencyKey" readonly aria-label="Idempotency Key"/>
+                    <div class="hint">Unique per submission. Prevents accidental duplicate payments on network retry.</div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:var(--sp-3);align-items:center;padding-top:var(--sp-2);">
+                <button type="submit" class="btn" id="submitBtn">Submit Payment</button>
+                <button type="button" class="btn ghost" onclick="document.getElementById('paymentForm').reset();syncCurrency();">Clear Form</button>
+            </div>
+
+        </form>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none;">
+        <h2>Payment Result</h2>
+        <div id="resultBody"></div>
+    </div>
+
+    <p class="footer-note">PayPulse · All transactions are logged and auditable</p>
 </main>
 
 <script src="js/api.js"></script>
 <script>
-let accounts = [];
-let currentSubmissionKey = null;
-let lastSourceCurrency = '';
+    /* ── Theme ── */
+    (function() {
+      const saved = localStorage.getItem('pp-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.getElementById('themeToggle').textContent = saved === 'dark' ? '☀️' : '🌙';
+    })();
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('pp-theme', next);
+      document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+    });
 
-async function loadAccounts() {
-  const sel = document.getElementById('sourceAccount');
-  try {
-    accounts = await Accounts.list();
-    const active = accounts.filter(a => a.status === 'ACTIVE');
-    sel.innerHTML = '<option value="">— Select source account —</option>' +
-      active.map(a => `<option value="${a.id}" data-currency="${a.currency}">${a.label} — ${a.accountNumber} (${a.currency})</option>`).join('');
-    if (!active.length) {
-      sel.innerHTML = '<option value="">No active accounts available</option>';
+    const CURRENCY_SYMBOL = { INR: '₹', USD: '$' };
+
+    let accounts = [];
+    let currentSubmissionKey = null;
+    let lastSourceCurrency = '';
+
+    async function loadAccounts() {
+      const sel = document.getElementById('sourceAccount');
+      try {
+        accounts = await Accounts.list();
+        const active = accounts.filter(a => a.status === 'ACTIVE');
+        sel.innerHTML = '<option value="">— Select debit account —</option>' +
+          active.map(a =>
+            `<option value="${a.id}" data-currency="${a.currency}">${a.label} · ${a.accountNumber} (${a.currency})</option>`
+          ).join('');
+        if (!active.length) {
+          sel.innerHTML = '<option value="">No active accounts available</option>';
+        }
+      } catch (err) {
+        sel.innerHTML = '<option value="">Could not load accounts</option>';
+      }
     }
-  } catch (err) {
-    sel.innerHTML = '<option value="">Could not load accounts</option>';
-  }
-}
 
-function syncCurrency() {
-  const opt = document.getElementById('sourceAccount').selectedOptions[0];
-  const sourceCurrency = opt ? (opt.dataset.currency || '') : '';
-  const targetEl = document.getElementById('targetCurrency');
-  document.getElementById('currency').value = sourceCurrency;
+    function syncCurrency() {
+      const opt = document.getElementById('sourceAccount').selectedOptions[0];
+      const sourceCurrency = opt ? (opt.dataset.currency || '') : '';
+      const targetEl = document.getElementById('targetCurrency');
+      document.getElementById('currency').value = sourceCurrency;
+      document.getElementById('currencyPrefix').textContent = CURRENCY_SYMBOL[sourceCurrency] || (sourceCurrency || '—');
 
-  if (!targetEl.dataset.userSelected || !targetEl.value || targetEl.value === lastSourceCurrency) {
-    targetEl.value = sourceCurrency || 'INR';
-  }
-  lastSourceCurrency = sourceCurrency;
-  updateConversionPreview();
-}
+      if (!targetEl.dataset.userSelected || !targetEl.value || targetEl.value === lastSourceCurrency) {
+        targetEl.value = sourceCurrency || 'INR';
+      }
+      lastSourceCurrency = sourceCurrency;
+      updateConversionPreview();
+    }
 
-document.getElementById('sourceAccount').addEventListener('change', syncCurrency);
-document.getElementById('targetCurrency').addEventListener('change', () => {
-  const targetEl = document.getElementById('targetCurrency');
-  targetEl.dataset.userSelected = 'true';
-  updateConversionPreview();
-});
-document.getElementById('amount').addEventListener('input', updateConversionPreview);
+    document.getElementById('sourceAccount').addEventListener('change', syncCurrency);
+    document.getElementById('targetCurrency').addEventListener('change', () => {
+      document.getElementById('targetCurrency').dataset.userSelected = 'true';
+      updateConversionPreview();
+    });
+    document.getElementById('amount').addEventListener('input', updateConversionPreview);
 
-function showCurrentKey() {
-  document.getElementById('idempotencyKey').value = currentSubmissionKey || '';
-}
+    function showCurrentKey() {
+      document.getElementById('idempotencyKey').value = currentSubmissionKey || '';
+    }
 
-function ensureSubmissionKey() {
-  if (!currentSubmissionKey) {
-    currentSubmissionKey = generateIdempotencyKey();
-  }
-  showCurrentKey();
-}
-
-function clearSubmissionKey() {
-  currentSubmissionKey = null;
-  showCurrentKey();
-}
-
-function isRetryableError(err) {
-  const retryableCodes = new Set(['NETWORK_ERROR', 'RATE_LIMIT_EXCEEDED', 'PROCESSING_ERROR', 'UNKNOWN']);
-  return retryableCodes.has((err && err.errorCode) || 'UNKNOWN');
-}
-
-async function updateConversionPreview() {
-  const previewEl = document.getElementById('conversionPreview');
-  const amount = Number(document.getElementById('amount').value);
-  const currency = document.getElementById('currency').value;
-  const targetCurrency = document.getElementById('targetCurrency').value;
-
-  if (!currency || !targetCurrency) {
-    previewEl.className = 'conversion-preview';
-    previewEl.textContent = 'Choose source account, amount, and payout currency to preview conversion.';
-    return;
-  }
-
-  if (!amount || amount <= 0) {
-    previewEl.className = 'conversion-preview';
-    previewEl.textContent = `Enter amount to preview payout in ${targetCurrency}.`;
-    return;
-  }
-
-  if (currency === targetCurrency) {
-    previewEl.className = 'conversion-preview';
-    previewEl.textContent = `Same-currency payout: ${formatMoney(amount, currency)}. FX rate used: 1.0.`;
-    return;
-  }
-
-  try {
-    const quote = await Fx.getRate(currency, targetCurrency);
-    const converted = Math.round(amount * Number(quote.rate) * 100) / 100;
-    previewEl.className = 'conversion-preview';
-    previewEl.textContent = `${formatMoney(amount, currency)} converts to ${formatMoney(converted, targetCurrency)} using ${formatRate(quote.rate, currency, targetCurrency)}.`;
-  } catch (err) {
-    previewEl.className = 'conversion-preview error';
-    previewEl.textContent = `${err.errorCode || 'FX_ERROR'}: ${err.message || 'Could not load conversion rate.'}`;
-  }
-}
-
-showCurrentKey();
-updateConversionPreview();
-
-document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const noticeEl = document.getElementById('formNotice');
-  noticeEl.innerHTML = '';
-
-  const sourceAccountId = document.getElementById('sourceAccount').value;
-  const amount = parseFloat(document.getElementById('amount').value);
-  const currency = document.getElementById('currency').value;
-  const targetCurrency = document.getElementById('targetCurrency').value;
-  const destinationAccount = document.getElementById('destinationAccount').value.trim();
-  const reference = document.getElementById('reference').value.trim();
-  const forceFailureStage = document.getElementById('forceFailureStage').value;
-  ensureSubmissionKey();
-  const idempotencyKey = currentSubmissionKey;
-
-  const submitBtn = document.getElementById('submitBtn');
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
-
-  try {
-    const payment = await Payments.create(
-      { sourceAccountId, amount, currency, targetCurrency, destinationAccount, reference, forceFailureStage },
-      idempotencyKey
-    );
-
-    const isOk = payment.status === 'COMPLETED';
-    const payout = payment.targetCurrency && payment.convertedAmount != null
-      ? `${formatMoney(payment.convertedAmount, payment.targetCurrency)} (${payment.targetCurrency})`
-      : formatMoney(payment.amount, payment.currency);
-    const resultCard = document.getElementById('resultCard');
-    resultCard.style.display = 'block';
-    document.getElementById('resultBody').innerHTML = `
-      <div class="notice ${isOk ? 'success' : 'error'}">
-        ${isOk ? 'Payment completed successfully.' : `Payment ${payment.status}: ${payment.errorMessage || payment.errorCode}`}
-      </div>
-      <dl class="field-list">
-        <dt>Payment ID</dt><dd>${payment.id}</dd>
-        <dt>Status</dt><dd>${badgeHtml(payment.status, payment.reversed)}</dd>
-        <dt>Debited</dt><dd>${formatMoney(payment.amount, payment.currency)}</dd>
-        <dt>Payout</dt><dd>${payout}</dd>
-        <dt>FX Rate</dt><dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>
-        <dt>Created</dt><dd>${formatDateTime(payment.createdAt)}</dd>
-      </dl>
-      <p style="margin-top:14px;">
-        <a class="btn ghost" href="payment-details.html?id=${encodeURIComponent(payment.id)}">View Full Details →</a>
-      </p>`;
-    resultCard.scrollIntoView({ behavior: 'smooth' });
-    clearSubmissionKey();
-    document.getElementById('forceFailureStage').value = 'NONE';
-  } catch (err) {
-    noticeEl.innerHTML = `<div class="notice error"><strong>${err.errorCode || 'ERROR'}</strong>: ${err.message || 'Submission failed.'}</div>`;
-
-    if (!isRetryableError(err)) {
-      // Non-retryable failures require user edits; next submit gets a new key.
-      clearSubmissionKey();
-    } else {
-      // Retryable failures keep the same key to preserve idempotency on retry.
+    function ensureSubmissionKey() {
+      if (!currentSubmissionKey) currentSubmissionKey = generateIdempotencyKey();
       showCurrentKey();
     }
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit Payment';
-  }
-});
 
-loadAccounts().then(() => {
-  syncCurrency();
-  updateConversionPreview();
-});
+    function clearSubmissionKey() {
+      currentSubmissionKey = null;
+      showCurrentKey();
+    }
+
+    function isRetryableError(err) {
+      return new Set(['NETWORK_ERROR', 'RATE_LIMIT_EXCEEDED', 'PROCESSING_ERROR', 'UNKNOWN'])
+        .has((err && err.errorCode) || 'UNKNOWN');
+    }
+
+    async function updateConversionPreview() {
+      const previewEl = document.getElementById('conversionPreview');
+      const amount = Number(document.getElementById('amount').value);
+      const currency = document.getElementById('currency').value;
+      const targetCurrency = document.getElementById('targetCurrency').value;
+
+      if (!currency || !targetCurrency) {
+        previewEl.className = 'conversion-preview';
+        previewEl.textContent = 'Select a source account and enter an amount to preview the FX conversion.';
+        return;
+      }
+
+      if (!amount || amount <= 0) {
+        previewEl.className = 'conversion-preview';
+        previewEl.textContent = `Enter a payment amount to preview the payout in ${targetCurrency}.`;
+        return;
+      }
+
+      if (currency === targetCurrency) {
+        previewEl.className = 'conversion-preview';
+        previewEl.textContent = `Same-currency transfer. Payout: ${formatMoney(amount, currency)} · No FX conversion applied.`;
+        return;
+      }
+
+      try {
+        const quote = await Fx.getRate(currency, targetCurrency);
+        const converted = Math.round(amount * Number(quote.rate) * 100) / 100;
+        previewEl.className = 'conversion-preview';
+        previewEl.textContent =
+          `${formatMoney(amount, currency)} → ${formatMoney(converted, targetCurrency)} · Rate: ${formatRate(quote.rate, currency, targetCurrency)}`;
+      } catch (err) {
+        previewEl.className = 'conversion-preview error';
+        previewEl.textContent = `${err.errorCode || 'FX_ERROR'}: ${err.message || 'Could not retrieve conversion rate.'}`;
+      }
+    }
+
+    showCurrentKey();
+    updateConversionPreview();
+
+    document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const noticeEl = document.getElementById('formNotice');
+      noticeEl.innerHTML = '';
+
+      const sourceAccountId  = document.getElementById('sourceAccount').value;
+      const amount           = parseFloat(document.getElementById('amount').value);
+      const currency         = document.getElementById('currency').value;
+      const targetCurrency   = document.getElementById('targetCurrency').value;
+      const destinationAccount = document.getElementById('destinationAccount').value.trim();
+      const reference        = document.getElementById('reference').value.trim();
+      const forceFailureStage = document.getElementById('forceFailureStage').value;
+      ensureSubmissionKey();
+      const idempotencyKey = currentSubmissionKey;
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Processing…';
+
+      try {
+        const payment = await Payments.create(
+          { sourceAccountId, amount, currency, targetCurrency, destinationAccount, reference, forceFailureStage },
+          idempotencyKey
+        );
+
+        const isOk = payment.status === 'COMPLETED';
+        const payout = payment.targetCurrency && payment.convertedAmount != null
+          ? `${formatMoney(payment.convertedAmount, payment.targetCurrency)} (${payment.targetCurrency})`
+          : formatMoney(payment.amount, payment.currency);
+
+        const resultCard = document.getElementById('resultCard');
+        resultCard.style.display = '';
+        document.getElementById('resultBody').innerHTML = `
+          <div class="notice ${isOk ? 'success' : 'error'}">
+            ${isOk
+              ? 'Payment submitted and settled successfully.'
+              : `Payment ${payment.status}: ${payment.errorMessage || payment.errorCode}`}
+          </div>
+          <dl class="field-list" style="margin-top:var(--sp-4);">
+            <dt>Payment ID</dt>   <dd class="mono">${payment.id}</dd>
+            <dt>Status</dt>       <dd>${badgeHtml(payment.status, payment.reversed)}</dd>
+            <dt>Debited</dt>      <dd>${formatMoney(payment.amount, payment.currency)}</dd>
+            <dt>Payout</dt>       <dd>${payout}</dd>
+            <dt>FX Rate</dt>      <dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>
+            <dt>Created</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
+          </dl>
+          <div style="margin-top:var(--sp-5);">
+            <a class="btn ghost" href="payment-details.html?id=${encodeURIComponent(payment.id)}">View Full Details →</a>
+          </div>`;
+        resultCard.scrollIntoView({ behavior: 'smooth' });
+        clearSubmissionKey();
+        document.getElementById('forceFailureStage').value = 'NONE';
+      } catch (err) {
+        noticeEl.innerHTML =
+          `<div class="notice error"><strong>${err.errorCode || 'ERROR'}</strong>: ${err.message || 'Submission failed.'}</div>`;
+        if (!isRetryableError(err)) {
+          clearSubmissionKey();
+        } else {
+          showCurrentKey();
+        }
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Submit Payment';
+      }
+    });
+
+    loadAccounts().then(() => { syncCurrency(); updateConversionPreview(); });
 </script>
 </body>
 </html>
-

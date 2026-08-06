@@ -1,232 +1,267 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<title>PayPulse — Dashboard</title>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<link rel="stylesheet" href="css/style.css"/>
+    <meta charset="UTF-8"/>
+    <title>PayPulse — Dashboard</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="logo">P</span> PayPulse</div>
-  <nav class="nav">
-    <a href="index.html">Dashboard</a>
-    <a href="accounts.html">Accounts</a>
-    <a href="create-payment.html">Create Payment</a>
-    <a href="payments.html">Payments</a>
-  </nav>
+    <div class="brand">
+        <span class="logo">P</span>
+        <span class="brand-name">PayPulse</span>
+        <span class="tag">LIVE</span>
+    </div>
+    <nav class="nav">
+        <a href="index.html">Dashboard</a>
+        <a href="accounts.html">Accounts</a>
+        <a href="create-payment.html">New Payment</a>
+        <a href="payments.html">Payments</a>
+    </nav>
+    <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
+    </div>
 </header>
 
 <main>
-  <div class="page-head">
-    <h1>Dashboard</h1>
-    <p id="subhead">Loading KPIs...</p>
-  </div>
-
-  <div id="kpiGrid" class="kpi-grid"></div>
-
-  <div class="card">
-    <h2>Volume by Currency</h2>
-    <div id="volumeGrid" class="kpi-grid"></div>
-  </div>
-
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <h2 id="trendTitle">Payments — Last 24 Hours (Trend)</h2>
-      <div style="display:flex;gap:10px;align-items:center;">
-        <label for="trendWindow" style="font-size:12px;font-weight:700;color:#374151;">Window</label>
-        <select id="trendWindow" aria-label="Trend window">
-          <option value="24">Last 24 hours</option>
-          <option value="48">Last 48 hours</option>
-          <option value="168">Last 7 days</option>
-        </select>
-        <label for="trendView" style="font-size:12px;font-weight:700;color:#374151;">View</label>
-        <select id="trendView" aria-label="Trend view mode">
-          <option value="status">Status Counts</option>
-          <option value="currency">Volume by Currency</option>
-        </select>
-      </div>
+    <div class="page-head">
+        <div class="page-head-text">
+            <h1>Dashboard</h1>
+            <p id="subhead">Fetching live metrics…</p>
+        </div>
     </div>
-    <div id="trendBars" class="bars"></div>
-    <div id="trendLegend" style="display:flex;gap:14px;margin-top:8px;font-size:11px;color:#6b7280;">
-      <span>🟢 Completed</span><span>🔴 Failed</span>
-    </div>
-  </div>
 
-  <div class="card">
-    <h2>Top Failure Reasons</h2>
-    <table class="table">
-      <thead><tr><th>Error Code</th><th id="failureWindowLabel">Count (last 24h)</th></tr></thead>
-      <tbody id="failureTable"></tbody>
-    </table>
-  </div>
+    <div class="section-label">Key Performance Indicators</div>
+    <div id="kpiGrid" class="kpi-grid"></div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Settled Volume by Currency</h2>
+        </div>
+        <div id="volumeGrid" class="kpi-grid" style="margin-bottom:0;"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 id="trendTitle">Payment Activity — Last 24 Hours</h2>
+            <div class="chart-controls">
+                <div class="chart-control-group">
+                    <label for="trendWindow">Window</label>
+                    <select id="trendWindow" aria-label="Trend window">
+                        <option value="24">Last 24 hours</option>
+                        <option value="48">Last 48 hours</option>
+                        <option value="168">Last 7 days</option>
+                    </select>
+                </div>
+                <div class="chart-control-group">
+                    <label for="trendView">View</label>
+                    <select id="trendView" aria-label="Trend view mode">
+                        <option value="status">Status Counts</option>
+                        <option value="currency">Volume by Currency</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="trendBars" class="bars"></div>
+        <div id="trendLegend" class="trend-legend"></div>
+    </div>
+
+    <div class="card" style="padding:0;">
+        <div class="card-header" style="padding: 16px 20px 0;">
+            <h2>Top Failure Reasons</h2>
+            <span id="failureWindowLabel" class="text-muted text-sm"></span>
+        </div>
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Error Code</th>
+                <th style="text-align:right;">Occurrences</th>
+            </tr>
+            </thead>
+            <tbody id="failureTable"></tbody>
+        </table>
+    </div>
+
+    <p class="footer-note">PayPulse · Real-time data via SSE · Refreshes automatically</p>
 </main>
+
 <script src="js/api.js"></script>
 <script>
-let currentTrendHours = 24;
-let currentTrendView = 'status';
+    /* ── Theme ── */
+    (function() {
+      const saved = localStorage.getItem('pp-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.getElementById('themeToggle').textContent = saved === 'dark' ? '☀️' : '🌙';
+    })();
 
-async function loadDashboard() {
-  try {
-    const summary = await Analytics.summary();
-    updateDashboardFromSummary(summary);
-    await updateTrend();
-  } catch (err) {
-    document.getElementById('subhead').textContent = '';
-    document.getElementById('kpiGrid').innerHTML =
-      `<div class="notice error">Could not load KPIs: ${err.message || 'Unknown error'}. Is the backend running?</div>`;
-  }
-}
-
-async function updateTrend() {
-  try {
-    const trend = await Analytics.trend(currentTrendHours);
-    const buckets = trend.buckets || [];
-    renderTrend(buckets);
-    document.getElementById('trendTitle').textContent =
-      `Payments - Last ${currentTrendHours} Hours (Trend)`;
-    document.getElementById('failureWindowLabel').textContent =
-      `Count (last ${currentTrendHours}h)`;
-  } catch (_) {
-    document.getElementById('trendBars').innerHTML =
-      '<div class="empty-state">Could not load trend data.</div>';
-  }
-}
-
-function renderTrend(buckets) {
-  const shown = buckets.slice(-Math.min(24, buckets.length));
-  const barsEl = document.getElementById('trendBars');
-  const legendEl = document.getElementById('trendLegend');
-
-  if (!shown.length) {
-    barsEl.innerHTML = '<div class="empty-state">No data for the selected window.</div>';
-    legendEl.innerHTML = '';
-    return;
-  }
-
-  if (currentTrendView === 'currency') {
-    const maxVal = Math.max(1, ...shown.map(b => {
-      const vol = b.volumeByCurrency || {};
-      return Number(vol.INR || 0) + Number(vol.USD || 0);
-    }));
-
-    barsEl.innerHTML = shown.map(b => {
-      const vol = b.volumeByCurrency || {};
-      const inr = Number(vol.INR || 0);
-      const usd = Number(vol.USD || 0);
-      const total = inr + usd;
-      const inrH = total > 0 ? Math.round((inr / maxVal) * 100) : 0;
-      const usdH = total > 0 ? Math.round((usd / maxVal) * 100) : 0;
-      const label = new Date(b.periodStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      return `<div class="bar-col">
-        <div class="bar completed" style="height:${inrH}%" title="INR ${inr.toFixed(2)}"></div>
-        <div class="bar failed" style="height:${usdH}%" title="USD ${usd.toFixed(2)}"></div>
-        <div class="bar-label">${label}</div>
-      </div>`;
-    }).join('');
-
-    legendEl.innerHTML = '<span>INR Volume</span><span>USD Volume</span>';
-    return;
-  }
-
-  const maxVal = Math.max(1, ...shown.map(b => Math.max(b.created || 0, b.completed || 0, b.failed || 0)));
-  barsEl.innerHTML = shown.map(b => {
-    const cH = Math.round(((b.completed || 0) / maxVal) * 100);
-    const fH = Math.round(((b.failed || 0) / maxVal) * 100);
-    const label = new Date(b.periodStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `<div class="bar-col">
-      <div class="bar completed" style="height:${cH}%" title="${b.completed || 0} completed"></div>
-      <div class="bar failed" style="height:${fH}%" title="${b.failed || 0} failed"></div>
-      <div class="bar-label">${label}</div>
-    </div>`;
-  }).join('');
-  legendEl.innerHTML = '<span>Completed</span><span>Failed</span>';
-}
-
-function updateDashboardFromSummary(summary) {
-  document.getElementById('subhead').textContent = 'Live data - updates in real time via SSE.';
-
-  document.getElementById('kpiGrid').innerHTML = [
-    kpiCard('Total Payments', summary.totalPayments, ''),
-    kpiCard('Success Rate', summary.successRatePct.toFixed(1) + '%', 'green', 'COMPLETED / terminal'),
-    kpiCard('Failure Rate', summary.failureRatePct.toFixed(1) + '%', 'red', 'FAILED / terminal'),
-    kpiCard('Avg. Processing Time', summary.avgProcessingTimeSeconds.toFixed(2) + 's', 'blue', 'CREATED to COMPLETED'),
-    kpiCard('Throughput', summary.throughputPerMinute.toFixed(1) + '/min', 'blue', 'trailing window')
-  ].join('');
-
-  const vol = summary.volumeByCurrency || {};
-  document.getElementById('volumeGrid').innerHTML =
-    kpiCard('INR Volume', formatMoney(vol.INR || 0, 'INR'), '', 'sum of COMPLETED INR payments') +
-    kpiCard('USD Volume', formatMoney(vol.USD || 0, 'USD'), '', 'sum of COMPLETED USD payments');
-
-  const reasons = summary.topFailureReasons || {};
-  const tbody = document.getElementById('failureTable');
-  const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
-  if (entries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="2" class="empty-state">No failures in the last ${currentTrendHours}h</td></tr>`;
-  } else {
-    tbody.innerHTML = entries.map(([code, count]) =>
-      `<tr><td><code>${code}</code></td><td>${count}</td></tr>`
-    ).join('');
-  }
-}
-
-function kpiCard(label, value, colorClass, sub) {
-  return `<div class="kpi-card ${colorClass}">
-    <div class="label">${label}</div>
-    <div class="value">${value}</div>
-    ${sub ? `<div class="sub">${sub}</div>` : ''}
-  </div>`;
-}
-
-document.getElementById('trendWindow').addEventListener('change', async (e) => {
-  currentTrendHours = parseInt(e.target.value, 10) || 24;
-  await updateTrend();
-  await loadDashboard();
-});
-
-document.getElementById('trendView').addEventListener('change', (e) => {
-  currentTrendView = e.target.value;
-  updateTrend();
-});
-
-// SSE: replace 30s poll with server-sent events (MEM-027)
-(function initSSE() {
-  if (!window.EventSource) {
-    setInterval(loadDashboard, 30000);
-    return;
-  }
-
-  let retryCount = 0;
-  function connect() {
-    const es = new EventSource('/api/v1/analytics/stream');
-    es.addEventListener('kpi', (e) => {
-      try {
-        const summary = JSON.parse(e.data);
-        updateDashboardFromSummary(summary);
-        updateTrend();
-        retryCount = 0;
-      } catch (_) {}
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('pp-theme', next);
+      document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
     });
 
-    es.onerror = () => {
-      es.close();
-      retryCount++;
-      if (retryCount >= 5) {
-        setInterval(loadDashboard, 30000);
+    let currentTrendHours = 24;
+    let currentTrendView = 'status';
+
+    async function loadDashboard() {
+      try {
+        const summary = await Analytics.summary();
+        updateDashboardFromSummary(summary);
+        await updateTrend();
+      } catch (err) {
+        document.getElementById('subhead').textContent = 'Unable to load data.';
+        document.getElementById('kpiGrid').innerHTML =
+          `<div class="notice error">Could not load KPIs: ${err.message || 'Unknown error'}. Verify the backend is running.</div>`;
+      }
+    }
+
+    async function updateTrend() {
+      try {
+        const trend = await Analytics.trend(currentTrendHours);
+        renderTrend(trend.buckets || []);
+        const label = currentTrendHours < 48
+          ? `Last ${currentTrendHours} Hours`
+          : currentTrendHours === 168 ? 'Last 7 Days' : `Last ${currentTrendHours} Hours`;
+        document.getElementById('trendTitle').textContent = `Payment Activity — ${label}`;
+        document.getElementById('failureWindowLabel').textContent = `Last ${currentTrendHours}h`;
+      } catch (_) {
+        document.getElementById('trendBars').innerHTML =
+          '<div class="empty-state"><span class="empty-state-icon">📊</span>No trend data available.</div>';
+      }
+    }
+
+    function renderTrend(buckets) {
+      const shown = buckets.slice(-Math.min(24, buckets.length));
+      const barsEl = document.getElementById('trendBars');
+      const legendEl = document.getElementById('trendLegend');
+
+      if (!shown.length) {
+        barsEl.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📊</span>No data for the selected window.</div>';
+        legendEl.innerHTML = '';
         return;
       }
-      setTimeout(connect, Math.min(30000, 1000 * Math.pow(2, retryCount)));
-    };
-  }
 
-  connect();
-})();
+      if (currentTrendView === 'currency') {
+        const maxVal = Math.max(1, ...shown.map(b => {
+          const vol = b.volumeByCurrency || {};
+          return Number(vol.INR || 0) + Number(vol.USD || 0);
+        }));
 
-loadDashboard();
+        barsEl.innerHTML = shown.map(b => {
+          const vol = b.volumeByCurrency || {};
+          const inr = Number(vol.INR || 0);
+          const usd = Number(vol.USD || 0);
+          const inrH = Math.max(0, Math.round((inr / maxVal) * 120));
+          const usdH = Math.max(0, Math.round((usd / maxVal) * 120));
+          const label = new Date(b.periodStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return `<div class="bar-col">
+            <div class="bar completed" style="height:${inrH}px;background:var(--bar-inr);" title="INR ${inr.toFixed(2)}"></div>
+            <div class="bar failed"    style="height:${usdH}px;background:var(--bar-usd);" title="USD ${usd.toFixed(2)}"></div>
+            <div class="bar-label">${label}</div>
+          </div>`;
+        }).join('');
+
+        legendEl.innerHTML = `
+          <div class="legend-item"><span class="legend-dot inr"></span>INR Volume</div>
+          <div class="legend-item"><span class="legend-dot usd"></span>USD Volume</div>`;
+        return;
+      }
+
+      const maxVal = Math.max(1, ...shown.map(b => Math.max(b.completed || 0, b.failed || 0)));
+      barsEl.innerHTML = shown.map(b => {
+        const cH = Math.max(0, Math.round(((b.completed || 0) / maxVal) * 120));
+        const fH = Math.max(0, Math.round(((b.failed || 0) / maxVal) * 120));
+        const label = new Date(b.periodStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `<div class="bar-col">
+          <div class="bar completed" style="height:${cH}px;" title="${b.completed || 0} completed"></div>
+          <div class="bar failed"    style="height:${fH}px;" title="${b.failed || 0} failed"></div>
+          <div class="bar-label">${label}</div>
+        </div>`;
+      }).join('');
+
+      legendEl.innerHTML = `
+        <div class="legend-item"><span class="legend-dot completed"></span>Completed</div>
+        <div class="legend-item"><span class="legend-dot failed"></span>Failed</div>`;
+    }
+
+    function updateDashboardFromSummary(summary) {
+      document.getElementById('subhead').textContent = 'Live data — updates in real time via SSE.';
+
+      document.getElementById('kpiGrid').innerHTML = [
+        kpiCard('Total Payments',        summary.totalPayments,                         '',      'All-time transaction count'),
+        kpiCard('Success Rate',          summary.successRatePct.toFixed(1) + '%',       'green', 'COMPLETED / terminal'),
+        kpiCard('Failure Rate',          summary.failureRatePct.toFixed(1) + '%',       'red',   'FAILED / terminal'),
+        kpiCard('Avg. Processing Time',  summary.avgProcessingTimeSeconds.toFixed(2) + 's', 'blue', 'CREATED → COMPLETED'),
+        kpiCard('Throughput',            summary.throughputPerMinute.toFixed(1) + '/min', 'blue', 'Trailing window')
+      ].join('');
+
+      const vol = summary.volumeByCurrency || {};
+      document.getElementById('volumeGrid').innerHTML =
+        kpiCard('INR Settled', formatMoney(vol.INR || 0, 'INR'), '', 'Sum of COMPLETED INR payments') +
+        kpiCard('USD Settled', formatMoney(vol.USD || 0, 'USD'), '', 'Sum of COMPLETED USD payments');
+
+      const reasons = summary.topFailureReasons || {};
+      const tbody = document.getElementById('failureTable');
+      const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
+
+      if (!entries.length) {
+        tbody.innerHTML = `<tr><td colspan="2"><div class="empty-state" style="padding:24px;">No failures recorded in this window.</div></td></tr>`;
+      } else {
+        tbody.innerHTML = entries.map(([code, count]) =>
+          `<tr>
+            <td><span class="failure-code">${code}</span></td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;">${count}</td>
+          </tr>`
+        ).join('');
+      }
+    }
+
+    function kpiCard(label, value, colorClass, sub) {
+      return `<div class="kpi-card ${colorClass}">
+        <div class="label">${label}</div>
+        <div class="value">${value}</div>
+        ${sub ? `<div class="sub">${sub}</div>` : ''}
+      </div>`;
+    }
+
+    document.getElementById('trendWindow').addEventListener('change', async (e) => {
+      currentTrendHours = parseInt(e.target.value, 10) || 24;
+      await updateTrend();
+      await loadDashboard();
+    });
+
+    document.getElementById('trendView').addEventListener('change', (e) => {
+      currentTrendView = e.target.value;
+      updateTrend();
+    });
+
+    (function initSSE() {
+      if (!window.EventSource) { setInterval(loadDashboard, 30000); return; }
+      let retryCount = 0;
+      function connect() {
+        const es = new EventSource('/api/v1/analytics/stream');
+        es.addEventListener('kpi', (e) => {
+          try {
+            updateDashboardFromSummary(JSON.parse(e.data));
+            updateTrend();
+            retryCount = 0;
+          } catch (_) {}
+        });
+        es.onerror = () => {
+          es.close();
+          retryCount++;
+          if (retryCount >= 5) { setInterval(loadDashboard, 30000); return; }
+          setTimeout(connect, Math.min(30000, 1000 * Math.pow(2, retryCount)));
+        };
+      }
+      connect();
+    })();
+
+    loadDashboard();
 </script>
 </body>
 </html>
-
