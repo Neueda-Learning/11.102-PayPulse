@@ -63,7 +63,7 @@ services:
       MAIL_ENABLED: ${MAIL_ENABLED}
       APP_BASE_URL: ${APP_BASE_URL}
 
-      PAYPULSE_CORS_ALLOWED_ORIGINS: http://10.9.67.127:8085,http://localhost:8080
+      PAYPULSE_CORS_ALLOWED_ORIGINS: http://10.9.67.127:8085,http://localhost:8080,http://10.9.73.100:8085
 
     ports:
       - "8088:8080"
