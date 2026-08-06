@@ -63,10 +63,48 @@
 
 <script src="js/api.js"></script>
 <script>
+async function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'absolute';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
+
+function showCopyNotice(message) {
+  const existing = document.getElementById('copy-notice');
+  if (existing) existing.remove();
+  const notice = document.createElement('div');
+  notice.id = 'copy-notice';
+  notice.className = 'notice success';
+  notice.textContent = message;
+  const main = document.querySelector('main');
+  main.prepend(notice);
+  setTimeout(() => notice.remove(), 1800);
+}
+
+async function copyPaymentId(event, id) {
+  event.stopPropagation();
+  event.preventDefault();
+  try {
+    await copyToClipboard(id);
+    showCopyNotice('Payment ID copied.');
+  } catch (_) {
+    alert('Could not copy payment ID.');
+  }
+}
+
 let currentPage = 0;
 let totalPages = 0;
 let accountMap = {};
-
 let currentSort = 'createdAt';
 let currentDir = 'desc';
 
@@ -82,7 +120,7 @@ function setSort(field) {
 }
 
 function updateSortIndicators() {
-  ['amount','status','createdAt'].forEach(f => {
+  ['amount', 'status', 'createdAt'].forEach(f => {
     const el = document.getElementById('sort-' + f);
     if (el) el.textContent = currentSort === f ? (currentDir === 'asc' ? '▲' : '▼') : '';
   });
@@ -115,7 +153,12 @@ async function loadPayments(page = 0) {
 
     tbody.innerHTML = data.content.map(p => `
       <tr class="clickable" onclick="window.location.href='payment-details.html?id=${encodeURIComponent(p.id)}'">
-        <td><code style="font-size:11px;">${p.id}</code></td>
+        <td>
+          <code style="font-size:11px;">${p.id}</code>
+          <span class="inline-actions">
+            <button type="button" class="btn ghost copy-btn" onclick="copyPaymentId(event, '${p.id}')">Copy</button>
+          </span>
+        </td>
         <td>${accountMap[p.sourceAccountId] || p.sourceAccountId}</td>
         <td>${p.destinationAccount}</td>
         <td>${formatMoney(p.amount, p.currency)}</td>

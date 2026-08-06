@@ -33,6 +33,36 @@
 
 <script src="js/api.js"></script>
 <script>
+async function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  // Fallback for older browser contexts.
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'absolute';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
+
+function showCopyNotice(message) {
+  const content = document.getElementById('content');
+  const existing = document.getElementById('copy-notice');
+  if (existing) existing.remove();
+  const note = document.createElement('div');
+  note.id = 'copy-notice';
+  note.className = 'notice success';
+  note.textContent = message;
+  content.prepend(note);
+  setTimeout(() => note.remove(), 1800);
+}
+
 async function loadPaymentDetails() {
   const id = getQueryParam('id');
   const content = document.getElementById('content');
@@ -75,11 +105,76 @@ async function loadPaymentDetails() {
       ? `<button class="btn" id="reverse-btn" style="margin-top:12px;">Reverse Payment</button>`
       : '';
 
+    const reversalLink = payment.reversalPaymentId
+      ? `<dt>Reversed By</dt><dd><a href="payment-details.html?id=${payment.reversalPaymentId}">${payment.reversalPaymentId}</a></dd>`
+        <h2>
+          Payment
+          <code style="font-size:13px;">${payment.id}</code>
+          <span class="inline-actions">
+            <button type="button" class="btn ghost copy-btn" id="copy-id-btn">Copy ID</button>
+            <button type="button" class="btn ghost copy-btn" id="copy-link-btn">Copy Link</button>
+          </span>
+          &nbsp; ${badgeHtml(payment.status)}
+        </h2>
+
+    const reversalOfLink = payment.reversalOfPaymentId
+      ? `<dt>Reversal Of</dt><dd><a href="payment-details.html?id=${payment.reversalOfPaymentId}">${payment.reversalOfPaymentId}</a></dd>`
+      : '';
+
+    const cancelBtn = payment.status === 'CREATED'
+      ? `<button class="btn" id="cancel-btn" style="margin-top:12px;">Cancel Payment</button>`
+      : '';
+
+          ${reversalLink}
+          ${reversalOfLink}
+    const reverseBtn = (payment.status === 'COMPLETED' && !payment.reversed)
+        ${cancelBtn}
+        ${reverseBtn}
+      ? `<button class="btn" id="reverse-btn" style="margin-top:12px;">Reverse Payment</button>`
+      : '';
+
     content.innerHTML = `
       <div class="card">
         <h2>Payment <code style="font-size:13px;">${payment.id}</code> &nbsp; ${badgeHtml(payment.status)}</h2>
         ${errorBlock}
         <dl class="field-list">
+    document.getElementById('cancel-btn')?.addEventListener('click', async () => {
+      try {
+        await Payments.cancel(id);
+        loadPaymentDetails();
+      } catch (err) {
+        alert(`Cancel failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
+      }
+    });
+
+    document.getElementById('reverse-btn')?.addEventListener('click', async () => {
+      try {
+        await Payments.reverse(id);
+        loadPaymentDetails();
+      } catch (err) {
+        alert(`Reverse failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
+      }
+    });
+
+    document.getElementById('copy-id-btn')?.addEventListener('click', async () => {
+      try {
+        await copyToClipboard(payment.id);
+        showCopyNotice('Payment ID copied.');
+      } catch (_) {
+        alert('Could not copy payment ID.');
+      }
+    });
+
+    document.getElementById('copy-link-btn')?.addEventListener('click', async () => {
+      try {
+        const deepLink = `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(payment.id)}`;
+        await copyToClipboard(deepLink);
+        showCopyNotice('Deep link copied.');
+      } catch (_) {
+        alert('Could not copy deep link.');
+      }
+    });
+
           <dt>Source Account</dt><dd>${accountLabel}</dd>
           <dt>Destination</dt>  <dd>${payment.destinationAccount}</dd>
           <dt>Amount</dt>       <dd>${formatMoney(payment.amount, payment.currency)}</dd>
