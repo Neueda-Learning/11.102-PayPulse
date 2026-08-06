@@ -1,215 +1,256 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<title>PayPulse — Payment Details</title>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<link rel="stylesheet" href="css/style.css"/>
+    <meta charset="UTF-8"/>
+    <title>PayPulse — Payment Details</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="logo">P</span> PayPulse</div>
-  <nav class="nav">
-    <a href="index.html">Dashboard</a>
-    <a href="accounts.html">Accounts</a>
-    <a href="create-payment.html">Create Payment</a>
-    <a href="payments.html">Payments</a>
-  </nav>
+    <div class="brand">
+        <span class="logo">P</span>
+        <span class="brand-name">PayPulse</span>
+        <span class="tag">LIVE</span>
+    </div>
+    <nav class="nav">
+        <a href="index.html">Dashboard</a>
+        <a href="accounts.html">Accounts</a>
+        <a href="create-payment.html">New Payment</a>
+        <a href="payments.html">Payments</a>
+    </nav>
+    <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
+    </div>
 </header>
 
 <main>
-  <div class="page-head">
-    <h1>Payment Details</h1>
-    <a href="payments.html" class="btn ghost" style="margin-top:8px;">← Back to Payments</a>
-  </div>
-
-  <div id="content">
-    <div class="card">
-      <div class="empty-state"><span class="spinner"></span> Loading payment...</div>
+    <div class="page-head">
+        <div class="page-head-text">
+            <h1>Payment Details</h1>
+            <p>Full transaction record including audit trail and lifecycle history.</p>
+        </div>
+        <div class="page-head-actions">
+            <a href="payments.html" class="btn ghost">← Back to Payments</a>
+        </div>
     </div>
-  </div>
+
+    <div id="content">
+        <div class="card">
+            <div class="empty-state"><span class="spinner"></span> Loading payment record…</div>
+        </div>
+    </div>
+
+    <p class="footer-note">PayPulse · All payment records are immutable and fully auditable</p>
 </main>
 
 <script src="js/api.js"></script>
 <script>
-async function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
+    /* ── Theme ── */
+    (function() {
+      const saved = localStorage.getItem('pp-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.getElementById('themeToggle').textContent = saved === 'dark' ? '☀️' : '🌙';
+    })();
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('pp-theme', next);
+      document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+    });
 
-  // Fallback for older browser contexts.
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.setAttribute('readonly', '');
-  ta.style.position = 'absolute';
-  ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  ta.remove();
-}
-
-function showCopyNotice(message) {
-  const existing = document.getElementById('copy-notice');
-  if (existing) existing.remove();
-  const notice = document.createElement('div');
-  notice.id = 'copy-notice';
-  notice.className = 'notice success';
-  notice.textContent = message;
-  document.querySelector('main').prepend(notice);
-  setTimeout(() => notice.remove(), 1800);
-}
-
-async function loadPaymentDetails() {
-  const id = getQueryParam('id');
-  const content = document.getElementById('content');
-
-  if (!id) {
-    content.innerHTML = '<div class="notice error">No payment ID specified.</div>';
-    return;
-  }
-
-  try {
-    const [payment, history] = await Promise.all([
-      Payments.getById(id),
-      Payments.getHistory(id)
-    ]);
-
-    // Try to resolve source account label
-    let accountLabel = payment.sourceAccountId;
-    try {
-      const acc = await Accounts.getById(payment.sourceAccountId);
-      accountLabel = `${acc.label} — ${acc.accountNumber} (${acc.currency})`;
-    } catch (_) {}
-
-    const errorBlock = payment.status === 'FAILED'
-      ? `<div class="notice error"><strong>${payment.errorCode}</strong>: ${payment.errorMessage || ''}</div>`
-      : '';
-
-    const reversalLink = payment.reversalPaymentId
-      ? `<dt>Reversed By</dt><dd><a href="payment-details.html?id=${payment.reversalPaymentId}">${payment.reversalPaymentId}</a></dd>`
-      : '';
-
-    const reversalOfLink = payment.reversalOfPaymentId
-      ? `<dt>Reversal Of</dt><dd><a href="payment-details.html?id=${payment.reversalOfPaymentId}">${payment.reversalOfPaymentId}</a></dd>`
-      : '';
-
-    const cancelBtn = payment.status === 'CREATED'
-      ? `<button class="btn" id="cancel-btn" style="margin-top:12px;">Cancel Payment</button>`
-      : '';
-
-    const reverseBtn = (payment.status === 'COMPLETED' && !payment.reversed)
-      ? `<button class="btn" id="reverse-btn" style="margin-top:12px;">Reverse Payment</button>`
-      : '';
-
-    const payoutAmount = payment.targetCurrency && payment.convertedAmount != null
-      ? `${formatMoney(payment.convertedAmount, payment.targetCurrency)}${payment.targetCurrency !== payment.currency ? ` <span class="subtle-meta">${formatRate(payment.fxRate, payment.currency, payment.targetCurrency)}</span>` : ''}`
-      : formatMoney(payment.amount, payment.currency);
-
-    content.innerHTML = `
-      <div class="card">
-        <h2>
-          Payment <code style="font-size:13px;">${payment.id}</code>
-          <span class="inline-actions">
-            <button type="button" class="btn ghost copy-btn" id="copy-id-btn">Copy ID</button>
-            <button type="button" class="btn ghost copy-btn" id="copy-link-btn">Copy Link</button>
-          </span>
-          &nbsp; ${badgeHtml(payment.status, payment.reversed)}
-        </h2>
-        ${errorBlock}
-        <dl class="field-list">
-          <dt>Source Account</dt><dd>${accountLabel}</dd>
-          <dt>Destination</dt>  <dd>${payment.destinationAccount}</dd>
-          <dt>Debited</dt>      <dd>${formatMoney(payment.amount, payment.currency)}</dd>
-          <dt>Source Currency</dt><dd>${payment.currency}</dd>
-          <dt>Payout Currency</dt><dd>${payment.targetCurrency || payment.currency}</dd>
-          <dt>Payout Amount</dt><dd>${payoutAmount}</dd>
-          <dt>FX Rate</dt>      <dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>
-          <dt>Reference</dt>    <dd>${payment.reference || '<span style="color:#9aa1ab;">(none)</span>'}</dd>
-          <dt>Created</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
-          <dt>Updated</dt>      <dd>${formatDateTime(payment.updatedAt)}</dd>
-          ${reversalLink}
-          ${reversalOfLink}
-        </dl>
-        ${cancelBtn}
-        ${reverseBtn}
-      </div>
-
-      <div class="card">
-        <h2>Status History (Audit Trail)</h2>
-        <ul class="timeline" id="timeline"></ul>
-      </div>
-    `;
-
-    document.getElementById('copy-id-btn')?.addEventListener('click', async () => {
-      try {
-        await copyToClipboard(payment.id);
-        showCopyNotice('Payment ID copied.');
-      } catch (_) {
-        alert('Could not copy payment ID.');
+    async function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
       }
-    });
-
-    document.getElementById('copy-link-btn')?.addEventListener('click', async () => {
-      try {
-        const deepLink = `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(payment.id)}`;
-        await copyToClipboard(deepLink);
-        showCopyNotice('Deep link copied.');
-      } catch (_) {
-        alert('Could not copy deep link.');
-      }
-    });
-
-
-    document.getElementById('cancel-btn')?.addEventListener('click', async () => {
-      try {
-        await Payments.cancel(id);
-        loadPaymentDetails();
-      } catch (err) {
-        alert(`Cancel failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
-      }
-    });
-
-    document.getElementById('reverse-btn')?.addEventListener('click', async () => {
-      try {
-        await Payments.reverse(id);
-        loadPaymentDetails();
-      } catch (err) {
-        alert(`Reverse failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
-      }
-    });
-
-    const timeline = document.getElementById('timeline');
-    (history || []).forEach(h => {
-      const li = document.createElement('li');
-      const sameStatus = h.previousStatus && h.previousStatus === h.newStatus;
-      const desc = sameStatus
-        ? (h.errorMessage || `${h.newStatus} (updated)`)
-        : (h.previousStatus
-            ? `${h.previousStatus} → ${h.newStatus}`
-            : `Payment created (${h.newStatus})`);
-      const errPart = h.errorCode
-        ? ` <span style="color:#b91c1c;">(${h.errorCode}: ${h.errorMessage || ''})</span>`
-        : (!sameStatus && h.errorMessage
-            ? ` <span style="color:#2563eb;">(${h.errorMessage})</span>`
-            : '');
-      li.innerHTML = `<span class="t-time">${formatDateTime(h.occurredAt)}</span><span>${desc}${errPart}</span>`;
-      timeline.appendChild(li);
-    });
-
-  } catch (err) {
-    if (err.errorCode === 'PAYMENT_NOT_FOUND') {
-      content.innerHTML = `<div class="card"><div class="notice error">PAYMENT_NOT_FOUND: No payment found with id <code>${id}</code>.</div></div>`;
-    } else {
-      content.innerHTML = `<div class="card"><div class="notice error">Could not load payment: ${err.message || 'Unknown error'}</div></div>`;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:absolute;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
     }
-  }
-}
 
-loadPaymentDetails();
+    function showCopyNotice(message) {
+      const existing = document.getElementById('copy-notice');
+      if (existing) existing.remove();
+      const notice = document.createElement('div');
+      notice.id = 'copy-notice';
+      notice.className = 'notice success';
+      notice.style.cssText = 'position:fixed;top:72px;right:16px;z-index:300;max-width:280px;';
+      notice.textContent = message;
+      document.body.appendChild(notice);
+      setTimeout(() => notice.remove(), 1800);
+    }
+
+    async function loadPaymentDetails() {
+      const id = getQueryParam('id');
+      const content = document.getElementById('content');
+
+      if (!id) {
+        content.innerHTML = '<div class="notice error">No payment ID specified in the URL.</div>';
+        return;
+      }
+
+      try {
+        const [payment, history] = await Promise.all([
+          Payments.getById(id),
+          Payments.getHistory(id)
+        ]);
+
+        let accountLabel = payment.sourceAccountId;
+        try {
+          const acc = await Accounts.getById(payment.sourceAccountId);
+          accountLabel = `${acc.label} · ${acc.accountNumber} (${acc.currency})`;
+        } catch (_) {}
+
+        const errorBlock = payment.status === 'FAILED'
+          ? `<div class="notice error" style="margin-bottom:var(--sp-4);">
+               <strong>${payment.errorCode}</strong>: ${payment.errorMessage || ''}
+             </div>`
+          : '';
+
+        const reversalLink = payment.reversalPaymentId
+          ? `<dt>Reversed By</dt>
+             <dd><a href="payment-details.html?id=${payment.reversalPaymentId}"
+                   style="color:var(--text-link);">${payment.reversalPaymentId}</a></dd>`
+          : '';
+
+        const reversalOfLink = payment.reversalOfPaymentId
+          ? `<dt>Reversal Of</dt>
+             <dd><a href="payment-details.html?id=${payment.reversalOfPaymentId}"
+                   style="color:var(--text-link);">${payment.reversalOfPaymentId}</a></dd>`
+          : '';
+
+        const cancelBtn = payment.status === 'CREATED'
+          ? `<button class="btn danger" id="cancel-btn">Cancel Payment</button>`
+          : '';
+
+        const reverseBtn = (payment.status === 'COMPLETED' && !payment.reversed)
+          ? `<button class="btn ghost" id="reverse-btn">Reverse Payment</button>`
+          : '';
+
+        const payoutAmount = payment.targetCurrency && payment.convertedAmount != null
+          ? `${formatMoney(payment.convertedAmount, payment.targetCurrency)}
+             ${payment.targetCurrency !== payment.currency
+               ? `<span class="subtle-meta">${formatRate(payment.fxRate, payment.currency, payment.targetCurrency)}</span>`
+               : ''}`
+          : formatMoney(payment.amount, payment.currency);
+
+        content.innerHTML = `
+          <div class="card">
+            <div class="card-header">
+              <div style="display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;">
+                <h2 style="margin:0;">Transaction Record</h2>
+                ${badgeHtml(payment.status, payment.reversed)}
+              </div>
+              <div class="inline-actions">
+                <button type="button" class="btn ghost btn-sm" id="copy-id-btn">Copy ID</button>
+                <button type="button" class="btn ghost btn-sm" id="copy-link-btn">Copy Link</button>
+              </div>
+            </div>
+
+            ${errorBlock}
+
+            <dl class="field-list">
+              <dt>Payment ID</dt>      <dd class="mono">${payment.id}</dd>
+              <dt>Source Account</dt>  <dd>${accountLabel}</dd>
+              <dt>Destination</dt>     <dd class="mono">${payment.destinationAccount}</dd>
+              <dt>Debited Amount</dt>  <dd style="font-weight:600;">${formatMoney(payment.amount, payment.currency)}</dd>
+              <dt>Source Currency</dt> <dd>${payment.currency}</dd>
+              <dt>Payout Currency</dt> <dd>${payment.targetCurrency || payment.currency}</dd>
+              <dt>Payout Amount</dt>   <dd>${payoutAmount}</dd>
+              <dt>FX Rate</dt>         <dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>
+              <dt>Reference</dt>       <dd>${payment.reference || '<span class="text-muted">None</span>'}</dd>
+              <dt>Created At</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
+              <dt>Last Updated</dt>    <dd>${formatDateTime(payment.updatedAt)}</dd>
+              ${reversalLink}
+              ${reversalOfLink}
+            </dl>
+
+            ${(cancelBtn || reverseBtn) ? `
+              <div style="display:flex;gap:var(--sp-2);margin-top:var(--sp-5);padding-top:var(--sp-4);border-top:1px solid var(--border-subtle);">
+                ${cancelBtn}
+                ${reverseBtn}
+              </div>` : ''}
+          </div>
+
+          <div class="card">
+            <h2>Audit Trail</h2>
+            <p class="text-muted text-sm" style="margin-bottom:var(--sp-4);">
+              Complete lifecycle event history for this transaction.
+            </p>
+            <ul class="timeline" id="timeline"></ul>
+          </div>
+        `;
+
+        document.getElementById('copy-id-btn')?.addEventListener('click', async () => {
+          try { await copyToClipboard(payment.id); showCopyNotice('Payment ID copied.'); }
+          catch (_) { alert('Could not copy payment ID.'); }
+        });
+
+        document.getElementById('copy-link-btn')?.addEventListener('click', async () => {
+          try {
+            const deepLink = `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(payment.id)}`;
+            await copyToClipboard(deepLink);
+            showCopyNotice('Deep link copied.');
+          } catch (_) { alert('Could not copy deep link.'); }
+        });
+
+        document.getElementById('cancel-btn')?.addEventListener('click', async () => {
+          if (!confirm('Cancel this payment? This action cannot be undone.')) return;
+          try { await Payments.cancel(id); loadPaymentDetails(); }
+          catch (err) { alert(`Cancel failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`); }
+        });
+
+        document.getElementById('reverse-btn')?.addEventListener('click', async () => {
+          if (!confirm('Reverse this payment? An offsetting debit will be created.')) return;
+          try { await Payments.reverse(id); loadPaymentDetails(); }
+          catch (err) { alert(`Reverse failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`); }
+        });
+
+        const timeline = document.getElementById('timeline');
+        (history || []).forEach(h => {
+          const li = document.createElement('li');
+          const sameStatus = h.previousStatus && h.previousStatus === h.newStatus;
+          const desc = sameStatus
+            ? (h.errorMessage || `${h.newStatus} (updated)`)
+            : (h.previousStatus
+                ? `${h.previousStatus} → ${h.newStatus}`
+                : `Payment created (${h.newStatus})`);
+          const errPart = h.errorCode
+            ? ` <span class="text-danger">(${h.errorCode}: ${h.errorMessage || ''})</span>`
+            : (!sameStatus && h.errorMessage
+                ? ` <span style="color:var(--info-text);">(${h.errorMessage})</span>`
+                : '');
+          li.innerHTML = `
+            <span class="t-time">${formatDateTime(h.occurredAt)}</span>
+            <span class="t-desc">${desc}${errPart}</span>`;
+          timeline.appendChild(li);
+        });
+
+      } catch (err) {
+        if (err.errorCode === 'PAYMENT_NOT_FOUND') {
+          content.innerHTML = `
+            <div class="card">
+              <div class="notice error">
+                <strong>PAYMENT_NOT_FOUND</strong>: No payment record found for ID <code>${id}</code>.
+              </div>
+            </div>`;
+        } else {
+          content.innerHTML = `
+            <div class="card">
+              <div class="notice error">Could not load payment: ${err.message || 'Unknown error'}</div>
+            </div>`;
+        }
+      }
+    }
+
+    loadPaymentDetails();
 </script>
 </body>
 </html>
-
