@@ -1,11 +1,9 @@
 package com.paypulse.analytics.service;
 
 import com.paypulse.analytics.dto.KpiSummaryResponse;
+import com.paypulse.analytics.read.AnalyticsReadRepository;
 import com.paypulse.payment.PaymentStatus;
-import com.paypulse.payment.repository.PaymentRepository;
-import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Collections;
 
@@ -15,18 +13,19 @@ import static org.mockito.Mockito.*;
 
 class AnalyticsServiceTest {
 
-    private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
-    private final PaymentStatusHistoryRepository historyRepository = mock(PaymentStatusHistoryRepository.class);
-    private final AnalyticsService service = new AnalyticsService(paymentRepository, historyRepository, 168);
+    private final AnalyticsReadRepository analyticsReadRepository = mock(AnalyticsReadRepository.class);
+    private final AnalyticsService service = new AnalyticsService(analyticsReadRepository, 168);
 
     @Test
     void getSummary_zeroPayments_returnsZeroedRatesNoDivideByZero() {
-        when(paymentRepository.countByCreatedAtBetween(any(), any())).thenReturn(0L);
-        when(paymentRepository.countByStatusAndCreatedAtBetween(eq(PaymentStatus.COMPLETED), any(), any())).thenReturn(0L);
-        when(paymentRepository.countByStatusAndCreatedAtBetween(eq(PaymentStatus.FAILED), any(), any())).thenReturn(0L);
-        when(historyRepository.avgProcessingTimeSeconds(any(), any())).thenReturn(null);
-        when(paymentRepository.sumAmountByCurrency(any(), any())).thenReturn(Collections.emptyList());
-        when(paymentRepository.topFailureReasons(any(), any())).thenReturn(Collections.emptyList());
+        when(analyticsReadRepository.countCreatedBetween(any(), any())).thenReturn(0L);
+        when(analyticsReadRepository.countByStatusAndCreatedBetween(eq(PaymentStatus.COMPLETED), any(), any())).thenReturn(0L);
+        when(analyticsReadRepository.countByStatusAndCreatedBetween(eq(PaymentStatus.FAILED), any(), any())).thenReturn(0L);
+        when(analyticsReadRepository.countByStatusAndCreatedBetween(eq(PaymentStatus.CANCELLED), any(), any())).thenReturn(0L);
+        when(analyticsReadRepository.avgProcessingTimeSeconds(any(), any())).thenReturn(null);
+        when(analyticsReadRepository.sumCompletedAmountByCurrency(any(), any())).thenReturn(Collections.emptyMap());
+        when(analyticsReadRepository.topFailureReasons(any(), any())).thenReturn(Collections.emptyMap());
+        when(analyticsReadRepository.maxCreatedAtBetween(any(), any())).thenReturn(null);
 
         KpiSummaryResponse result = service.getSummary(null, null);
 
@@ -40,12 +39,14 @@ class AnalyticsServiceTest {
 
     @Test
     void getSummary_withData_computesRatesCorrectly() {
-        when(paymentRepository.countByCreatedAtBetween(any(), any())).thenReturn(10L);
-        when(paymentRepository.countByStatusAndCreatedAtBetween(eq(PaymentStatus.COMPLETED), any(), any())).thenReturn(8L);
-        when(paymentRepository.countByStatusAndCreatedAtBetween(eq(PaymentStatus.FAILED), any(), any())).thenReturn(2L);
-        when(historyRepository.avgProcessingTimeSeconds(any(), any())).thenReturn(12.5);
-        when(paymentRepository.sumAmountByCurrency(any(), any())).thenReturn(Collections.emptyList());
-        when(paymentRepository.topFailureReasons(any(), any())).thenReturn(Collections.emptyList());
+        when(analyticsReadRepository.countCreatedBetween(any(), any())).thenReturn(10L);
+        when(analyticsReadRepository.countByStatusAndCreatedBetween(eq(PaymentStatus.COMPLETED), any(), any())).thenReturn(8L);
+        when(analyticsReadRepository.countByStatusAndCreatedBetween(eq(PaymentStatus.FAILED), any(), any())).thenReturn(2L);
+        when(analyticsReadRepository.countByStatusAndCreatedBetween(eq(PaymentStatus.CANCELLED), any(), any())).thenReturn(0L);
+        when(analyticsReadRepository.avgProcessingTimeSeconds(any(), any())).thenReturn(12.5);
+        when(analyticsReadRepository.sumCompletedAmountByCurrency(any(), any())).thenReturn(Collections.emptyMap());
+        when(analyticsReadRepository.topFailureReasons(any(), any())).thenReturn(Collections.emptyMap());
+        when(analyticsReadRepository.maxCreatedAtBetween(any(), any())).thenReturn(null);
 
         KpiSummaryResponse result = service.getSummary(null, null);
 
@@ -56,9 +57,9 @@ class AnalyticsServiceTest {
 
     @Test
     void getTrend_returnsOneBucketPerHour() {
-        when(paymentRepository.countByCreatedAtBetween(any(), any())).thenReturn(1L);
-        when(paymentRepository.countByStatusAndCreatedAtBetween(any(), any(), any())).thenReturn(0L);
-        when(paymentRepository.sumAmountByCurrency(any(), any())).thenReturn(Collections.emptyList());
+        when(analyticsReadRepository.countCreatedBetween(any(), any())).thenReturn(1L);
+        when(analyticsReadRepository.countByStatusAndCreatedBetween(any(), any(), any())).thenReturn(0L);
+        when(analyticsReadRepository.sumCompletedAmountByCurrency(any(), any())).thenReturn(Collections.emptyMap());
 
         var result = service.getTrend(6);
 

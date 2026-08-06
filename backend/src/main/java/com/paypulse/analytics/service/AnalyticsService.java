@@ -1,11 +1,10 @@
 package com.paypulse.analytics.service;
 
+import com.paypulse.analytics.read.AnalyticsReadRepository;
 import com.paypulse.analytics.dto.KpiSummaryResponse;
 import com.paypulse.analytics.dto.TrendResponse;
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.PaymentStatus;
-import com.paypulse.payment.repository.PaymentRepository;
-import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
 import com.paypulse.payment.service.PaymentException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,8 +23,7 @@ import java.util.Map;
 @Service
 public class AnalyticsService {
 
-    private final PaymentRepository paymentRepository;
-    private final PaymentStatusHistoryRepository historyRepository;
+    private final AnalyticsReadRepository analyticsReadRepository;
     private final int maxTrendHours;
     private final int throughputWindowMinutes;
 
@@ -34,19 +32,16 @@ public class AnalyticsService {
      * this service with 3 args — defaults the throughput trailing window to
      * 5 minutes. The 4-arg constructor below is the one Spring actually uses.
      */
-    public AnalyticsService(PaymentRepository paymentRepository,
-                            PaymentStatusHistoryRepository historyRepository,
+    public AnalyticsService(AnalyticsReadRepository analyticsReadRepository,
                             int maxTrendHours) {
-        this(paymentRepository, historyRepository, maxTrendHours, 5);
+        this(analyticsReadRepository, maxTrendHours, 5);
     }
 
     @Autowired
-    public AnalyticsService(PaymentRepository paymentRepository,
-                            PaymentStatusHistoryRepository historyRepository,
+    public AnalyticsService(AnalyticsReadRepository analyticsReadRepository,
                             @Value("${paypulse.analytics.trend.max-hours:168}") int maxTrendHours,
                             @Value("${paypulse.analytics.throughput.window-minutes:5}") int throughputWindowMinutes) {
-        this.paymentRepository = paymentRepository;
-        this.historyRepository = historyRepository;
+        this.analyticsReadRepository = analyticsReadRepository;
         this.maxTrendHours = maxTrendHours;
         this.throughputWindowMinutes = throughputWindowMinutes;
     }
@@ -61,15 +56,15 @@ public class AnalyticsService {
                 ? Instant.parse(fromStr)
                 : to.minus(24, ChronoUnit.HOURS);
 
-        long total = paymentRepository.countByCreatedAtBetween(from, to);
+        long total = analyticsReadRepository.countCreatedBetween(from, to);
 
-        long completed = paymentRepository.countByStatusAndCreatedAtBetween(
+        long completed = analyticsReadRepository.countByStatusAndCreatedBetween(
                 PaymentStatus.COMPLETED, from, to);
 
-        long failed = paymentRepository.countByStatusAndCreatedAtBetween(
+        long failed = analyticsReadRepository.countByStatusAndCreatedBetween(
                 PaymentStatus.FAILED, from, to);
 
-        long cancelled = paymentRepository.countByStatusAndCreatedAtBetween(
+        long cancelled = analyticsReadRepository.countByStatusAndCreatedBetween(
                 PaymentStatus.CANCELLED, from, to);
 
         long terminal = completed + failed + cancelled;
@@ -78,7 +73,7 @@ public class AnalyticsService {
         double failureRate = terminal == 0 ? 0.0 : (failed * 100.0) / terminal;
         double cancelledRate = terminal == 0 ? 0.0 : (cancelled * 100.0) / terminal;
 
-        Double avgSeconds = historyRepository.avgProcessingTimeSeconds(from, to);
+        Double avgSeconds = analyticsReadRepository.avgProcessingTimeSeconds(from, to);
 
 
         // Throughput is intentionally NOT total/minutes over the (potentially
@@ -94,7 +89,7 @@ public class AnalyticsService {
         // wall-clock "now", a naive "last N minutes before now" slice
         // would always be empty and throughput would permanently read
         // 0 even though the data clearly shows real processing activity.
-        Instant lastActivity = paymentRepository.maxCreatedAtBetween(from, to);
+        Instant lastActivity = analyticsReadRepository.maxCreatedAtBetween(from, to);
         double throughput = 0.0;
         if (lastActivity != null) {
             Instant anchor = lastActivity.isAfter(to) ? to : lastActivity;
@@ -106,34 +101,16 @@ public class AnalyticsService {
             if (throughputFrom.isBefore(from)) {
                 throughputFrom = from;
             }
-            long trailingCount = paymentRepository.countByCreatedAtBetween(throughputFrom, anchor);
+            long trailingCount = analyticsReadRepository.countCreatedBetween(throughputFrom, anchor);
             double throughputMinutes = Math.max(1.0, throughputWindow.toSeconds() / 60.0);
             throughput = trailingCount / throughputMinutes;
         }
 
-        Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>();
+        Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>(
+                analyticsReadRepository.sumCompletedAmountByCurrency(from, to));
 
-        for (Object[] row : paymentRepository.sumAmountByCurrency(from, to)) {
-            volumeByCurrency.put(
-                    (String) row[0],
-                    (BigDecimal) row[1]
-            );
-        }
-
-        Map<String, Long> topFailures = new LinkedHashMap<>();
-
-        for (Object[] row : paymentRepository.topFailureReasons(from, to)) {
-
-            if (row[0] != null) {
-
-                Long count = ((Number) row[1]).longValue();
-
-                topFailures.put(
-                        (String) row[0],
-                        count
-                );
-            }
-        }
+        Map<String, Long> topFailures = new LinkedHashMap<>(
+                analyticsReadRepository.topFailureReasons(from, to));
 
         return KpiSummaryResponse.builder()
                 .totalPayments(total)
@@ -176,32 +153,29 @@ public class AnalyticsService {
             Instant bucketStart = from.plus(i, ChronoUnit.HOURS);
             Instant bucketEnd = bucketStart.plus(1, ChronoUnit.HOURS);
 
-            long created = paymentRepository.countByCreatedAtBetween(bucketStart, bucketEnd);
+            long created = analyticsReadRepository.countCreatedBetween(bucketStart, bucketEnd);
 
-            long completed = paymentRepository.countByStatusAndCreatedAtBetween(
+            long completed = analyticsReadRepository.countByStatusAndCreatedBetween(
                     PaymentStatus.COMPLETED,
                     bucketStart,
                     bucketEnd
             );
 
-            long failed = paymentRepository.countByStatusAndCreatedAtBetween(
+            long failed = analyticsReadRepository.countByStatusAndCreatedBetween(
                     PaymentStatus.FAILED,
                     bucketStart,
                     bucketEnd
             );
 
-            long cancelled = paymentRepository.countByStatusAndCreatedAtBetween(
+            long cancelled = analyticsReadRepository.countByStatusAndCreatedBetween(
                     PaymentStatus.CANCELLED,
                     bucketStart,
                     bucketEnd
             );
 
-            Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>();
-            if (created > 0) {
-                for (Object[] row : paymentRepository.sumAmountByCurrency(bucketStart, bucketEnd)) {
-                    volumeByCurrency.put((String) row[0], (BigDecimal) row[1]);
-                }
-            }
+            Map<String, BigDecimal> volumeByCurrency = created > 0
+                    ? new LinkedHashMap<>(analyticsReadRepository.sumCompletedAmountByCurrency(bucketStart, bucketEnd))
+                    : new LinkedHashMap<>();
 
             buckets.add(
                     TrendResponse.Bucket.builder()

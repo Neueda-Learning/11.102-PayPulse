@@ -10,6 +10,7 @@ import com.paypulse.payment.api.dto.PaymentHistoryResponse;
 import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.TriggeredBy;
+import com.paypulse.payment.read.PaymentReadRepository;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.PaymentCreationResult;
 import com.paypulse.payment.service.PaymentService;
@@ -48,6 +49,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
+    private final PaymentReadRepository paymentReadRepository;
     private final StatusTransitionEngine statusTransitionEngine;
     private final PaymentMapper paymentMapper;
     private final ReversalService reversalService;
@@ -132,7 +134,7 @@ public class PaymentController {
         Sort sortObj = Sort.by(Sort.Direction.fromString(s.length > 1 ? s[1] : "desc"), field);
         Pageable pageable = PageRequest.of(page, size, sortObj);
 
-        Page<Payment> result = paymentRepository.search(status, search, sourceAccountId, pageable);
+        Page<Payment> result = paymentReadRepository.search(status, search, sourceAccountId, pageable);
         return ResponseEntity.ok(result.map(paymentMapper::toResponse));
     }
 
