@@ -19,12 +19,19 @@
         <a href="accounts.html">Accounts</a>
         <a href="create-payment.html">New Payment</a>
         <a href="payments.html">Payments</a>
-        <a href="/grafana/d/paypulse-logs/paypulse-application-logs?orgId=1&kiosk=tv" target="_blank" rel="noopener" title="View live application logs (Grafana)">Logs</a>
+        <a id="logsNavLink" href="#" target="_blank" rel="noopener" title="View live application logs (Grafana)">Logs</a>
     </nav>
     <div class="topbar-right">
         <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
     </div>
 </header>
+<script>
+    // Grafana runs on its own dedicated port (3001) so the link must reuse whatever
+    // host the app itself was loaded from (localhost, EC2 private IP, etc.) instead
+    // of a hardcoded/relative URL.
+    document.getElementById('logsNavLink').href =
+        `${location.protocol}//${location.hostname}:3001/d/paypulse-logs/paypulse-application-logs?orgId=1&kiosk=tv`;
+</script>
 
 <main>
     <div class="page-head">
