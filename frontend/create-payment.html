@@ -48,6 +48,18 @@
           <label for="currency">Currency</label>
           <input type="text" id="currency" readonly placeholder="auto-filled"/>
         </div>
+        <div class="form-row">
+          <label for="targetCurrency">Payout Currency *</label>
+          <select id="targetCurrency" required>
+            <option value="INR">INR</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>Conversion Preview</label>
+        <div id="conversionPreview" class="conversion-preview">Choose source account, amount, and payout currency to preview conversion.</div>
       </div>
 
       <div class="form-row">
@@ -93,6 +105,7 @@
 <script>
 let accounts = [];
 let currentSubmissionKey = null;
+let lastSourceCurrency = '';
 
 async function loadAccounts() {
   const sel = document.getElementById('sourceAccount');
@@ -111,10 +124,24 @@ async function loadAccounts() {
 
 function syncCurrency() {
   const opt = document.getElementById('sourceAccount').selectedOptions[0];
-  document.getElementById('currency').value = opt ? (opt.dataset.currency || '') : '';
+  const sourceCurrency = opt ? (opt.dataset.currency || '') : '';
+  const targetEl = document.getElementById('targetCurrency');
+  document.getElementById('currency').value = sourceCurrency;
+
+  if (!targetEl.dataset.userSelected || !targetEl.value || targetEl.value === lastSourceCurrency) {
+    targetEl.value = sourceCurrency || 'INR';
+  }
+  lastSourceCurrency = sourceCurrency;
+  updateConversionPreview();
 }
 
 document.getElementById('sourceAccount').addEventListener('change', syncCurrency);
+document.getElementById('targetCurrency').addEventListener('change', () => {
+  const targetEl = document.getElementById('targetCurrency');
+  targetEl.dataset.userSelected = 'true';
+  updateConversionPreview();
+});
+document.getElementById('amount').addEventListener('input', updateConversionPreview);
 
 function showCurrentKey() {
   document.getElementById('idempotencyKey').value = currentSubmissionKey || '';
@@ -137,7 +164,43 @@ function isRetryableError(err) {
   return retryableCodes.has((err && err.errorCode) || 'UNKNOWN');
 }
 
+async function updateConversionPreview() {
+  const previewEl = document.getElementById('conversionPreview');
+  const amount = Number(document.getElementById('amount').value);
+  const currency = document.getElementById('currency').value;
+  const targetCurrency = document.getElementById('targetCurrency').value;
+
+  if (!currency || !targetCurrency) {
+    previewEl.className = 'conversion-preview';
+    previewEl.textContent = 'Choose source account, amount, and payout currency to preview conversion.';
+    return;
+  }
+
+  if (!amount || amount <= 0) {
+    previewEl.className = 'conversion-preview';
+    previewEl.textContent = `Enter amount to preview payout in ${targetCurrency}.`;
+    return;
+  }
+
+  if (currency === targetCurrency) {
+    previewEl.className = 'conversion-preview';
+    previewEl.textContent = `Same-currency payout: ${formatMoney(amount, currency)}. FX rate used: 1.0.`;
+    return;
+  }
+
+  try {
+    const quote = await Fx.getRate(currency, targetCurrency);
+    const converted = Math.round(amount * Number(quote.rate) * 100) / 100;
+    previewEl.className = 'conversion-preview';
+    previewEl.textContent = `${formatMoney(amount, currency)} converts to ${formatMoney(converted, targetCurrency)} using ${formatRate(quote.rate, currency, targetCurrency)}.`;
+  } catch (err) {
+    previewEl.className = 'conversion-preview error';
+    previewEl.textContent = `${err.errorCode || 'FX_ERROR'}: ${err.message || 'Could not load conversion rate.'}`;
+  }
+}
+
 showCurrentKey();
+updateConversionPreview();
 
 document.getElementById('paymentForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -147,11 +210,12 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
   const sourceAccountId = document.getElementById('sourceAccount').value;
   const amount = parseFloat(document.getElementById('amount').value);
   const currency = document.getElementById('currency').value;
+  const targetCurrency = document.getElementById('targetCurrency').value;
   const destinationAccount = document.getElementById('destinationAccount').value.trim();
   const reference = document.getElementById('reference').value.trim();
-const forceFailureStage = document.getElementById('forceFailureStage').value; // optional UI-only
-ensureSubmissionKey();
-const idempotencyKey = currentSubmissionKey;
+  const forceFailureStage = document.getElementById('forceFailureStage').value;
+  ensureSubmissionKey();
+  const idempotencyKey = currentSubmissionKey;
 
   const submitBtn = document.getElementById('submitBtn');
   submitBtn.disabled = true;
@@ -159,11 +223,14 @@ const idempotencyKey = currentSubmissionKey;
 
   try {
     const payment = await Payments.create(
-  { sourceAccountId, amount, currency, destinationAccount, reference, forceFailureStage },
-  idempotencyKey
-);
+      { sourceAccountId, amount, currency, targetCurrency, destinationAccount, reference, forceFailureStage },
+      idempotencyKey
+    );
 
     const isOk = payment.status === 'COMPLETED';
+    const payout = payment.targetCurrency && payment.convertedAmount != null
+      ? `${formatMoney(payment.convertedAmount, payment.targetCurrency)} (${payment.targetCurrency})`
+      : formatMoney(payment.amount, payment.currency);
     const resultCard = document.getElementById('resultCard');
     resultCard.style.display = 'block';
     document.getElementById('resultBody').innerHTML = `
@@ -173,15 +240,17 @@ const idempotencyKey = currentSubmissionKey;
       <dl class="field-list">
         <dt>Payment ID</dt><dd>${payment.id}</dd>
         <dt>Status</dt><dd>${badgeHtml(payment.status)}</dd>
-        <dt>Amount</dt><dd>${formatMoney(payment.amount, payment.currency)}</dd>
+        <dt>Debited</dt><dd>${formatMoney(payment.amount, payment.currency)}</dd>
+        <dt>Payout</dt><dd>${payout}</dd>
+        <dt>FX Rate</dt><dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>
         <dt>Created</dt><dd>${formatDateTime(payment.createdAt)}</dd>
       </dl>
       <p style="margin-top:14px;">
         <a class="btn ghost" href="payment-details.html?id=${encodeURIComponent(payment.id)}">View Full Details →</a>
       </p>`;
     resultCard.scrollIntoView({ behavior: 'smooth' });
-clearSubmissionKey();
-document.getElementById('forceFailureStage').value = 'NONE';
+    clearSubmissionKey();
+    document.getElementById('forceFailureStage').value = 'NONE';
   } catch (err) {
     noticeEl.innerHTML = `<div class="notice error"><strong>${err.errorCode || 'ERROR'}</strong>: ${err.message || 'Submission failed.'}</div>`;
 
@@ -198,7 +267,10 @@ document.getElementById('forceFailureStage').value = 'NONE';
   }
 });
 
-loadAccounts();
+loadAccounts().then(() => {
+  syncCurrency();
+  updateConversionPreview();
+});
 </script>
 </body>
 </html>

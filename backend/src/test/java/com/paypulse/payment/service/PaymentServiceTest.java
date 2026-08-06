@@ -29,6 +29,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -96,8 +97,22 @@ class PaymentServiceTest {
     }
 
     @Test
-    void createPayment_whenForceFailureStageIsCreate_throwsServiceUnavailable_andNeverSaves() {
+    void createPayment_whenForceFailureStageIsCreate_persistsFailedPayment_andSkipsAutomaticLifecycle() {
         when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+
+        Payment savedAsCreated = payment(PaymentStatus.CREATED);
+        Payment failed = payment(PaymentStatus.FAILED);
+        failed.setId(savedAsCreated.getId());
+
+        when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(new Payment());
+        when(paymentRepository.save(any(Payment.class))).thenReturn(savedAsCreated);
+        when(statusTransitionEngine.markFailed(any(Payment.class), eq(TriggeredBy.SYSTEM), eq("PROCESSING_ERROR"), any()))
+                .thenReturn(failed);
+        when(paymentMapper.toResponse(failed)).thenReturn(PaymentResponse.builder()
+                .id(failed.getId())
+                .status(PaymentStatus.FAILED)
+                .errorCode("PROCESSING_ERROR")
+                .build());
 
         CreatePaymentRequest request = CreatePaymentRequest.builder()
                 .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
@@ -108,13 +123,21 @@ class PaymentServiceTest {
                 .forceFailureStage("CREATE")
                 .build();
 
-        assertThatThrownBy(() -> paymentService.createPayment("key-2", request))
-                .isInstanceOf(PaymentException.class)
-                .satisfies(ex -> assertThat(((PaymentException) ex).getStatus())
-                        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+        PaymentCreationResult result = paymentService.createPayment("key-2", request);
 
-        verify(paymentRepository, never()).save(any());
-        verify(statusTransitionEngine, never()).recordCreation(any(), any());
+        assertThat(result.created()).isTrue();
+        assertThat(result.payment().getStatus()).isEqualTo(PaymentStatus.FAILED);
+
+        InOrder inOrder = inOrder(paymentRepository, statusTransitionEngine);
+        inOrder.verify(paymentRepository).save(any(Payment.class));
+        inOrder.verify(statusTransitionEngine).recordCreation(savedAsCreated, TriggeredBy.CLIENT);
+        inOrder.verify(statusTransitionEngine).markFailed(
+                savedAsCreated,
+                TriggeredBy.SYSTEM,
+                "PROCESSING_ERROR",
+                "Simulated failure during CREATE (UI-selected forced failure)");
+
+        verify(statusTransitionEngine, never()).runAutomaticLifecycle(any());
     }
 
     @Test

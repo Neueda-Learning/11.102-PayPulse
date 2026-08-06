@@ -18,11 +18,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class PaymentNotificationListener {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentNotificationListener.class);
+    private static final Pattern FAILURE_STAGE_PATTERN = Pattern.compile("(?:during|transition)\\s+([A-Z]+)");
 
     private final NotificationService notificationService;
     private final AccountRepository accountRepository;
@@ -71,24 +74,39 @@ public class PaymentNotificationListener {
             return;
         }
 
-        UUID paymentUUID = UUID.fromString(payment.getId());
-        Map<String, Object> vars = new HashMap<>(Map.of(
-                "paymentId", payment.getId(),
-                "amount", payment.getAmount(),
-                "currency", payment.getCurrency(),
-                "sourceAccount", account.getAccountNumber(),
-                "destinationAccount", payment.getDestinationAccount(),
-                "reference", payment.getReference() != null ? payment.getReference() : ""
-        ));
+        UUID paymentUUID;
+        try {
+            paymentUUID = UUID.fromString(payment.getId());
+        } catch (IllegalArgumentException ex) {
+            log.warn("Notification skipped: payment id {} is not a valid UUID", payment.getId());
+            return;
+        }
+
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("paymentId", payment.getId());
+        vars.put("amount", payment.getAmount());
+        vars.put("currency", payment.getCurrency());
+        vars.put("sourceAccount", account.getAccountNumber());
+        vars.put("destinationAccount", payment.getDestinationAccount());
+        vars.put("reference", payment.getReference() != null ? payment.getReference() : "");
+        vars.put("referenceId", payment.getReference() != null ? payment.getReference() : "");
+        vars.put("submittedAt", payment.getCreatedAt());
+
+        if (newStatus == PaymentStatus.COMPLETED) {
+            vars.put("completedAt", payment.getUpdatedAt());
+        }
+
+        if (newStatus == PaymentStatus.CANCELLED) {
+            vars.put("cancelledAt", payment.getUpdatedAt());
+        }
 
         // FAILED needs to show exactly which stage the payment failed at
         // (e.g. it failed during VALIDATE vs SEND vs COMPLETE) so devs/QA can
         // verify the state machine behaved as expected.
         if (newStatus == PaymentStatus.FAILED) {
-            String failedAtStage = event.previousStatus() != null
-                    ? event.previousStatus().name()
-                    : "UNKNOWN";
+            String failedAtStage = resolveFailedAtStage(event);
             vars.put("failedAtStage", failedAtStage);
+            vars.put("failedAt", event.occurredAt());
             vars.put("failureReason", event.errorMessage() != null ? event.errorMessage() : "Unknown error");
             vars.put("errorCode", event.errorCode() != null ? event.errorCode() : "ERR_UNKNOWN");
         }
@@ -106,5 +124,26 @@ public class PaymentNotificationListener {
                     payment.getId(), newStatus, ex.getMessage());
             // Never rethrow — notifications must never affect payment outcome
         }
+    }
+
+    private String resolveFailedAtStage(PaymentStatusChangedEvent event) {
+        String message = event.errorMessage();
+        if (message != null) {
+            Matcher matcher = FAILURE_STAGE_PATTERN.matcher(message.toUpperCase());
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+
+        PaymentStatus previousStatus = event.previousStatus();
+        if (previousStatus == null) {
+            return "UNKNOWN";
+        }
+        return switch (previousStatus) {
+            case CREATED -> "VALIDATE";
+            case VALIDATED -> "SEND";
+            case SENT -> "COMPLETE";
+            default -> "UNKNOWN";
+        };
     }
 }

@@ -52,15 +52,14 @@ async function copyToClipboard(text) {
 }
 
 function showCopyNotice(message) {
-  const content = document.getElementById('content');
   const existing = document.getElementById('copy-notice');
   if (existing) existing.remove();
-  const note = document.createElement('div');
-  note.id = 'copy-notice';
-  note.className = 'notice success';
-  note.textContent = message;
-  content.prepend(note);
-  setTimeout(() => note.remove(), 1800);
+  const notice = document.createElement('div');
+  notice.id = 'copy-notice';
+  notice.className = 'notice success';
+  notice.textContent = message;
+  document.querySelector('main').prepend(notice);
+  setTimeout(() => notice.remove(), 1800);
 }
 
 async function loadPaymentDetails() {
@@ -85,7 +84,7 @@ async function loadPaymentDetails() {
       accountLabel = `${acc.label} — ${acc.accountNumber} (${acc.currency})`;
     } catch (_) {}
 
-          const errorBlock = payment.status === 'FAILED'
+    const errorBlock = payment.status === 'FAILED'
       ? `<div class="notice error"><strong>${payment.errorCode}</strong>: ${payment.errorMessage || ''}</div>`
       : '';
 
@@ -105,56 +104,44 @@ async function loadPaymentDetails() {
       ? `<button class="btn" id="reverse-btn" style="margin-top:12px;">Reverse Payment</button>`
       : '';
 
-    const reversalLink = payment.reversalPaymentId
-      ? `<dt>Reversed By</dt><dd><a href="payment-details.html?id=${payment.reversalPaymentId}">${payment.reversalPaymentId}</a></dd>`
+    const payoutAmount = payment.targetCurrency && payment.convertedAmount != null
+      ? `${formatMoney(payment.convertedAmount, payment.targetCurrency)}${payment.targetCurrency !== payment.currency ? ` <span class="subtle-meta">${formatRate(payment.fxRate, payment.currency, payment.targetCurrency)}</span>` : ''}`
+      : formatMoney(payment.amount, payment.currency);
+
+    content.innerHTML = `
+      <div class="card">
         <h2>
-          Payment
-          <code style="font-size:13px;">${payment.id}</code>
+          Payment <code style="font-size:13px;">${payment.id}</code>
           <span class="inline-actions">
             <button type="button" class="btn ghost copy-btn" id="copy-id-btn">Copy ID</button>
             <button type="button" class="btn ghost copy-btn" id="copy-link-btn">Copy Link</button>
           </span>
           &nbsp; ${badgeHtml(payment.status)}
         </h2>
-
-    const reversalOfLink = payment.reversalOfPaymentId
-      ? `<dt>Reversal Of</dt><dd><a href="payment-details.html?id=${payment.reversalOfPaymentId}">${payment.reversalOfPaymentId}</a></dd>`
-      : '';
-
-    const cancelBtn = payment.status === 'CREATED'
-      ? `<button class="btn" id="cancel-btn" style="margin-top:12px;">Cancel Payment</button>`
-      : '';
-
-          ${reversalLink}
-          ${reversalOfLink}
-    const reverseBtn = (payment.status === 'COMPLETED' && !payment.reversed)
-        ${cancelBtn}
-        ${reverseBtn}
-      ? `<button class="btn" id="reverse-btn" style="margin-top:12px;">Reverse Payment</button>`
-      : '';
-
-    content.innerHTML = `
-      <div class="card">
-        <h2>Payment <code style="font-size:13px;">${payment.id}</code> &nbsp; ${badgeHtml(payment.status)}</h2>
         ${errorBlock}
         <dl class="field-list">
-    document.getElementById('cancel-btn')?.addEventListener('click', async () => {
-      try {
-        await Payments.cancel(id);
-        loadPaymentDetails();
-      } catch (err) {
-        alert(`Cancel failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
-      }
-    });
+          <dt>Source Account</dt><dd>${accountLabel}</dd>
+          <dt>Destination</dt>  <dd>${payment.destinationAccount}</dd>
+          <dt>Debited</dt>      <dd>${formatMoney(payment.amount, payment.currency)}</dd>
+          <dt>Source Currency</dt><dd>${payment.currency}</dd>
+          <dt>Payout Currency</dt><dd>${payment.targetCurrency || payment.currency}</dd>
+          <dt>Payout Amount</dt><dd>${payoutAmount}</dd>
+          <dt>FX Rate</dt>      <dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>
+          <dt>Reference</dt>    <dd>${payment.reference || '<span style="color:#9aa1ab;">(none)</span>'}</dd>
+          <dt>Created</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
+          <dt>Updated</dt>      <dd>${formatDateTime(payment.updatedAt)}</dd>
+          ${reversalLink}
+          ${reversalOfLink}
+        </dl>
+        ${cancelBtn}
+        ${reverseBtn}
+      </div>
 
-    document.getElementById('reverse-btn')?.addEventListener('click', async () => {
-      try {
-        await Payments.reverse(id);
-        loadPaymentDetails();
-      } catch (err) {
-        alert(`Reverse failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
-      }
-    });
+      <div class="card">
+        <h2>Status History (Audit Trail)</h2>
+        <ul class="timeline" id="timeline"></ul>
+      </div>
+    `;
 
     document.getElementById('copy-id-btn')?.addEventListener('click', async () => {
       try {
@@ -175,25 +162,6 @@ async function loadPaymentDetails() {
       }
     });
 
-          <dt>Source Account</dt><dd>${accountLabel}</dd>
-          <dt>Destination</dt>  <dd>${payment.destinationAccount}</dd>
-          <dt>Amount</dt>       <dd>${formatMoney(payment.amount, payment.currency)}</dd>
-          <dt>Currency</dt>     <dd>${payment.currency}</dd>
-          <dt>Reference</dt>    <dd>${payment.reference || '<span style="color:#9aa1ab;">(none)</span>'}</dd>
-          <dt>Created</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
-          <dt>Updated</dt>      <dd>${formatDateTime(payment.updatedAt)}</dd>
-          ${reversalLink}
-          ${reversalOfLink}
-        </dl>
-        ${cancelBtn}
-        ${reverseBtn}
-      </div>
-
-      <div class="card">
-        <h2>Status History (Audit Trail)</h2>
-        <ul class="timeline" id="timeline"></ul>
-      </div>
-    `;
 
     document.getElementById('cancel-btn')?.addEventListener('click', async () => {
       try {

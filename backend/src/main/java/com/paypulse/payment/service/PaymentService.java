@@ -73,12 +73,26 @@ public class PaymentService {
         Payment created = saveNewPayment(idempotencyKey, request);
         statusTransitionEngine.recordCreation(created, TriggeredBy.CLIENT);
 
+        // UI-driven CREATE failure should still produce a persisted payment,
+        // history rows, events, and downstream analytics/notification updates.
+        if (isForcedCreateFailure(request)) {
+            return statusTransitionEngine.markFailed(
+                    created,
+                    TriggeredBy.SYSTEM,
+                    ErrorCode.PROCESSING_ERROR.name(),
+                    "Simulated failure during CREATE (UI-selected forced failure)"
+            );
+        }
+
         awaitCancelWindow();
 
         // Re-fetch: a concurrent cancel may have already moved this payment
         // off CREATED during the window above. If so, respect that outcome
         // instead of racing the automatic lifecycle over it.
         Payment current = paymentRepository.findById(created.getId()).orElse(created);
+        // forcedFailureStage is transient; carry it forward after re-fetch so
+        // VALIDATE/SEND simulation can still trigger during auto-lifecycle.
+        current.setForcedFailureStage(created.getForcedFailureStage());
         if (current.getStatus() != PaymentStatus.CREATED) {
             return current;
         }
@@ -129,10 +143,6 @@ public class PaymentService {
     }
 
     private void simulateCreationFailure(CreatePaymentRequest request) {
-        if ("CREATE".equalsIgnoreCase(request.getForceFailureStage())) {
-            throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
-                    "Simulated failure while creating payment (UI-selected)");
-        }
         if (createFailureAccount != null && createFailureAccount.equals(request.getDestinationAccount())) {
             throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
                     "Simulated failure while creating payment (deterministic trigger)");
@@ -141,6 +151,10 @@ public class PaymentService {
             throw new PaymentException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.PROCESSING_ERROR,
                     "Simulated transient failure while creating payment");
         }
+    }
+
+    private boolean isForcedCreateFailure(CreatePaymentRequest request) {
+        return "CREATE".equalsIgnoreCase(request.getForceFailureStage());
     }
 
     @Transactional

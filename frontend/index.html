@@ -64,117 +64,141 @@
 </main>
 <script src="js/api.js"></script>
 <script>
-    async function loadDashboard() {
-      try {
-        const [summary, trend] = await Promise.all([
-          Analytics.summary(),
-          Analytics.trend(24)
-        ]);
-        updateDashboardFromSummary(summary);
-        await updateTrend();
-      } catch (err) {
-        document.getElementById('subhead').textContent = '';
-        document.getElementById('kpiGrid').innerHTML =
-          `<div class="notice error">Could not load KPIs: ${err.message || 'Unknown error'}. Is the backend running?</div>`;
-      }
-    }
+let currentTrendHours = 24;
+let currentTrendView = 'status';
 
-    async function updateTrend() {
-      try {
-        const trend = await Analytics.trend(24);
-        const buckets = (trend.buckets || []).slice(-12);
-        const maxVal = Math.max(1, ...buckets.map(b => b.created));
-        document.getElementById('trendBars').innerHTML = buckets.map(b => {
-          const cH = Math.round((b.completed / maxVal) * 100);
-          const fH = Math.round((b.failed / maxVal) * 100);
-          const label = new Date(b.periodStart).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-          return `<div class="bar-col">
-            <div class="bar completed" style="height:${cH}%" title="${b.completed} completed"></div>
-            <div class="bar failed"    style="height:${fH}%" title="${b.failed} failed"></div>
-            <div class="bar-label">${label}</div>
-          </div>`;
-        }).join('');
-      } catch (_) {}
-    }
+async function loadDashboard() {
+  try {
+    const summary = await Analytics.summary();
+    updateDashboardFromSummary(summary);
+    await updateTrend();
+  } catch (err) {
+    document.getElementById('subhead').textContent = '';
+    document.getElementById('kpiGrid').innerHTML =
+      `<div class="notice error">Could not load KPIs: ${err.message || 'Unknown error'}. Is the backend running?</div>`;
+  }
+}
 
-    function updateDashboardFromSummary(summary) {
-      document.getElementById('subhead').textContent = 'Live data — updates in real time via SSE.';
+async function updateTrend() {
+  try {
+    const trend = await Analytics.trend(currentTrendHours);
+    const buckets = trend.buckets || [];
+    renderTrend(buckets);
+    document.getElementById('trendTitle').textContent =
+      `Payments - Last ${currentTrendHours} Hours (Trend)`;
+    document.getElementById('failureWindowLabel').textContent =
+      `Count (last ${currentTrendHours}h)`;
+  } catch (_) {
+    document.getElementById('trendBars').innerHTML =
+      '<div class="empty-state">Could not load trend data.</div>';
+  }
+}
 
-      document.getElementById('kpiGrid').innerHTML = [
-        kpiCard('Total Payments', summary.totalPayments, ''),
-        kpiCard('Success Rate', summary.successRatePct.toFixed(1) + '%', 'green', 'COMPLETED / total terminal'),
-        kpiCard('Failure Rate', summary.failureRatePct.toFixed(1) + '%', 'red', 'FAILED / total terminal'),
-        kpiCard('Avg. Processing Time', summary.avgProcessingTimeSeconds.toFixed(2) + 's', 'blue', 'CREATED to terminal'),
-        kpiCard('Throughput', summary.throughputPerMinute.toFixed(1) + '/min', 'blue', 'trailing window')
-      ].join('');
+function renderTrend(buckets) {
+  const shown = buckets.slice(-Math.min(24, buckets.length));
+  const barsEl = document.getElementById('trendBars');
+  const legendEl = document.getElementById('trendLegend');
 
-      const vol = summary.volumeByCurrency || {};
-      document.getElementById('volumeGrid').innerHTML =
-        kpiCard('INR Volume', formatMoney(vol.INR || 0, 'INR'), '', 'sum of INR payments') +
-        kpiCard('USD Volume', formatMoney(vol.USD || 0, 'USD'), '', 'sum of USD payments');
+  if (!shown.length) {
+    barsEl.innerHTML = '<div class="empty-state">No data for the selected window.</div>';
+    legendEl.innerHTML = '';
+    return;
+  }
 
-      const reasons = summary.topFailureReasons || {};
-      const tbody = document.getElementById('failureTable');
-      const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
-      if (entries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="2" class="empty-state">No failures in the last 24h 🎉</td></tr>';
-      } else {
-        tbody.innerHTML = entries.map(([code, count]) =>
-          `<tr><td><code>${code}</code></td><td>${count}</td></tr>`
-        ).join('');
-      }
-    }
+  if (currentTrendView === 'currency') {
+    const maxVal = Math.max(1, ...shown.map(b => {
+      const vol = b.volumeByCurrency || {};
+      return Number(vol.INR || 0) + Number(vol.USD || 0);
+    }));
 
-    function kpiCard(label, value, colorClass, sub) {
-      return `<div class="kpi-card ${colorClass}">
-        <div class="label">${label}</div>
-        <div class="value">${value}</div>
-        ${sub ? `<div class="sub">${sub}</div>` : ''}
+    barsEl.innerHTML = shown.map(b => {
+      const vol = b.volumeByCurrency || {};
+      const inr = Number(vol.INR || 0);
+      const usd = Number(vol.USD || 0);
+      const total = inr + usd;
+      const inrH = total > 0 ? Math.round((inr / maxVal) * 100) : 0;
+      const usdH = total > 0 ? Math.round((usd / maxVal) * 100) : 0;
+      const label = new Date(b.periodStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      return `<div class="bar-col">
+        <div class="bar completed" style="height:${inrH}%" title="INR ${inr.toFixed(2)}"></div>
+        <div class="bar failed" style="height:${usdH}%" title="USD ${usd.toFixed(2)}"></div>
+        <div class="bar-label">${label}</div>
       </div>`;
-    }
+    }).join('');
 
-    // Initial load
-    loadDashboard();
+    legendEl.innerHTML = '<span>INR Volume</span><span>USD Volume</span>';
+    return;
+  }
 
-    // SSE: real-time KPI push (MEM-027)
-    (function initSSE() {
-      if (!window.EventSource) { setInterval(loadDashboard, 30000); return; }
-      let retryCount = 0;
-      function connect() {
-        const es = new EventSource('/api/v1/analytics/stream');
-        es.addEventListener('kpi', (e) => {
-          try { updateDashboardFromSummary(JSON.parse(e.data)); updateTrend(); retryCount = 0; } catch (_) {}
-        });
-        es.onerror = () => {
-          es.close();
-          retryCount++;
-          if (retryCount >= 5) { setInterval(loadDashboard, 30000); return; }
-          setTimeout(connect, Math.min(30000, 1000 * Math.pow(2, retryCount)));
-        };
-      }
-      connect();
-    })();
-</script>
+  const maxVal = Math.max(1, ...shown.map(b => Math.max(b.created || 0, b.completed || 0, b.failed || 0)));
+  barsEl.innerHTML = shown.map(b => {
+    const cH = Math.round(((b.completed || 0) / maxVal) * 100);
+    const fH = Math.round(((b.failed || 0) / maxVal) * 100);
+    const label = new Date(b.periodStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="bar-col">
+      <div class="bar completed" style="height:${cH}%" title="${b.completed || 0} completed"></div>
+      <div class="bar failed" style="height:${fH}%" title="${b.failed || 0} failed"></div>
+      <div class="bar-label">${label}</div>
+    </div>`;
+  }).join('');
+  legendEl.innerHTML = '<span>Completed</span><span>Failed</span>';
+}
 
-document.getElementById('trendWindow').addEventListener('change', (e) => {
-  currentTrendHours = parseInt(e.target.value, 10);
-  loadDashboard();
+function updateDashboardFromSummary(summary) {
+  document.getElementById('subhead').textContent = 'Live data - updates in real time via SSE.';
+
+  document.getElementById('kpiGrid').innerHTML = [
+    kpiCard('Total Payments', summary.totalPayments, ''),
+    kpiCard('Success Rate', summary.successRatePct.toFixed(1) + '%', 'green', 'COMPLETED / terminal'),
+    kpiCard('Failure Rate', summary.failureRatePct.toFixed(1) + '%', 'red', 'FAILED / terminal'),
+    kpiCard('Avg. Processing Time', summary.avgProcessingTimeSeconds.toFixed(2) + 's', 'blue', 'CREATED to COMPLETED'),
+    kpiCard('Throughput', summary.throughputPerMinute.toFixed(1) + '/min', 'blue', 'trailing window')
+  ].join('');
+
+  const vol = summary.volumeByCurrency || {};
+  document.getElementById('volumeGrid').innerHTML =
+    kpiCard('INR Volume', formatMoney(vol.INR || 0, 'INR'), '', 'sum of COMPLETED INR payments') +
+    kpiCard('USD Volume', formatMoney(vol.USD || 0, 'USD'), '', 'sum of COMPLETED USD payments');
+
+  const reasons = summary.topFailureReasons || {};
+  const tbody = document.getElementById('failureTable');
+  const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="2" class="empty-state">No failures in the last ${currentTrendHours}h</td></tr>`;
+  } else {
+    tbody.innerHTML = entries.map(([code, count]) =>
+      `<tr><td><code>${code}</code></td><td>${count}</td></tr>`
+    ).join('');
+  }
+}
+
+function kpiCard(label, value, colorClass, sub) {
+  return `<div class="kpi-card ${colorClass}">
+    <div class="label">${label}</div>
+    <div class="value">${value}</div>
+    ${sub ? `<div class="sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+document.getElementById('trendWindow').addEventListener('change', async (e) => {
+  currentTrendHours = parseInt(e.target.value, 10) || 24;
+  await updateTrend();
+  await loadDashboard();
 });
 
 document.getElementById('trendView').addEventListener('change', (e) => {
   currentTrendView = e.target.value;
-  renderTrend();
+  updateTrend();
 });
-
-loadDashboard();
 
 // SSE: replace 30s poll with server-sent events (MEM-027)
 (function initSSE() {
   if (!window.EventSource) {
-    // Fallback: browser doesn't support SSE
     setInterval(loadDashboard, 30000);
     return;
   }
+
   let retryCount = 0;
   function connect() {
     const es = new EventSource('/api/v1/analytics/stream');
@@ -182,22 +206,26 @@ loadDashboard();
       try {
         const summary = JSON.parse(e.data);
         updateDashboardFromSummary(summary);
+        updateTrend();
         retryCount = 0;
       } catch (_) {}
     });
+
     es.onerror = () => {
       es.close();
       retryCount++;
       if (retryCount >= 5) {
-        // Give up on SSE, fall back to poll
         setInterval(loadDashboard, 30000);
         return;
       }
       setTimeout(connect, Math.min(30000, 1000 * Math.pow(2, retryCount)));
     };
   }
+
   connect();
 })();
+
+loadDashboard();
 </script>
 </body>
 </html>
