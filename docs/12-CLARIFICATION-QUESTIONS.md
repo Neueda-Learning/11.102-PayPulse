@@ -106,9 +106,9 @@ Bring this list to the next instructor check-in. Log every answer as a new dated
 - **Why it matters:** Affects whether cancellation needs a companion config toggle (`paypulse.processing.simulated-delay-ms`) added in this wave or not.
 
 ### Q16. Does Multi-Currency Conversion (#20) need real cross-currency settlement, or is display-only sufficient?
-- **Question:** The feature list marks full FX conversion (paying an INR account's funds out as USD) as **Future/post-MVP**. V2 ships only a **display-only** rate hint (MEM-031). Is that sufficient for this delivery, or is there appetite/time to attempt real conversion (with all the rounding/reconciliation complexity that implies)?
-- **Our default:** Display-only for this wave; full conversion remains explicitly out of scope pending confirmation.
-- **Why it matters:** Real conversion is a significantly larger scope item (live rate feed, FX-loss accounting, reconciliation) — worth confirming before any engineering time is spent beyond the display hint.
+- **Question:** The feature list marks full FX conversion (paying an INR account's funds out as USD) as **Future/post-MVP**. V2 now narrows this further to a **display-only hint using a hardcoded present INR↔USD reference rate** (MEM-031), with no backend lookup/API. Is that sufficient for this delivery, or is there appetite/time to attempt real conversion later?
+- **Our default:** Hardcoded display-only hint for this wave; full conversion remains explicitly out of scope pending confirmation.
+- **Why it matters:** Real conversion is a significantly larger scope item (live rate feed, FX-loss accounting, reconciliation); the hardcoded hint is intentionally minimal and demo-oriented.
 
 ### Q17. Notification provider — real SMTP or a mock/log-only sink for the presentation?
 - **Question:** Is a real SMTP provider (e.g. a sandbox Mailtrap/SendGrid account) expected to be wired up for the live demo, or is logging to `notification_log` (with `EmailService` mocked/no-op) sufficient to demonstrate the wiring/audit-trail mechanics?
