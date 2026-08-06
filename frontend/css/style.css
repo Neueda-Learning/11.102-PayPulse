@@ -47,6 +47,8 @@ main{max-width:1080px;margin:0 auto;padding:28px 24px 60px}
 .badge.SENT{background:#fef3c7;color:#92400e}
 .badge.COMPLETED{background:#dcfce7;color:#15803d}
 .badge.FAILED{background:#fee2e2;color:#b91c1c}
+.badge.CANCELLED{background:#f3f4f6;color:#4b5563}
+.badge.REVERSED{background:#dbeafe;color:#1d4ed8}
 
 /* ── Table ── */
 .table{width:100%;border-collapse:collapse;font-size:13px}

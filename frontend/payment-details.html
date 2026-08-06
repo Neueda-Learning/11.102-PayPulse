@@ -116,7 +116,7 @@ async function loadPaymentDetails() {
             <button type="button" class="btn ghost copy-btn" id="copy-id-btn">Copy ID</button>
             <button type="button" class="btn ghost copy-btn" id="copy-link-btn">Copy Link</button>
           </span>
-          &nbsp; ${badgeHtml(payment.status)}
+          &nbsp; ${badgeHtml(payment.status, payment.reversed)}
         </h2>
         ${errorBlock}
         <dl class="field-list">

@@ -239,7 +239,7 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
       </div>
       <dl class="field-list">
         <dt>Payment ID</dt><dd>${payment.id}</dd>
-        <dt>Status</dt><dd>${badgeHtml(payment.status)}</dd>
+        <dt>Status</dt><dd>${badgeHtml(payment.status, payment.reversed)}</dd>
         <dt>Debited</dt><dd>${formatMoney(payment.amount, payment.currency)}</dd>
         <dt>Payout</dt><dd>${payout}</dd>
         <dt>FX Rate</dt><dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>

@@ -132,7 +132,14 @@ function formatDateTime(iso) {
   });
 }
 
-function badgeHtml(status) {
+function badgeHtml(status, reversed) {
+  // A reversed COMPLETED payment should surface as "REVERSED" in the UI
+  // rather than the misleading "COMPLETED" (success) badge — the money
+  // was moved back out via an offsetting payment, so this is no longer
+  // a "successful, final" state from the user's point of view.
+  if (reversed) {
+    return `<span class="badge REVERSED">REVERSED</span>`;
+  }
   return `<span class="badge ${status}">${status}</span>`;
 }
 
