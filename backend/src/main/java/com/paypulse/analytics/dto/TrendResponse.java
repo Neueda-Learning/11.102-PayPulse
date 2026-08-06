@@ -1,8 +1,10 @@
 package com.paypulse.analytics.dto;
 
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TrendResponse {
@@ -15,5 +17,6 @@ public class TrendResponse {
         private long completed;
         private long failed;
         private long cancelled;
+        private Map<String, BigDecimal> volumeByCurrency;
     }
 }

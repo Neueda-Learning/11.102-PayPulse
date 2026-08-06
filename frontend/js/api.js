@@ -76,7 +76,20 @@ const Payments = {
 
   validate: (id) => apiFetch(`/payments/${id}/validate`, { method: 'POST' }),
   send:     (id) => apiFetch(`/payments/${id}/send`,     { method: 'POST' }),
-  complete: (id) => apiFetch(`/payments/${id}/complete`, { method: 'POST' })
+  complete: (id) => apiFetch(`/payments/${id}/complete`, { method: 'POST' }),
+
+  // ── CSV Export (feature #14, V2) ────────────────────────────────────────
+  // Not routed through apiFetch — this triggers a browser file download,
+  // not a JSON response. Same filters as list(), no pagination (full
+  // filtered result, subject to the server's row-count cap).
+  exportUrl: (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.status)          qs.set('status', params.status);
+    if (params.search)          qs.set('search', params.search);
+    if (params.sourceAccountId) qs.set('sourceAccountId', params.sourceAccountId);
+    qs.set('sort', params.sort || 'createdAt,desc');
+    return `${API_BASE}/payments/export?${qs.toString()}`;
+  }
 };
 
 // ── Analytics ────────────────────────────────────────────────────────────────

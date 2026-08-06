@@ -38,6 +38,7 @@
            aria-label="Search payments"/>
     <button class="btn ghost" id="clearBtn" type="button">Clear</button>
     <button class="btn" id="refreshBtn" type="button">Refresh</button>
+    <button class="btn ghost" id="exportBtn" type="button" title="Download the current filtered list as CSV">⬇ Export CSV</button>
   </div>
 
   <div class="card" style="padding:0;">
@@ -190,6 +191,46 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   document.getElementById('statusFilter').value = '';
   document.getElementById('searchBox').value = '';
   loadPayments(0);
+});
+
+// ── CSV Export (feature #14, V2) ──────────────────────────────────────────
+// Exports the FULL filtered result set (current status/search filters),
+// not just the current page. Uses fetch()+Blob (not a raw navigation) so
+// that an error response (e.g. 400 EXPORT_TOO_LARGE) shows a proper inline
+// notice instead of replacing the whole page with raw JSON.
+document.getElementById('exportBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('exportBtn');
+  const status = document.getElementById('statusFilter').value;
+  const search = document.getElementById('searchBox').value.trim();
+  const url = Payments.exportUrl({ status, search });
+
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Exporting...';
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw err;
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match ? match[1] : `payments-export-${Date.now()}.csv`;
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (err) {
+    alert(`Export failed: ${err.message || 'Unknown error'}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 });
 
 // Support ?status=FAILED deep link
