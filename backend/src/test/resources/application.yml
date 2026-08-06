@@ -18,5 +18,10 @@ spring:
 
 # Add this at the bottom, aligned fully to the left
 paypulse:
+  fx:
+    as-of: 2026-08-06T00:00:00Z
+    rates:
+      INR-USD: 0.012
+      USD-INR: 83.330000
   cors:
     allowed-origins: "http://localhost:3000"

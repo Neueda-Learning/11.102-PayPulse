@@ -63,6 +63,7 @@ class AmountValidatorTest {
         return CreatePaymentRequest.builder()
                 .sourceAccountId("b2c3d4e5-1111-4a11-8a11-111111111111")
                 .currency(currency)
+                .targetCurrency(currency)
                 .amount(amount)
                 .destinationAccount("ACC2000002")
                 .build();

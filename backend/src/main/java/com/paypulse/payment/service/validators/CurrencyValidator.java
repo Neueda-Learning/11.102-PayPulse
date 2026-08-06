@@ -14,13 +14,17 @@ public class CurrencyValidator implements PaymentValidator {
 
     @Override
     public void validate(CreatePaymentRequest request) {
-        String currency = request.getCurrency();
+        validateCurrency("currency", request.getCurrency());
+        validateCurrency("targetCurrency", request.getTargetCurrency());
+    }
+
+    private void validateCurrency(String fieldName, String currency) {
         if (currency == null || currency.isBlank()) {
-            throw new PaymentException(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_CURRENCY, "currency is required");
+            throw new PaymentException(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_CURRENCY, fieldName + " is required");
         }
         if (!currency.equals("INR") && !currency.equals("USD")) {
             throw new PaymentException(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_CURRENCY,
-                    "currency must be INR or USD, got: " + currency);
+                    fieldName + " must be INR or USD, got: " + currency);
         }
     }
 }

@@ -42,6 +42,10 @@ public class CreatePaymentRequest {
     @Pattern(regexp = "INR|USD", message = "currency must be INR or USD")
     private String currency;
 
+    @NotBlank(message = "targetCurrency is required")
+    @Pattern(regexp = "INR|USD", message = "targetCurrency must be INR or USD")
+    private String targetCurrency;
+
     @NotBlank(message = "destinationAccount is required")
     @Size(min = 8, max = 20, message = "destinationAccount length must be 8-20")
     @Pattern(regexp = "^[A-Za-z0-9]{8,20}$", message = "destinationAccount must be alphanumeric")

@@ -37,6 +37,15 @@ public class Payment {
     @Column(length = 3, nullable = false)
     private String currency;
 
+    @Column(name = "target_currency", length = 3, nullable = false)
+    private String targetCurrency;
+
+    @Column(name = "converted_amount", precision = 19, scale = 2, nullable = false)
+    private BigDecimal convertedAmount;
+
+    @Column(name = "fx_rate", precision = 19, scale = 6, nullable = false)
+    private BigDecimal fxRate;
+
 
     @Column(length = 255)
     private String reference;

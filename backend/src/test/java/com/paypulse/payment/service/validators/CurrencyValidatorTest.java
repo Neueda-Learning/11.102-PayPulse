@@ -51,10 +51,21 @@ class CurrencyValidatorTest {
                 .isInstanceOf(PaymentException.class);
     }
 
+    @Test
+    void null_target_currency_throws() {
+        CreatePaymentRequest request = request("INR");
+        request.setTargetCurrency(null);
+
+        assertThatThrownBy(() -> validator.validate(request))
+                .isInstanceOf(PaymentException.class)
+                .hasMessageContaining("targetCurrency");
+    }
+
     private CreatePaymentRequest request(String currency) {
         return CreatePaymentRequest.builder()
                 .sourceAccountId("b2c3d4e5-1111-4a11-8a11-111111111111")
                 .currency(currency)
+                .targetCurrency("INR")
                 .amount(new BigDecimal("100.00"))
                 .destinationAccount("ACC2000002")
                 .build();

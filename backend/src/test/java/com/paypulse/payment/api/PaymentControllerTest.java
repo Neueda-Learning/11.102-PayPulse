@@ -94,7 +94,7 @@ class PaymentControllerTest {
     @Test
     void createPayment_validationError_returns400() throws Exception {
         String body = """
-                {"sourceAccountId":"not-a-uuid","amount":100,"currency":"INR","destinationAccount":"ACC2000002"}
+                {"sourceAccountId":"not-a-uuid","amount":100,"currency":"INR","targetCurrency":"INR","destinationAccount":"ACC2000002"}
                 """;
 
         mockMvc.perform(post("/api/v1/payments")
@@ -176,6 +176,7 @@ class PaymentControllerTest {
                 .sourceAccountId("b2c3d4e5-1111-4a11-8a11-111111111111")
                 .amount(new BigDecimal("100.00"))
                 .currency("INR")
+                .targetCurrency("INR")
                 .destinationAccount("ACC2000002")
                 .reference("Invoice #4471")
                 .build();
@@ -188,6 +189,9 @@ class PaymentControllerTest {
                 .destinationAccount("ACC9001001")
                 .amount(new BigDecimal("100.00"))
                 .currency("INR")
+                .targetCurrency("INR")
+                .convertedAmount(new BigDecimal("100.00"))
+                .fxRate(BigDecimal.ONE)
                 .status(status)
                 .build();
     }

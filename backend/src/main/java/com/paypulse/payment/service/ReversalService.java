@@ -37,6 +37,7 @@ public class ReversalService {
         reversalRequest.setDestinationAccount(original.getDestinationAccount());
         reversalRequest.setAmount(original.getAmount());
         reversalRequest.setCurrency(original.getCurrency());
+        reversalRequest.setTargetCurrency(original.getTargetCurrency());
         reversalRequest.setReference("Reversal of " + original.getId());
 
         Payment reversalPayment = paymentService.createReversalPayment(reversalRequest, original.getId());

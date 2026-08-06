@@ -23,6 +23,7 @@ public enum ErrorCode {
     INSUFFICIENT_FUNDS,
     PAYMENT_NOT_CANCELLABLE,
     PAYMENT_ALREADY_REVERSED,
+    FX_RATE_UNAVAILABLE,
 
     // System / simulation
     PROCESSING_ERROR,

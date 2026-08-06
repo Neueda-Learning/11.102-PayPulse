@@ -2,6 +2,8 @@ package com.paypulse.payment.service;
 
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.common.idempotency.IdempotencyService;
+import com.paypulse.fx.dto.FxRateResponse;
+import com.paypulse.fx.service.FxRateService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.PaymentMapper;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
@@ -16,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Random;
 import java.util.UUID;
 
@@ -42,6 +46,7 @@ public class PaymentService {
     private final ValidationChain validationChain;
     private final StatusTransitionEngine statusTransitionEngine;
     private final Random simulationRandom;
+    private final FxRateService fxRateService;
 
     @Value("${paypulse.simulation.create-failure-account:FAILCREATE01}")
     private String createFailureAccount;
@@ -98,14 +103,25 @@ public class PaymentService {
         simulateCreationFailure(request);
 
         Payment payment = paymentMapper.toEntity(request);
+        FxRateResponse fxQuote = fxRateService.getRate(request.getCurrency(), request.getTargetCurrency());
         payment.setId(UUID.randomUUID().toString());
         payment.setStatus(PaymentStatus.CREATED);
         payment.setIdempotencyKey(normalizeIdempotencyKey(idempotencyKey));
         payment.setErrorCode(null);
         payment.setErrorMessage(null);
         payment.setForcedFailureStage(request.getForceFailureStage());
+        payment.setTargetCurrency(fxQuote.getTo());
+        payment.setFxRate(fxQuote.getRate());
+        payment.setConvertedAmount(calculateConvertedAmount(request.getAmount(), fxQuote.getRate()));
 
         return paymentRepository.save(payment);
+    }
+
+    private BigDecimal calculateConvertedAmount(BigDecimal amount, BigDecimal fxRate) {
+        if (amount == null || fxRate == null) {
+            return amount;
+        }
+        return amount.multiply(fxRate).setScale(2, RoundingMode.HALF_UP);
     }
 
     private String normalizeIdempotencyKey(String idempotencyKey) {

@@ -25,6 +25,9 @@ public class PaymentResponse {
     private String sourceAccountId;
     private BigDecimal amount;
     private String currency;
+    private String targetCurrency;
+    private BigDecimal convertedAmount;
+    private BigDecimal fxRate;
     private String destinationAccount;
     private String reference;
     private PaymentStatus status;

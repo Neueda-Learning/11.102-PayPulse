@@ -147,6 +147,12 @@ paypulse:
     complete-failure-account: FAILCOMPLETE01 # NEW — fails SENT -> FAILED
     random-failure-rate: 0.05
 
+  fx:
+    as-of: 2026-08-06T00:00:00Z
+    rates:
+      INR-USD: 0.012
+      USD-INR: 83.330000
+
   notification:
     email:
       from-address: ${MAIL_FROM_ADDRESS:noreply@paypulse.io}

@@ -14,6 +14,11 @@ spring:
     enabled: false           # Use ddl-auto in tests, not Flyway migrations
 
 paypulse:
+  fx:
+    as-of: 2026-08-06T00:00:00Z
+    rates:
+      INR-USD: 0.012
+      USD-INR: 83.330000
   notification:
     email:
       from-address: noreply@paypulse.io
