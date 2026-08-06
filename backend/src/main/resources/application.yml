@@ -161,8 +161,8 @@ paypulse:
   fx:
     as-of: 2026-08-06T00:00:00Z
     rates:
-      INR-USD: 0.012
-      USD-INR: 83.330000
+      INR-USD: 0.011
+      USD-INR: 95.24
   export:
     max-rows: 50000   # feature #14 (CSV export) — reject filters exceeding this with EXPORT_TOO_LARGE
     batch-size: 500   # rows fetched per DB round-trip while streaming (bounded memory)
