@@ -16,8 +16,7 @@ public class TrendResponse {
         private long created;
         private long completed;
         private long failed;
-
-        /** V2 (feature #13 deepening) — total payment volume in this bucket, broken down by currency. */
+        private long cancelled;
         private Map<String, BigDecimal> volumeByCurrency;
     }
 }

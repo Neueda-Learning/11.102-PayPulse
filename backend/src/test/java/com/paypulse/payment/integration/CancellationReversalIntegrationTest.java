@@ -114,7 +114,7 @@ class CancellationReversalIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("errorCode")).isEqualTo("PAYMENT_NOT_CANCELLABLE");
+        assertThat(response.getBody().get("errorCode")).isEqualTo("INVALID_STATUS_TRANSITION");
     }
 
     @Test

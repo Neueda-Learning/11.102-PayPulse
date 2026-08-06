@@ -52,10 +52,14 @@ public class AnalyticsService {
         long failed = paymentRepository.countByStatusAndCreatedAtBetween(
                 PaymentStatus.FAILED, from, to);
 
-        long terminal = completed + failed;
+        long cancelled = paymentRepository.countByStatusAndCreatedAtBetween(
+                PaymentStatus.CANCELLED, from, to);
+
+        long terminal = completed + failed + cancelled;
 
         double successRate = terminal == 0 ? 0.0 : (completed * 100.0) / terminal;
         double failureRate = terminal == 0 ? 0.0 : (failed * 100.0) / terminal;
+        double cancelledRate = terminal == 0 ? 0.0 : (cancelled * 100.0) / terminal;
 
         Double avgSeconds = historyRepository.avgProcessingTimeSeconds(from, to);
 
@@ -94,6 +98,8 @@ public class AnalyticsService {
                 .totalPayments(total)
                 .successRatePct(round2(successRate))
                 .failureRatePct(round2(failureRate))
+                .cancelledRatePct(round2(cancelledRate))
+                .cancelledCount(cancelled)
                 .avgProcessingTimeSeconds(avgSeconds == null ? 0.0 : round2(avgSeconds))
                 .throughputPerMinute(round2(throughput))
                 .volumeByCurrency(volumeByCurrency)
@@ -105,8 +111,9 @@ public class AnalyticsService {
      * V2 (feature #13 deepening): now validates the requested window against a
      * configurable cap (paypulse.analytics.trend.max-hours, default 7 days) —
      * defensive bound against an unreasonably large aggregation request — and
-     * enriches each hourly bucket with a per-currency volume breakdown so the
-     * dashboard's trend view can show more than just status counts.
+     * enriches each hourly bucket with a per-currency volume breakdown, plus a
+     * cancelled-count field, so the dashboard's trend view can show more than
+     * just created/completed/failed status counts.
      */
     public TrendResponse getTrend(int hours) {
 
@@ -142,6 +149,12 @@ public class AnalyticsService {
                     bucketEnd
             );
 
+            long cancelled = paymentRepository.countByStatusAndCreatedAtBetween(
+                    PaymentStatus.CANCELLED,
+                    bucketStart,
+                    bucketEnd
+            );
+
             Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>();
             if (created > 0) {
                 for (Object[] row : paymentRepository.sumAmountByCurrency(bucketStart, bucketEnd)) {
@@ -155,6 +168,7 @@ public class AnalyticsService {
                             .created(created)
                             .completed(completed)
                             .failed(failed)
+                            .cancelled(cancelled)
                             .volumeByCurrency(volumeByCurrency)
                             .build()
             );

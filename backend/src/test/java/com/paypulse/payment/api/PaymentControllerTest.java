@@ -255,13 +255,13 @@ class PaymentControllerTest {
         String id = UUID.randomUUID().toString();
         when(reversalService.reverse(id))
                 .thenThrow(new PaymentException(org.springframework.http.HttpStatus.CONFLICT,
-                        ErrorCode.PAYMENT_NOT_CANCELLABLE,
+                        ErrorCode.INVALID_STATUS_TRANSITION,
                         "Only COMPLETED payments can be reversed"));
 
         mockMvc.perform(post("/api/v1/payments/{id}/reverse", id)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("PAYMENT_NOT_CANCELLABLE"));
+                .andExpect(jsonPath("$.errorCode").value("INVALID_STATUS_TRANSITION"));
     }
 
     @Test
