@@ -24,6 +24,9 @@ class AnalyticsControllerTest {
     @Autowired private MockMvc mockMvc;
     @MockBean private AnalyticsService analyticsService;
 
+    @MockBean
+    private io.github.bucket4j.distributed.proxy.ProxyManager<byte[]> proxyManager;
+
     @Test
     void getSummary_returns200WithBody() throws Exception {
         when(analyticsService.getSummary(any(), any())).thenReturn(

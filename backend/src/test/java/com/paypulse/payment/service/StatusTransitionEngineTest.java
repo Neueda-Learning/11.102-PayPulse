@@ -26,9 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StatusTransitionEngineTest {
@@ -51,6 +49,17 @@ class StatusTransitionEngineTest {
 
     @BeforeEach
     void setup() {
+        // 1. Lenient stubs here
+        lenient().doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Supplier<Boolean> supplier = invocation.getArgument(1);
+            supplier.get();
+            return true;
+        }).when(resilienceConfig).execute(any(String.class), any(Supplier.class));
+
+        lenient().when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // 2. Engine initialization
         engine = new StatusTransitionEngine(
                 paymentRepository,
                 historyRepository,
@@ -60,19 +69,13 @@ class StatusTransitionEngineTest {
                 eventPublisher
         );
 
+        // 3. Reflection fields
         ReflectionTestUtils.setField(engine, "validateFailureAccount", "FAILVALIDATE01");
         ReflectionTestUtils.setField(engine, "sendFailureAccount", "FAILTEST01");
         ReflectionTestUtils.setField(engine, "completeFailureAccount", "FAILCOMPLETE01");
         ReflectionTestUtils.setField(engine, "randomFailureRate", 0.0d);
 
-        doAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Supplier<Boolean> supplier = invocation.getArgument(1);
-            supplier.get();
-            return true;
-        }).when(resilienceConfig).execute(any(String.class), any(Supplier.class));
-
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // DO NOT put the stubs again down here!
     }
 
     @Test
@@ -187,7 +190,8 @@ class StatusTransitionEngineTest {
 
     @Test
     void completePayment_whenDeterministicFailure_transitionsToFailedWithNetworkError() {
-        Payment payment = paymentWithStatus(PaymentStatus.SENT, "FAILTEST01");
+        // Change "FAILTEST01" to "FAILCOMPLETE01"
+        Payment payment = paymentWithStatus(PaymentStatus.SENT, "FAILCOMPLETE01");
 
         Payment updated = engine.completePayment(payment, TriggeredBy.CLIENT);
 

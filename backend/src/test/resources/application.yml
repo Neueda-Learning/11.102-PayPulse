@@ -16,6 +16,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
 # Add this at the bottom, aligned fully to the left
 paypulse:
   fx:
@@ -25,3 +30,5 @@ paypulse:
       USD-INR: 83.330000
   cors:
     allowed-origins: "http://localhost:3000"
+  rate-limit:
+    global-requests-per-minute: 100

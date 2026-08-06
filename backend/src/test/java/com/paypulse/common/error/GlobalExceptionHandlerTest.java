@@ -4,6 +4,7 @@ import com.paypulse.payment.service.PaymentException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,9 @@ class GlobalExceptionHandlerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+    @MockBean
+    private io.github.bucket4j.distributed.proxy.ProxyManager<byte[]> proxyManager;
 
 	@RestController
 	static class ThrowingController {

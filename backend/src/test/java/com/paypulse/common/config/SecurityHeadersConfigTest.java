@@ -3,6 +3,7 @@ package com.paypulse.common.config;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,6 +19,9 @@ class SecurityHeadersConfigTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockBean
+    private io.github.bucket4j.distributed.proxy.ProxyManager<byte[]> proxyManager;
 
     @RestController
     static class PingController {

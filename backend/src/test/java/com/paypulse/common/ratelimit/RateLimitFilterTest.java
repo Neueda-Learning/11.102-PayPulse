@@ -3,6 +3,7 @@ package com.paypulse.common.ratelimit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
@@ -44,6 +45,9 @@ class RateLimitFilterTest {
     @Autowired
     private TestRestTemplate restTemplate;
 
+//    @MockBean
+//    private io.github.bucket4j.distributed.proxy.ProxyManager<byte[]> proxyManager;
+//
     @Test
     void exceedingPerClientLimit_returns429WithHeaders() {
         String url = "http://localhost:" + port + "/api/v1/accounts";
