@@ -184,12 +184,17 @@ async function loadPaymentDetails() {
     const timeline = document.getElementById('timeline');
     (history || []).forEach(h => {
       const li = document.createElement('li');
-      const desc = h.previousStatus
-        ? `${h.previousStatus} → ${h.newStatus}`
-        : `Payment created (${h.newStatus})`;
+      const sameStatus = h.previousStatus && h.previousStatus === h.newStatus;
+      const desc = sameStatus
+        ? (h.errorMessage || `${h.newStatus} (updated)`)
+        : (h.previousStatus
+            ? `${h.previousStatus} → ${h.newStatus}`
+            : `Payment created (${h.newStatus})`);
       const errPart = h.errorCode
         ? ` <span style="color:#b91c1c;">(${h.errorCode}: ${h.errorMessage || ''})</span>`
-        : '';
+        : (!sameStatus && h.errorMessage
+            ? ` <span style="color:#2563eb;">(${h.errorMessage})</span>`
+            : '');
       li.innerHTML = `<span class="t-time">${formatDateTime(h.occurredAt)}</span><span>${desc}${errPart}</span>`;
       timeline.appendChild(li);
     });

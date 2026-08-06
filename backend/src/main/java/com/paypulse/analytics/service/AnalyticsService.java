@@ -7,11 +7,13 @@ import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
 import com.paypulse.payment.service.PaymentException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -25,13 +27,28 @@ public class AnalyticsService {
     private final PaymentRepository paymentRepository;
     private final PaymentStatusHistoryRepository historyRepository;
     private final int maxTrendHours;
+    private final int throughputWindowMinutes;
 
+    /**
+     * Kept for backward compatibility with existing unit tests that construct
+     * this service with 3 args — defaults the throughput trailing window to
+     * 5 minutes. The 4-arg constructor below is the one Spring actually uses.
+     */
     public AnalyticsService(PaymentRepository paymentRepository,
                             PaymentStatusHistoryRepository historyRepository,
-                            @Value("${paypulse.analytics.trend.max-hours:168}") int maxTrendHours) {
+                            int maxTrendHours) {
+        this(paymentRepository, historyRepository, maxTrendHours, 5);
+    }
+
+    @Autowired
+    public AnalyticsService(PaymentRepository paymentRepository,
+                            PaymentStatusHistoryRepository historyRepository,
+                            @Value("${paypulse.analytics.trend.max-hours:168}") int maxTrendHours,
+                            @Value("${paypulse.analytics.throughput.window-minutes:5}") int throughputWindowMinutes) {
         this.paymentRepository = paymentRepository;
         this.historyRepository = historyRepository;
         this.maxTrendHours = maxTrendHours;
+        this.throughputWindowMinutes = throughputWindowMinutes;
     }
 
     public KpiSummaryResponse getSummary(String fromStr, String toStr) {
@@ -63,12 +80,23 @@ public class AnalyticsService {
 
         Double avgSeconds = historyRepository.avgProcessingTimeSeconds(from, to);
 
-        double minutes = Math.max(
-                1.0,
-                (double) ChronoUnit.MINUTES.between(from, to)
-        );
 
-        double throughput = total / minutes;
+        // Throughput is intentionally NOT total/minutes over the (potentially
+        // multi-day) requested from/to window — that would make even a
+        // healthy system look like it has ~0 throughput once the window
+        // spans more than a few minutes (e.g. 10 payments / 1440 minutes
+        // rounds to 0.00). Per FR-12.1 this is a "trailing window" metric:
+        // it always looks at the most recent `throughputWindowMinutes`
+        // (default 5) up to `to`, clamped to the requested range if that
+        // range is itself shorter.
+        Duration requestedWindow = Duration.between(from, to);
+        Duration throughputWindow = requestedWindow.compareTo(Duration.ofMinutes(throughputWindowMinutes)) < 0
+                ? requestedWindow
+                : Duration.ofMinutes(throughputWindowMinutes);
+        Instant throughputFrom = to.minus(throughputWindow);
+        long trailingCount = paymentRepository.countByCreatedAtBetween(throughputFrom, to);
+        double throughputMinutes = Math.max(1.0, throughputWindow.toSeconds() / 60.0);
+        double throughput = trailingCount / throughputMinutes;
 
         Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>();
 

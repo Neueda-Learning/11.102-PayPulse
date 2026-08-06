@@ -7,6 +7,7 @@ import com.paypulse.notification.service.NotificationService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
 import com.paypulse.payment.domain.Payment;
+import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -29,6 +30,7 @@ public class ReversalService {
     private final PaymentService paymentService;
     private final AccountRepository accountRepository;
     private final NotificationService notificationService;
+    private final StatusTransitionEngine statusTransitionEngine;
 
     @Transactional
     public Payment reverse(String id) {
@@ -58,6 +60,8 @@ public class ReversalService {
         original.setReversed(true);
         original.setReversalPaymentId(reversalPayment.getId());
         paymentRepository.save(original);
+
+        statusTransitionEngine.recordReversal(original, reversalPayment.getId(), TriggeredBy.CLIENT);
 
         notifyReversed(original, reversalPayment);
 

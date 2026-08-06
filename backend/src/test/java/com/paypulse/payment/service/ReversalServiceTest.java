@@ -6,6 +6,7 @@ import com.paypulse.common.error.ErrorCode;
 import com.paypulse.notification.service.NotificationService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.domain.Payment;
+import com.paypulse.payment.domain.TriggeredBy;
 import com.paypulse.payment.repository.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,11 +44,15 @@ class ReversalServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private StatusTransitionEngine statusTransitionEngine;
+
     private ReversalService reversalService;
 
     @BeforeEach
     void setup() {
-        reversalService = new ReversalService(paymentRepository, paymentService, accountRepository, notificationService);
+        reversalService = new ReversalService(paymentRepository, paymentService, accountRepository,
+                notificationService, statusTransitionEngine);
         // Default: no account found -> notifyReversed() no-ops safely (logs a warning, doesn't throw).
         lenient().when(accountRepository.findById(any())).thenReturn(Optional.empty());
     }
@@ -104,6 +109,8 @@ class ReversalServiceTest {
         ArgumentCaptor<Payment> savedCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(savedCaptor.capture());
         assertThat(savedCaptor.getValue().isReversed()).isTrue();
+
+        verify(statusTransitionEngine).recordReversal(original, reversalPayment.getId(), TriggeredBy.CLIENT);
     }
 
     @Test

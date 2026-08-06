@@ -159,6 +159,8 @@ paypulse:
   analytics:
     trend:
       max-hours: 168  # feature #13 (trend view) — cap the window to 7 days to bound query cost
+    throughput:
+      window-minutes: 5  # trailing window (independent of the summary from/to range) used to compute throughputPerMinute
 
   notification:
     email:

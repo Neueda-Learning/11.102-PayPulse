@@ -231,4 +231,22 @@ public class StatusTransitionEngine {
     public Payment cancelPayment(Payment payment, TriggeredBy triggeredBy) {
         return transition(payment, Action.CANCEL, triggeredBy, null, null);
     }
+
+    /**
+     * Records an audit-trail entry for a COMPLETED payment that has just been
+     * reversed. The payment's own {@code status} column stays COMPLETED (per
+     * design — reversal is tracked via the reversed/reversalPaymentId flags,
+     * not a status transition) so this writes a same-status
+     * (COMPLETED -> COMPLETED) history row purely as an audit annotation,
+     * carrying the reversal payment id in errorMessage (no errorCode, since
+     * this is not a failure) so the timeline UI can surface it.
+     */
+    @Transactional
+    public void recordReversal(Payment original, String reversalPaymentId, TriggeredBy triggeredBy) {
+        Instant occurredAt = Instant.now();
+        String note = "Reversed by payment " + reversalPaymentId;
+        saveHistory(original.getId(), original.getStatus(), original.getStatus(), null, note, triggeredBy, occurredAt);
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                original.getId(), original.getStatus(), original.getStatus(), null, note, triggeredBy, occurredAt));
+    }
 }
