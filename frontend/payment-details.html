@@ -1,215 +1,279 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<title>PayPulse — Payment Details</title>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<link rel="stylesheet" href="css/style.css"/>
+    <meta charset="UTF-8"/>
+    <title>PayPulse — Payments</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="logo">P</span> PayPulse</div>
-  <nav class="nav">
-    <a href="index.html">Dashboard</a>
-    <a href="accounts.html">Accounts</a>
-    <a href="create-payment.html">Create Payment</a>
-    <a href="payments.html">Payments</a>
-  </nav>
+    <div class="brand">
+        <span class="logo">P</span>
+        <span class="brand-name">PayPulse</span>
+        <span class="tag">LIVE</span>
+    </div>
+    <nav class="nav">
+        <a href="index.html">Dashboard</a>
+        <a href="accounts.html">Accounts</a>
+        <a href="create-payment.html">New Payment</a>
+        <a href="payments.html">Payments</a>
+    </nav>
+    <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
+    </div>
 </header>
 
 <main>
-  <div class="page-head">
-    <h1>Payment Details</h1>
-    <a href="payments.html" class="btn ghost" style="margin-top:8px;">← Back to Payments</a>
-  </div>
-
-  <div id="content">
-    <div class="card">
-      <div class="empty-state"><span class="spinner"></span> Loading payment...</div>
+    <div class="page-head">
+        <div class="page-head-text">
+            <h1>Payments</h1>
+            <p>Browse, filter, and search all payment transactions. Click any row for full details.</p>
+        </div>
     </div>
-  </div>
+
+    <div class="toolbar">
+        <span class="toolbar-label">Status</span>
+        <select id="statusFilter" aria-label="Filter by status">
+            <option value="">All Statuses</option>
+            <option value="CREATED">CREATED</option>
+            <option value="VALIDATED">VALIDATED</option>
+            <option value="SENT">SENT</option>
+            <option value="COMPLETED">COMPLETED</option>
+            <option value="FAILED">FAILED</option>
+            <option value="CANCELLED">CANCELLED</option>
+        </select>
+        <span class="toolbar-sep"></span>
+        <input type="search" id="searchBox" placeholder="Search by payment ID or reference…"
+               aria-label="Search payments"/>
+        <span class="toolbar-sep"></span>
+        <button class="btn ghost btn-sm" id="clearBtn" type="button">Clear</button>
+        <button class="btn btn-sm" id="refreshBtn" type="button">Refresh</button>
+        <button class="btn ghost btn-sm" id="exportBtn" type="button" title="Export current filtered list as CSV">↓ Export CSV</button>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Payment ID</th>
+                <th>Source Account</th>
+                <th>Destination</th>
+                <th class="sortable col-amount" data-field="amount" onclick="setSort('amount')">
+                    Amount <span class="sort-indicator" id="sort-amount"></span>
+                </th>
+                <th class="sortable" data-field="status" onclick="setSort('status')">
+                    Status <span class="sort-indicator" id="sort-status"></span>
+                </th>
+                <th class="sortable" data-field="createdAt" onclick="setSort('createdAt')">
+                    Created <span class="sort-indicator" id="sort-createdAt">▼</span>
+                </th>
+            </tr>
+            </thead>
+            <tbody id="paymentsBody">
+            <tr>
+                <td colspan="6">
+                    <div class="empty-state"><span class="spinner"></span> Loading payments…</div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="pagination" class="pagination"></div>
+
+    <p class="footer-note">PayPulse · Displaying up to 20 payments per page</p>
 </main>
 
 <script src="js/api.js"></script>
 <script>
-async function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
+    /* ── Theme ── */
+    (function() {
+      const saved = localStorage.getItem('pp-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.getElementById('themeToggle').textContent = saved === 'dark' ? '☀️' : '🌙';
+    })();
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('pp-theme', next);
+      document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+    });
 
-  // Fallback for older browser contexts.
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.setAttribute('readonly', '');
-  ta.style.position = 'absolute';
-  ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  ta.remove();
-}
-
-function showCopyNotice(message) {
-  const existing = document.getElementById('copy-notice');
-  if (existing) existing.remove();
-  const notice = document.createElement('div');
-  notice.id = 'copy-notice';
-  notice.className = 'notice success';
-  notice.textContent = message;
-  document.querySelector('main').prepend(notice);
-  setTimeout(() => notice.remove(), 1800);
-}
-
-async function loadPaymentDetails() {
-  const id = getQueryParam('id');
-  const content = document.getElementById('content');
-
-  if (!id) {
-    content.innerHTML = '<div class="notice error">No payment ID specified.</div>';
-    return;
-  }
-
-  try {
-    const [payment, history] = await Promise.all([
-      Payments.getById(id),
-      Payments.getHistory(id)
-    ]);
-
-    // Try to resolve source account label
-    let accountLabel = payment.sourceAccountId;
-    try {
-      const acc = await Accounts.getById(payment.sourceAccountId);
-      accountLabel = `${acc.label} — ${acc.accountNumber} (${acc.currency})`;
-    } catch (_) {}
-
-    const errorBlock = payment.status === 'FAILED'
-      ? `<div class="notice error"><strong>${payment.errorCode}</strong>: ${payment.errorMessage || ''}</div>`
-      : '';
-
-    const reversalLink = payment.reversalPaymentId
-      ? `<dt>Reversed By</dt><dd><a href="payment-details.html?id=${payment.reversalPaymentId}">${payment.reversalPaymentId}</a></dd>`
-      : '';
-
-    const reversalOfLink = payment.reversalOfPaymentId
-      ? `<dt>Reversal Of</dt><dd><a href="payment-details.html?id=${payment.reversalOfPaymentId}">${payment.reversalOfPaymentId}</a></dd>`
-      : '';
-
-    const cancelBtn = payment.status === 'CREATED'
-      ? `<button class="btn" id="cancel-btn" style="margin-top:12px;">Cancel Payment</button>`
-      : '';
-
-    const reverseBtn = (payment.status === 'COMPLETED' && !payment.reversed)
-      ? `<button class="btn" id="reverse-btn" style="margin-top:12px;">Reverse Payment</button>`
-      : '';
-
-    const payoutAmount = payment.targetCurrency && payment.convertedAmount != null
-      ? `${formatMoney(payment.convertedAmount, payment.targetCurrency)}${payment.targetCurrency !== payment.currency ? ` <span class="subtle-meta">${formatRate(payment.fxRate, payment.currency, payment.targetCurrency)}</span>` : ''}`
-      : formatMoney(payment.amount, payment.currency);
-
-    content.innerHTML = `
-      <div class="card">
-        <h2>
-          Payment <code style="font-size:13px;">${payment.id}</code>
-          <span class="inline-actions">
-            <button type="button" class="btn ghost copy-btn" id="copy-id-btn">Copy ID</button>
-            <button type="button" class="btn ghost copy-btn" id="copy-link-btn">Copy Link</button>
-          </span>
-          &nbsp; ${badgeHtml(payment.status, payment.reversed)}
-        </h2>
-        ${errorBlock}
-        <dl class="field-list">
-          <dt>Source Account</dt><dd>${accountLabel}</dd>
-          <dt>Destination</dt>  <dd>${payment.destinationAccount}</dd>
-          <dt>Debited</dt>      <dd>${formatMoney(payment.amount, payment.currency)}</dd>
-          <dt>Source Currency</dt><dd>${payment.currency}</dd>
-          <dt>Payout Currency</dt><dd>${payment.targetCurrency || payment.currency}</dd>
-          <dt>Payout Amount</dt><dd>${payoutAmount}</dd>
-          <dt>FX Rate</dt>      <dd>${payment.fxRate != null ? formatRate(payment.fxRate, payment.currency, payment.targetCurrency || payment.currency) : '—'}</dd>
-          <dt>Reference</dt>    <dd>${payment.reference || '<span style="color:#9aa1ab;">(none)</span>'}</dd>
-          <dt>Created</dt>      <dd>${formatDateTime(payment.createdAt)}</dd>
-          <dt>Updated</dt>      <dd>${formatDateTime(payment.updatedAt)}</dd>
-          ${reversalLink}
-          ${reversalOfLink}
-        </dl>
-        ${cancelBtn}
-        ${reverseBtn}
-      </div>
-
-      <div class="card">
-        <h2>Status History (Audit Trail)</h2>
-        <ul class="timeline" id="timeline"></ul>
-      </div>
-    `;
-
-    document.getElementById('copy-id-btn')?.addEventListener('click', async () => {
-      try {
-        await copyToClipboard(payment.id);
-        showCopyNotice('Payment ID copied.');
-      } catch (_) {
-        alert('Could not copy payment ID.');
+    async function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
       }
-    });
-
-    document.getElementById('copy-link-btn')?.addEventListener('click', async () => {
-      try {
-        const deepLink = `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(payment.id)}`;
-        await copyToClipboard(deepLink);
-        showCopyNotice('Deep link copied.');
-      } catch (_) {
-        alert('Could not copy deep link.');
-      }
-    });
-
-
-    document.getElementById('cancel-btn')?.addEventListener('click', async () => {
-      try {
-        await Payments.cancel(id);
-        loadPaymentDetails();
-      } catch (err) {
-        alert(`Cancel failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
-      }
-    });
-
-    document.getElementById('reverse-btn')?.addEventListener('click', async () => {
-      try {
-        await Payments.reverse(id);
-        loadPaymentDetails();
-      } catch (err) {
-        alert(`Reverse failed: ${err.errorCode || 'UNKNOWN'} — ${err.message || ''}`);
-      }
-    });
-
-    const timeline = document.getElementById('timeline');
-    (history || []).forEach(h => {
-      const li = document.createElement('li');
-      const sameStatus = h.previousStatus && h.previousStatus === h.newStatus;
-      const desc = sameStatus
-        ? (h.errorMessage || `${h.newStatus} (updated)`)
-        : (h.previousStatus
-            ? `${h.previousStatus} → ${h.newStatus}`
-            : `Payment created (${h.newStatus})`);
-      const errPart = h.errorCode
-        ? ` <span style="color:#b91c1c;">(${h.errorCode}: ${h.errorMessage || ''})</span>`
-        : (!sameStatus && h.errorMessage
-            ? ` <span style="color:#2563eb;">(${h.errorMessage})</span>`
-            : '');
-      li.innerHTML = `<span class="t-time">${formatDateTime(h.occurredAt)}</span><span>${desc}${errPart}</span>`;
-      timeline.appendChild(li);
-    });
-
-  } catch (err) {
-    if (err.errorCode === 'PAYMENT_NOT_FOUND') {
-      content.innerHTML = `<div class="card"><div class="notice error">PAYMENT_NOT_FOUND: No payment found with id <code>${id}</code>.</div></div>`;
-    } else {
-      content.innerHTML = `<div class="card"><div class="notice error">Could not load payment: ${err.message || 'Unknown error'}</div></div>`;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:absolute;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
     }
-  }
-}
 
-loadPaymentDetails();
+    function showCopyNotice(message) {
+      const existing = document.getElementById('copy-notice');
+      if (existing) existing.remove();
+      const notice = document.createElement('div');
+      notice.id = 'copy-notice';
+      notice.className = 'notice success';
+      notice.style.cssText = 'position:fixed;top:72px;right:16px;z-index:300;max-width:280px;';
+      notice.textContent = message;
+      document.body.appendChild(notice);
+      setTimeout(() => notice.remove(), 1800);
+    }
+
+    async function copyPaymentId(event, id) {
+      event.stopPropagation();
+      event.preventDefault();
+      try {
+        await copyToClipboard(id);
+        showCopyNotice('Payment ID copied.');
+      } catch (_) { alert('Could not copy payment ID.'); }
+    }
+
+    let currentPage  = 0;
+    let totalPages   = 0;
+    let accountMap   = {};
+    let currentSort  = 'createdAt';
+    let currentDir   = 'desc';
+
+    function setSort(field) {
+      if (currentSort === field) {
+        currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort = field;
+        currentDir  = 'desc';
+      }
+      updateSortIndicators();
+      loadPayments(0);
+    }
+
+    function updateSortIndicators() {
+      ['amount', 'status', 'createdAt'].forEach(f => {
+        const el = document.getElementById('sort-' + f);
+        if (el) el.textContent = currentSort === f ? (currentDir === 'asc' ? '▲' : '▼') : '';
+      });
+    }
+
+    async function loadAccountMap() {
+      try {
+        const accs = await Accounts.list();
+        accs.forEach(a => { accountMap[a.id] = `${a.label} (${a.accountNumber})`; });
+      } catch (_) {}
+    }
+
+    async function loadPayments(page = 0) {
+      const tbody = document.getElementById('paymentsBody');
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span class="spinner"></span> Loading…</div></td></tr>`;
+
+      const status = document.getElementById('statusFilter').value;
+      const search = document.getElementById('searchBox').value.trim();
+
+      try {
+        const data = await Payments.list({ status, search, page, size: 20, sort: `${currentSort},${currentDir}` });
+        currentPage = data.number;
+        totalPages  = data.totalPages;
+
+        if (!data.content || !data.content.length) {
+          tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span class="empty-state-icon">🔍</span>No payments match the current filters.</div></td></tr>`;
+          renderPagination();
+          return;
+        }
+
+        tbody.innerHTML = data.content.map(p => {
+          const escapedId = p.id.replace(/'/g, "\\'");
+          return `
+            <tr class="clickable" onclick="window.location.href='payment-details.html?id=${encodeURIComponent(p.id)}'">
+              <td>
+                <span class="text-mono">${p.id}</span>
+                <span class="inline-actions">
+                  <button type="button" class="btn ghost copy-btn"
+                    onclick="copyPaymentId(event,'${escapedId}')">Copy</button>
+                </span>
+              </td>
+              <td>${accountMap[p.sourceAccountId] || p.sourceAccountId}</td>
+              <td class="text-mono">${p.destinationAccount}</td>
+              <td class="col-amount">
+                <span class="amount-primary">${formatMoney(p.amount, p.currency)}</span>
+                ${p.targetCurrency && p.targetCurrency !== p.currency && p.convertedAmount != null
+                  ? `<span class="amount-sub">Payout: ${formatMoney(p.convertedAmount, p.targetCurrency)}</span>`
+                  : ''}
+              </td>
+              <td>${badgeHtml(p.status, p.reversed)}</td>
+              <td>${formatDateTime(p.createdAt)}</td>
+            </tr>`;
+        }).join('');
+
+        renderPagination();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="notice error">Failed to load payments: ${err.message || 'Unknown error'}</div></td></tr>`;
+      }
+    }
+
+    function renderPagination() {
+      const el = document.getElementById('pagination');
+      if (totalPages <= 1) { el.innerHTML = ''; return; }
+      el.innerHTML = `
+        <button class="btn ghost btn-sm" onclick="loadPayments(${currentPage - 1})"
+          ${currentPage === 0 ? 'disabled' : ''}>← Previous</button>
+        <span class="pagination-info">Page ${currentPage + 1} of ${totalPages}</span>
+        <button class="btn ghost btn-sm" onclick="loadPayments(${currentPage + 1})"
+          ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next →</button>`;
+    }
+
+    document.getElementById('statusFilter').addEventListener('change', () => loadPayments(0));
+    document.getElementById('searchBox').addEventListener('input', () => loadPayments(0));
+    document.getElementById('refreshBtn').addEventListener('click', () => loadPayments(currentPage));
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      document.getElementById('statusFilter').value = '';
+      document.getElementById('searchBox').value = '';
+      loadPayments(0);
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('exportBtn');
+      const status = document.getElementById('statusFilter').value;
+      const search = document.getElementById('searchBox').value.trim();
+      const url = Payments.exportUrl({ status, search });
+
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = 'Exporting…';
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: res.statusText }));
+          throw err;
+        }
+        const blob = await res.blob();
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="([^"]+)"/);
+        const filename = match ? match[1] : `payments-export-${Date.now()}.csv`;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } catch (err) {
+        alert(`Export failed: ${err.message || 'Unknown error'}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    });
+
+    const initialStatus = getQueryParam('status');
+    if (initialStatus) document.getElementById('statusFilter').value = initialStatus;
+
+    loadAccountMap().then(() => loadPayments(0));
 </script>
 </body>
 </html>
-

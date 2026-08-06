@@ -1,60 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<title>PayPulse — Accounts</title>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<link rel="stylesheet" href="css/style.css"/>
+    <meta charset="UTF-8"/>
+    <title>PayPulse — Accounts</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="logo">P</span> PayPulse</div>
-  <nav class="nav">
-    <a href="index.html">Dashboard</a>
-    <a href="accounts.html">Accounts</a>
-    <a href="create-payment.html">Create Payment</a>
-    <a href="payments.html">Payments</a>
-  </nav>
+    <div class="brand">
+        <span class="logo">P</span>
+        <span class="brand-name">PayPulse</span>
+        <span class="tag">LIVE</span>
+    </div>
+    <nav class="nav">
+        <a href="index.html">Dashboard</a>
+        <a href="accounts.html">Accounts</a>
+        <a href="create-payment.html">New Payment</a>
+        <a href="payments.html">Payments</a>
+    </nav>
+    <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
+    </div>
 </header>
 
 <main>
-  <div class="page-head">
-    <h1>Your Accounts</h1>
-    <p>These are your own accounts. Select one as the source when creating a payment. Only ACTIVE accounts can be used to pay from.</p>
-  </div>
-
-  <div class="card">
-    <div id="accGrid" class="acc-grid">
-      <div class="empty-state"><span class="spinner"></span> Loading accounts...</div>
+    <div class="page-head">
+        <div class="page-head-text">
+            <h1>Accounts</h1>
+            <p>Your registered payment accounts. Only <strong>ACTIVE</strong> accounts can be debited when initiating a payment.</p>
+        </div>
     </div>
-  </div>
+
+    <div class="card">
+        <div id="accGrid" class="acc-grid">
+            <div class="empty-state"><span class="spinner"></span> Loading accounts…</div>
+        </div>
+    </div>
+
+    <p class="footer-note">PayPulse · Account data is read-only in this interface</p>
 </main>
 
 <script src="js/api.js"></script>
 <script>
-async function loadAccounts() {
-  const grid = document.getElementById('accGrid');
-  try {
-    const accounts = await Accounts.list();
-    if (!accounts.length) {
-      grid.innerHTML = '<div class="empty-state">No accounts found.</div>';
-      return;
+    /* ── Theme ── */
+    (function() {
+      const saved = localStorage.getItem('pp-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.getElementById('themeToggle').textContent = saved === 'dark' ? '☀️' : '🌙';
+    })();
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('pp-theme', next);
+      document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+    });
+
+    const CURRENCY_SYMBOL = { INR: '₹', USD: '$' };
+
+    async function loadAccounts() {
+      const grid = document.getElementById('accGrid');
+      try {
+        const accounts = await Accounts.list();
+        if (!accounts.length) {
+          grid.innerHTML = '<div class="empty-state"><span class="empty-state-icon">🏦</span>No accounts found.</div>';
+          return;
+        }
+        grid.innerHTML = accounts.map(acc => {
+          const isActive = acc.status === 'ACTIVE';
+          const symbol = CURRENCY_SYMBOL[acc.currency] || acc.currency;
+          return `
+            <div class="acc-card ${isActive ? 'status-active' : 'status-inactive'}">
+              <div class="acc-card-header">
+                <div>
+                  <div class="acc-label">${acc.label}</div>
+                  <div class="acc-number">${acc.accountNumber}</div>
+                </div>
+                <span class="acc-status ${acc.status}">${acc.status}</span>
+              </div>
+              <div class="acc-meta">
+                <div class="acc-currency">
+                  <span class="acc-currency-symbol">${symbol}</span>${acc.currency}
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+      } catch (err) {
+        grid.innerHTML = `<div class="notice error">Could not load accounts: ${err.message || 'Unknown error'}</div>`;
+      }
     }
-    grid.innerHTML = accounts.map(acc => `
-      <div class="acc-card">
-        <div class="acc-label">${acc.label}</div>
-        <div class="acc-number">${acc.accountNumber}</div>
-        <div>Currency: <strong>${acc.currency}</strong></div>
-        <div class="acc-status ${acc.status}">${acc.status}</div>
-      </div>
-    `).join('');
-  } catch (err) {
-    grid.innerHTML = `<div class="notice error">Could not load accounts: ${err.message || 'Unknown error'}</div>`;
-  }
-}
-loadAccounts();
+
+    loadAccounts();
 </script>
 </body>
 </html>
-
