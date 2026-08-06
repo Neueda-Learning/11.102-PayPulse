@@ -11,8 +11,15 @@
 
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
+    <!--
+      NOTE: Logback's %replace OptionTokenizer counts raw '{' / '}' characters to find
+      the end of its own {regex, replacement} block — even inside quoted strings. Any
+      literal brace in the regex (e.g. quantifiers like \d{3,19}) breaks parsing with
+      "Unexpected end of pattern string". So the masking regexes below are written
+      WITHOUT curly-brace quantifiers (using repeated \d / \d? instead).
+    -->
     <property name="MASKED_PATTERN"
-              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %replace(%replace(%replace(%msg){'(?i)(&quot;?(cardNumber|cvv|cvc|pan)&quot;?\s*[:=]\s*&quot;?)\d{3,19}', '$1****MASKED****'}){'\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{1,4}\b', '****-****-****-****'}){'(?i)(&quot;?password&quot;?\s*[:=]\s*&quot;?)[^,}\s]+', '$1****MASKED****'}%n%wEx"/>
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %replace(%replace(%replace(%msg){'(?i)(&quot;?(cardNumber|cvv|cvc|pan)&quot;?\s*[:=]\s*&quot;?)\d\d\d[0-9]*', '$1****MASKED****'}){'\b\d\d\d\d[- ]?\d\d\d\d[- ]?\d\d\d\d[- ]?\d\d?\d?\d?\b', '****-****-****-****'}){'(?i)(&quot;?password&quot;?\s*[:=]\s*&quot;?)[^,\s]+', '$1****MASKED****'}%n%wEx"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
