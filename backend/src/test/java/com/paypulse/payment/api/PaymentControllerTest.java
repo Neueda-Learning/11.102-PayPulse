@@ -2,11 +2,13 @@ package com.paypulse.payment.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paypulse.common.error.ErrorCode;
+import com.paypulse.common.export.PaymentCsvExportService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
 import com.paypulse.payment.api.dto.PaymentResponse;
 import com.paypulse.payment.domain.Payment;
 import com.paypulse.payment.domain.TriggeredBy;
+import com.paypulse.payment.read.PaymentReadRepository;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.service.PaymentCreationResult;
 import com.paypulse.payment.service.PaymentException;
@@ -50,10 +52,17 @@ class PaymentControllerTest {
     private PaymentRepository paymentRepository;
 
     @MockBean
+    private PaymentReadRepository paymentReadRepository;
+
+    @MockBean
     private StatusTransitionEngine statusTransitionEngine;
 
     @MockBean
     private PaymentMapper paymentMapper;
+
+    @MockBean
+    private PaymentCsvExportService paymentCsvExportService;
+
     @MockBean
     private com.paypulse.payment.service.ReversalService reversalService;
 

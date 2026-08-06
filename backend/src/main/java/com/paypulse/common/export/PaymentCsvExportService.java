@@ -3,7 +3,7 @@ package com.paypulse.common.export;
 import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.domain.Payment;
-import com.paypulse.payment.repository.PaymentRepository;
+import com.paypulse.payment.read.PaymentReadRepository;
 import com.paypulse.payment.service.PaymentException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,15 +42,15 @@ public class PaymentCsvExportService {
     /** Sort fields this export (and the list endpoint, MEM-033) allow — never trust a raw client-supplied column name. */
     private static final List<String> ALLOWED_SORT_FIELDS = List.of("createdAt", "amount", "status");
 
-    private final PaymentRepository paymentRepository;
+    private final PaymentReadRepository paymentReadRepository;
     private final int maxRows;
     private final int batchSize;
 
     public PaymentCsvExportService(
-            PaymentRepository paymentRepository,
+            PaymentReadRepository paymentReadRepository,
             org.springframework.core.env.Environment env
     ) {
-        this.paymentRepository = paymentRepository;
+        this.paymentReadRepository = paymentReadRepository;
         this.maxRows = env.getProperty("paypulse.export.max-rows", Integer.class, 50_000);
         this.batchSize = env.getProperty("paypulse.export.batch-size", Integer.class, 500);
     }
@@ -88,13 +88,10 @@ public class PaymentCsvExportService {
             String sortDirection
     ) {
         String field = (sortField == null || sortField.isBlank()) ? "createdAt" : sortField;
-        String direction = (sortDirection == null || sortDirection.isBlank()) ? "desc" : sortDirection;
+        String direction = normalizeSortDirection(sortDirection);
         validateSortField(field);
 
-        Sort sort = Sort.by(Sort.Direction.fromString(direction), field);
-        Pageable firstPage = PageRequest.of(0, 1, sort); // count-only probe — cheap, size=1
-
-        long totalElements = paymentRepository.search(status, search, sourceAccountId, firstPage).getTotalElements();
+        long totalElements = paymentReadRepository.count(status, search, sourceAccountId);
 
         if (totalElements > maxRows) {
             throw new PaymentException(
@@ -123,12 +120,12 @@ public class PaymentCsvExportService {
     ) throws IOException {
 
         String field = (sortField == null || sortField.isBlank()) ? "createdAt" : sortField;
-        String direction = (sortDirection == null || sortDirection.isBlank()) ? "desc" : sortDirection;
+        String direction = normalizeSortDirection(sortDirection);
 
         Sort sort = Sort.by(Sort.Direction.fromString(direction), field);
         Pageable firstPage = PageRequest.of(0, batchSize, sort);
 
-        Page<Payment> firstResult = paymentRepository.search(status, search, sourceAccountId, firstPage);
+        Page<Payment> firstResult = paymentReadRepository.search(status, search, sourceAccountId, firstPage);
 
         writer.write(String.join(",", HEADER));
         writer.write("\n");
@@ -137,7 +134,7 @@ public class PaymentCsvExportService {
         int totalPages = firstResult.getTotalPages();
         for (int page = 1; page < totalPages; page++) {
             Pageable pageable = PageRequest.of(page, batchSize, sort);
-            Page<Payment> result = paymentRepository.search(status, search, sourceAccountId, pageable);
+            Page<Payment> result = paymentReadRepository.search(status, search, sourceAccountId, pageable);
             writeRows(writer, result.getContent());
         }
 
@@ -162,6 +159,19 @@ public class PaymentCsvExportService {
                 escape(String.valueOf(p.getCreatedAt())),
                 escape(String.valueOf(p.getUpdatedAt()))
         ) + "\n";
+    }
+
+    private String normalizeSortDirection(String sortDirection) {
+        String direction = (sortDirection == null || sortDirection.isBlank()) ? "desc" : sortDirection;
+        try {
+            return Sort.Direction.fromString(direction).name().toLowerCase();
+        } catch (IllegalArgumentException ex) {
+            throw new PaymentException(
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.VALIDATION_FAILED,
+                    "Unsupported sort direction '" + direction + "'. Allowed: asc, desc"
+            );
+        }
     }
 
     /** RFC-4180-style escaping: quote any field containing a comma, quote, or newline. */

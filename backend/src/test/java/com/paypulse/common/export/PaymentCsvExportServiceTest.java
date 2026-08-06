@@ -2,7 +2,7 @@ package com.paypulse.common.export;
 
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.domain.Payment;
-import com.paypulse.payment.repository.PaymentRepository;
+import com.paypulse.payment.read.PaymentReadRepository;
 import com.paypulse.payment.service.PaymentException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.env.Environment;
@@ -24,13 +24,13 @@ import static org.mockito.Mockito.when;
 
 class PaymentCsvExportServiceTest {
 
-    private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
+    private final PaymentReadRepository paymentReadRepository = mock(PaymentReadRepository.class);
     private final Environment env = mock(Environment.class);
 
     private PaymentCsvExportService newService() {
         when(env.getProperty(eq("paypulse.export.max-rows"), eq(Integer.class), any())).thenReturn(50_000);
         when(env.getProperty(eq("paypulse.export.batch-size"), eq(Integer.class), any())).thenReturn(500);
-        return new PaymentCsvExportService(paymentRepository, env);
+        return new PaymentCsvExportService(paymentReadRepository, env);
     }
 
     private Payment samplePayment() {
@@ -61,7 +61,7 @@ class PaymentCsvExportServiceTest {
     void validateExportRequest_withinCap_returnsResolvedSort() {
         PaymentCsvExportService service = newService();
         Page<Payment> page = new PageImpl<>(List.of(samplePayment()));
-        when(paymentRepository.search(any(), any(), any(), any(Pageable.class))).thenReturn(page);
+        when(paymentReadRepository.count(any(), any(), any())).thenReturn(1L);
 
         String[] resolved = service.validateExportRequest(null, null, null, null, null);
 
@@ -72,10 +72,9 @@ class PaymentCsvExportServiceTest {
     void validateExportRequest_exceedsCap_throwsExportTooLarge() {
         when(env.getProperty(eq("paypulse.export.max-rows"), eq(Integer.class), any())).thenReturn(1);
         when(env.getProperty(eq("paypulse.export.batch-size"), eq(Integer.class), any())).thenReturn(500);
-        PaymentCsvExportService service = new PaymentCsvExportService(paymentRepository, env);
+        PaymentCsvExportService service = new PaymentCsvExportService(paymentReadRepository, env);
 
-        Page<Payment> bigPage = new PageImpl<>(List.of(samplePayment(), samplePayment()));
-        when(paymentRepository.search(any(), any(), any(), any(Pageable.class))).thenReturn(bigPage);
+        when(paymentReadRepository.count(any(), any(), any())).thenReturn(2L);
 
         assertThatThrownBy(() ->
                 service.validateExportRequest(PaymentStatus.COMPLETED, null, null, null, null)
@@ -87,7 +86,7 @@ class PaymentCsvExportServiceTest {
     void streamExport_writesHeaderAndEscapedRows() throws Exception {
         PaymentCsvExportService service = newService();
         Page<Payment> page = new PageImpl<>(List.of(samplePayment()));
-        when(paymentRepository.search(any(), any(), any(), any(Pageable.class))).thenReturn(page);
+        when(paymentReadRepository.search(any(), any(), any(), any(Pageable.class))).thenReturn(page);
 
         StringWriter writer = new StringWriter();
         service.streamExport(null, null, null, "createdAt", "desc", writer);
