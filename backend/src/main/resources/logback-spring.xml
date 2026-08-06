@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PayPulse logging configuration.
+
+  SECURITY (Log Sanitization / PII): financial log lines must never leak card
+  numbers, CVVs, or full account numbers to disk / Loki. We apply %replace regex
+  masking on the message BEFORE it is written to any appender, so masked data
+  never reaches Promtail -> Loki -> Grafana.
+-->
+<configuration>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <property name="MASKED_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %replace(%replace(%replace(%msg){'(?i)(&quot;?(cardNumber|cvv|cvc|pan)&quot;?\s*[:=]\s*&quot;?)\d{3,19}', '$1****MASKED****'}){'\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{1,4}\b', '****-****-****-****'}){'(?i)(&quot;?password&quot;?\s*[:=]\s*&quot;?)[^,}\s]+', '$1****MASKED****'}%n%wEx"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${MASKED_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <logger name="com.paypulse" level="INFO"/>
+    <logger name="org.hibernate.SQL" level="WARN"/>
+    <logger name="org.flywaydb" level="INFO"/>
+
+</configuration>
+
+

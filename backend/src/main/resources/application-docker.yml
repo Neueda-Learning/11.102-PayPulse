@@ -39,4 +39,5 @@ logging:
     com.paypulse: INFO
     org.hibernate.SQL: WARN
     org.flywaydb: INFO
+  # Console pattern + PII masking is defined in logback-spring.xml (applies to all profiles).
 

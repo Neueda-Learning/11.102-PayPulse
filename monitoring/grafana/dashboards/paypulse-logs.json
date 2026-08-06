@@ -1,0 +1,47 @@
+{
+  "uid": "paypulse-logs",
+  "title": "PayPulse Application Logs",
+  "tags": ["paypulse", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "level",
+        "type": "custom",
+        "label": "Level",
+        "query": "ERROR,WARN,INFO,DEBUG",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "logs",
+      "title": "Backend Logs — live tail (container=paypulse-backend)",
+      "gridPos": { "h": 20, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{container=\"paypulse-backend\"} |~ \"$level\"",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}
+

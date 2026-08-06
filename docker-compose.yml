@@ -95,11 +95,83 @@ services:
       - "8085:80"
     depends_on:
       - backend
+      - grafana
+    networks:
+      - paypulse-net
+
+  # ─── 4. Prometheus (Metrics Collector) ─────────────────────────────────────
+  # SECURITY: no host port published — reachable only from other containers on
+  # paypulse-net (Grafana queries it internally). Scrapes ONLY /actuator/prometheus.
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: paypulse-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - paypulse-net
+
+  # ─── 5. Grafana Loki (Log Aggregator) ──────────────────────────────────────
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: paypulse-loki
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/tmp/loki
+    command: -config.file=/etc/loki/loki-config.yml
+    networks:
+      - paypulse-net
+
+  # ─── 6. Promtail (Log Collector — tails Docker container stdout/stderr) ────
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: paypulse-promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/promtail-config.yml
+    depends_on:
+      - loki
+    networks:
+      - paypulse-net
+
+  # ─── 7. Grafana (Dashboards: metrics + live log tail) ──────────────────────
+  # SECURITY: NOT published to the host — only reachable through the nginx
+  # `/grafana/` reverse-proxy path (single public ingress, RBAC via Grafana auth).
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: paypulse-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-PayPulseAdmin2026!}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
     networks:
       - paypulse-net
 
 volumes:
   mysql_data:
+  prometheus_data:
+  loki_data:
+  grafana_data:
 
 networks:
   paypulse-net:
