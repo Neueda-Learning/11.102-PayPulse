@@ -19,6 +19,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -56,6 +57,9 @@ class PaymentControllerTest {
     private PaymentMapper paymentMapper;
     @MockBean
     private com.paypulse.payment.service.ReversalService reversalService;
+
+    @MockBean
+    private io.github.bucket4j.distributed.proxy.ProxyManager<byte[]> proxyManager;
 
     @Test
     void createPayment_success_returns201AndLocation() throws Exception {
@@ -169,6 +173,48 @@ class PaymentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_STATUS_TRANSITION"));
+    }
+    @Test
+    void createPayment_injectionStringInReference_treatedAsNormalValidation() throws Exception {
+        // SQL injection-style string in reference — should not 500, just process normally
+        CreatePaymentRequest req = CreatePaymentRequest.builder()
+                .sourceAccountId("b2c3d4e5-1111-4a11-8a11-111111111111")
+                .amount(new BigDecimal("100.00"))
+                .currency("INR")
+                .destinationAccount("ACC2000002")
+                .reference("' OR 1=1--")
+                .build();
+
+        PaymentResponse response = PaymentResponse.builder()
+                .id(UUID.randomUUID().toString())
+                .status(PaymentStatus.COMPLETED)
+                .build();
+        when(paymentService.createPayment(isNull(), any()))
+                .thenReturn(new PaymentCreationResult(response, true));
+
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void createPayment_oversizedPayload_returns4xx() throws Exception {
+        // Build a body well beyond any reasonable request size
+        String hugePadding = "x".repeat(200_000);
+        String body = """
+                {"sourceAccountId":"b2c3d4e5-1111-4a11-8a11-111111111111",
+                 "amount":100,"currency":"INR","destinationAccount":"ACC2000002",
+                 "reference":"%s"}
+                """.formatted(hugePadding);
+
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(result ->
+                        assertThat(result.getResponse().getStatus())
+                                .as("expected 4xx for oversized payload")
+                                .isBetween(400, 499));
     }
 
     private CreatePaymentRequest createRequest() {

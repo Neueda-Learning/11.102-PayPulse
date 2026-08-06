@@ -2,7 +2,7 @@
 
 CREATE TABLE notification_log (
     id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
-    notification_id     VARCHAR(36) NOT NULL UNIQUE DEFAULT (UUID()),
+    notification_id     VARCHAR(36) NOT NULL UNIQUE,
     recipient_email     VARCHAR(255) NOT NULL,
     recipient_name      VARCHAR(255),
     subject             VARCHAR(500) NOT NULL,

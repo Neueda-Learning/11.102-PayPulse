@@ -24,6 +24,9 @@ class AccountControllerTest {
     @MockBean private AccountRepository accountRepository;
     @MockBean private AccountMapper accountMapper;
 
+    @MockBean
+    private io.github.bucket4j.distributed.proxy.ProxyManager<byte[]> proxyManager;
+
     private Account sampleAccount() {
         return Account.builder()
                 .id("acc-1").label("Main").accountNumber("ACC001")

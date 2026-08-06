@@ -38,14 +38,17 @@ public class EmailTemplateEngine {
      * @return rendered HTML string ready for inclusion in a MIME message
      */
     public String render(String templateName, Map<String, Object> variables) {
+        // MUST BE ADDED HERE, before log.debug
+        if (variables == null) {
+            variables = new java.util.HashMap<>();
+        }
+
         String fullTemplatePath = TEMPLATE_PREFIX + templateName;
         log.debug("Rendering email template '{}' with {} variables",
                 fullTemplatePath, variables.size());
 
         Context ctx = new Context(Locale.ENGLISH);
-        if (variables != null) {
-            variables.forEach(ctx::setVariable);
-        }
+        variables.forEach(ctx::setVariable);
 
         try {
             return thymeleafEngine.process(fullTemplatePath, ctx);
