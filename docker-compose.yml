@@ -157,6 +157,17 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      # Grafana's default domain ("localhost") gets baked into root_url and used for
+      # redirect/cookie checks. Since this app is reached via many different
+      # hosts/IPs (localhost, EC2 private IP, etc.), disable that domain enforcement
+      # so it doesn't bounce the browser to the wrong (portless) host.
+      - GF_SERVER_ENFORCE_DOMAIN=false
+      # One-click access for developers (NFR): allow anonymous READ-ONLY (Viewer)
+      # access so clicking "Logs" in the app nav opens straight to the dashboard —
+      # no login prompt. Editing datasources/dashboards still requires the admin login.
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_AUTH_ANONYMOUS_ORG_NAME=Main Org.
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
