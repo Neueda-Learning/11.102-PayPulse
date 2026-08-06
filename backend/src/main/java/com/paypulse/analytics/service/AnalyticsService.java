@@ -2,9 +2,13 @@ package com.paypulse.analytics.service;
 
 import com.paypulse.analytics.dto.KpiSummaryResponse;
 import com.paypulse.analytics.dto.TrendResponse;
+import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
+import com.paypulse.payment.service.PaymentException;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,11 +24,14 @@ public class AnalyticsService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentStatusHistoryRepository historyRepository;
+    private final int maxTrendHours;
 
     public AnalyticsService(PaymentRepository paymentRepository,
-                            PaymentStatusHistoryRepository historyRepository) {
+                            PaymentStatusHistoryRepository historyRepository,
+                            @Value("${paypulse.analytics.trend.max-hours:168}") int maxTrendHours) {
         this.paymentRepository = paymentRepository;
         this.historyRepository = historyRepository;
+        this.maxTrendHours = maxTrendHours;
     }
 
     public KpiSummaryResponse getSummary(String fromStr, String toStr) {
@@ -45,10 +52,14 @@ public class AnalyticsService {
         long failed = paymentRepository.countByStatusAndCreatedAtBetween(
                 PaymentStatus.FAILED, from, to);
 
-        long terminal = completed + failed;
+        long cancelled = paymentRepository.countByStatusAndCreatedAtBetween(
+                PaymentStatus.CANCELLED, from, to);
+
+        long terminal = completed + failed + cancelled;
 
         double successRate = terminal == 0 ? 0.0 : (completed * 100.0) / terminal;
         double failureRate = terminal == 0 ? 0.0 : (failed * 100.0) / terminal;
+        double cancelledRate = terminal == 0 ? 0.0 : (cancelled * 100.0) / terminal;
 
         Double avgSeconds = historyRepository.avgProcessingTimeSeconds(from, to);
 
@@ -87,6 +98,8 @@ public class AnalyticsService {
                 .totalPayments(total)
                 .successRatePct(round2(successRate))
                 .failureRatePct(round2(failureRate))
+                .cancelledRatePct(round2(cancelledRate))
+                .cancelledCount(cancelled)
                 .avgProcessingTimeSeconds(avgSeconds == null ? 0.0 : round2(avgSeconds))
                 .throughputPerMinute(round2(throughput))
                 .volumeByCurrency(volumeByCurrency)
@@ -94,7 +107,23 @@ public class AnalyticsService {
                 .build();
     }
 
+    /**
+     * V2 (feature #13 deepening): now validates the requested window against a
+     * configurable cap (paypulse.analytics.trend.max-hours, default 7 days) —
+     * defensive bound against an unreasonably large aggregation request — and
+     * enriches each hourly bucket with a per-currency volume breakdown, plus a
+     * cancelled-count field, so the dashboard's trend view can show more than
+     * just created/completed/failed status counts.
+     */
     public TrendResponse getTrend(int hours) {
+
+        if (hours <= 0 || hours > maxTrendHours) {
+            throw new PaymentException(
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.VALIDATION_FAILED,
+                    "hours must be between 1 and " + maxTrendHours
+            );
+        }
 
         Instant to = Instant.now();
         Instant from = to.minus(hours, ChronoUnit.HOURS);
@@ -120,12 +149,27 @@ public class AnalyticsService {
                     bucketEnd
             );
 
+            long cancelled = paymentRepository.countByStatusAndCreatedAtBetween(
+                    PaymentStatus.CANCELLED,
+                    bucketStart,
+                    bucketEnd
+            );
+
+            Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>();
+            if (created > 0) {
+                for (Object[] row : paymentRepository.sumAmountByCurrency(bucketStart, bucketEnd)) {
+                    volumeByCurrency.put((String) row[0], (BigDecimal) row[1]);
+                }
+            }
+
             buckets.add(
                     TrendResponse.Bucket.builder()
                             .periodStart(bucketStart)
                             .created(created)
                             .completed(completed)
                             .failed(failed)
+                            .cancelled(cancelled)
+                            .volumeByCurrency(volumeByCurrency)
                             .build()
             );
         }

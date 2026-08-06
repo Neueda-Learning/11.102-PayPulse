@@ -39,10 +39,11 @@ public class PaymentNotificationListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPaymentStatusChanged(PaymentStatusChangedEvent event) {
         PaymentStatus newStatus = event.newStatus();
-        if (newStatus != PaymentStatus.CREATED
-                && newStatus != PaymentStatus.COMPLETED
-                && newStatus != PaymentStatus.FAILED) {
-            return; // only notify on these three
+        // Only notify on the initial state (CREATED) and terminal/final states
+        // (COMPLETED, FAILED, CANCELLED). Intermediate lifecycle steps
+        // (VALIDATED, SENT) are silent — no email noise for in-flight stages.
+        if (newStatus == PaymentStatus.VALIDATED || newStatus == PaymentStatus.SENT) {
+            return;
         }
 
         Optional<Payment> paymentOpt = paymentRepository.findById(event.paymentId());
@@ -70,21 +71,34 @@ public class PaymentNotificationListener {
         }
 
         UUID paymentUUID = UUID.fromString(payment.getId());
-        Map<String, Object> vars = Map.of(
+        Map<String, Object> vars = new HashMap<>(Map.of(
                 "paymentId", payment.getId(),
                 "amount", payment.getAmount(),
                 "currency", payment.getCurrency(),
                 "sourceAccount", account.getAccountNumber(),
                 "destinationAccount", payment.getDestinationAccount(),
                 "reference", payment.getReference() != null ? payment.getReference() : ""
-        );
+        ));
+
+        // FAILED needs to show exactly which stage the payment failed at
+        // (e.g. it failed during VALIDATE vs SEND vs COMPLETE) so devs/QA can
+        // verify the state machine behaved as expected.
+        if (newStatus == PaymentStatus.FAILED) {
+            String failedAtStage = event.previousStatus() != null
+                    ? event.previousStatus().name()
+                    : "UNKNOWN";
+            vars.put("failedAtStage", failedAtStage);
+            vars.put("failureReason", event.errorMessage() != null ? event.errorMessage() : "Unknown error");
+            vars.put("errorCode", event.errorCode() != null ? event.errorCode() : "ERR_UNKNOWN");
+        }
 
         try {
             switch (newStatus) {
-                case CREATED -> notificationService.notifyPaymentCreated(email, name, paymentUUID, vars);
+                case CREATED   -> notificationService.notifyPaymentCreated(email, name, paymentUUID, vars);
                 case COMPLETED -> notificationService.notifyPaymentCompleted(email, name, paymentUUID, vars);
-                case FAILED -> notificationService.notifyPaymentFailed(email, name, paymentUUID, vars);
-                default -> {} // unreachable
+                case FAILED    -> notificationService.notifyPaymentFailed(email, name, paymentUUID, vars);
+                case CANCELLED -> notificationService.notifyPaymentCancelled(email, name, paymentUUID, vars);
+                case VALIDATED, SENT -> {} // unreachable — filtered out above
             }
         } catch (Exception ex) {
             log.error("Notification send failed for payment {} status {}: {}",

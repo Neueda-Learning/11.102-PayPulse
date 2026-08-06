@@ -5,12 +5,13 @@ package com.paypulse.notification.domain;
  * Maps 1-to-1 with an HTML template in resources/templates/email/.
  */
 public enum NotificationEvent {
-
     PAYMENT_CREATED("payment-created", "Payment Received – Reference #{referenceId}"),
     PAYMENT_COMPLETED("payment-completed", "Payment Successful – {amount} {currency}"),
     PAYMENT_FAILED("payment-failed", "Payment Failed – Action Required"),
-    PAYMENT_VALIDATED("payment-validated", "Payment Validated – Processing Started"),
+    PAYMENT_CANCELLED("payment-cancelled", "Payment Cancelled – Reference #{referenceId}"),
+    PAYMENT_REVERSED("payment-reversed", "Payment Reversed – {amount} {currency}"),
     WELCOME("welcome", "Welcome to PayPulse!");
+
 
     private final String templateName;
     private final String subjectTemplate;
@@ -27,4 +28,6 @@ public enum NotificationEvent {
     public String getSubjectTemplate() {
         return subjectTemplate;
     }
+
+
 }

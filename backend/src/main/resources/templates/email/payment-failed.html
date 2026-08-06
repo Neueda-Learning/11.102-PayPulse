@@ -53,6 +53,10 @@
                 <span class="detail-value" th:text="${failedAt}">—</span>
             </div>
             <div class="detail-row">
+                <span class="detail-label">Failed At Stage</span>
+                <span class="detail-value" th:text="${failedAtStage}">—</span>
+            </div>
+            <div class="detail-row">
                 <span class="detail-label">Status</span>
                 <span class="detail-value">
           <span class="status-badge status-failed">Failed</span>
@@ -73,6 +77,11 @@
             </div>
             <div style="font-size:12px;color:#9a3412;margin-top:4px;">
                 Error Code: <code th:text="${errorCode}">ERR_UNKNOWN</code>
+            </div>
+            <div style="font-size:12px;color:#9a3412;margin-top:4px;">
+                This payment failed while transitioning out of the
+                <strong th:text="${failedAtStage}">UNKNOWN</strong> stage — use this to verify the
+                state machine stopped at the expected step.
             </div>
         </div>
 

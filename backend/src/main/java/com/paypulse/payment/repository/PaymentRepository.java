@@ -24,7 +24,8 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
     long countByCreatedAtBetween(Instant from, Instant to);
     long countByStatusAndCreatedAtBetween(PaymentStatus status, Instant from, Instant to);
 
-    @Query("select p.currency, sum(p.amount) from Payment p where p.createdAt between :from and :to group by p.currency")
+    @Query("select p.currency, sum(p.amount) from Payment p " +
+            "where p.status = 'COMPLETED' and p.createdAt between :from and :to group by p.currency")
     List<Object[]> sumAmountByCurrency(Instant from, Instant to);
 
     @Query("select p.errorCode, count(p) from Payment p where p.status = 'FAILED' and p.createdAt between :from and :to group by p.errorCode order by count(p) desc")

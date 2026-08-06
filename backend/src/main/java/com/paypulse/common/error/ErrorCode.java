@@ -30,6 +30,9 @@ public enum ErrorCode {
     NETWORK_ERROR,
 
     // Rate limiting (NFR-11)
-    RATE_LIMIT_EXCEEDED
+    RATE_LIMIT_EXCEEDED,
+
+    // Export (feature #14, V2)
+    EXPORT_TOO_LARGE
 }
 
