@@ -51,6 +51,7 @@ public class PaymentController {
     private final StatusTransitionEngine statusTransitionEngine;
     private final PaymentMapper paymentMapper;
     private final ReversalService reversalService;
+    private final PaymentCsvExportService csvExportService;
     // ── M3 ──────────────────────────────────────────────────────────
     @PostMapping
     @Operation(summary = "Create a new payment")
