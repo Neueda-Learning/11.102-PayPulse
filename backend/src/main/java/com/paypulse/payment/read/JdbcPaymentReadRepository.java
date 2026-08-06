@@ -35,8 +35,8 @@ public class JdbcPaymentReadRepository implements PaymentReadRepository {
     }
 
     @Override
-    public Page<Payment> search(PaymentStatus status, String search, String sourceAccountId, Pageable pageable) {
-        MapSqlParameterSource params = baseParams(status, search, sourceAccountId)
+    public Page<Payment> search(PaymentStatus status, Boolean reversed, String search, String sourceAccountId, Pageable pageable) {
+        MapSqlParameterSource params = baseParams(status, reversed, search, sourceAccountId)
                 .addValue("limit", pageable.getPageSize())
                 .addValue("offset", pageable.getOffset());
 
@@ -65,22 +65,23 @@ public class JdbcPaymentReadRepository implements PaymentReadRepository {
                 """ + whereClause() + orderByClause(pageable.getSort()) + " limit :limit offset :offset";
 
         List<Payment> content = jdbcTemplate.query(sql, params, PAYMENT_ROW_MAPPER);
-        long total = count(status, search, sourceAccountId);
+        long total = count(status, reversed, search, sourceAccountId);
         return new PageImpl<>(content, pageable, total);
     }
 
     @Override
-    public long count(PaymentStatus status, String search, String sourceAccountId) {
+    public long count(PaymentStatus status, Boolean reversed, String search, String sourceAccountId) {
         String sql = "select count(*) from payment p " + whereClause();
-        Long total = jdbcTemplate.queryForObject(sql, baseParams(status, search, sourceAccountId), Long.class);
+        Long total = jdbcTemplate.queryForObject(sql, baseParams(status, reversed, search, sourceAccountId), Long.class);
         return total == null ? 0L : total;
     }
 
-    private MapSqlParameterSource baseParams(PaymentStatus status, String search, String sourceAccountId) {
+    private MapSqlParameterSource baseParams(PaymentStatus status, Boolean reversed, String search, String sourceAccountId) {
         String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
         String normalizedAccountId = (sourceAccountId == null || sourceAccountId.isBlank()) ? null : sourceAccountId.trim();
         return new MapSqlParameterSource()
                 .addValue("status", status != null ? status.name() : null)
+                .addValue("reversed", reversed)
                 .addValue("search", normalizedSearch)
                 .addValue("sourceAccountId", normalizedAccountId);
     }
@@ -88,6 +89,7 @@ public class JdbcPaymentReadRepository implements PaymentReadRepository {
     private String whereClause() {
         return """
                 where (:status is null or p.status = :status)
+                  and (:reversed is null or p.reversed = :reversed)
                   and (:sourceAccountId is null or p.source_account_id = :sourceAccountId)
                   and (:search is null or p.id like concat('%', :search, '%') or coalesce(p.reference, '') like concat('%', :search, '%'))
                 """;

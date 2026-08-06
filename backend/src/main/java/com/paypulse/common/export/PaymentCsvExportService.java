@@ -82,6 +82,7 @@ public class PaymentCsvExportService {
      */
     public String[] validateExportRequest(
             PaymentStatus status,
+            Boolean reversed,
             String search,
             String sourceAccountId,
             String sortField,
@@ -91,7 +92,7 @@ public class PaymentCsvExportService {
         String direction = normalizeSortDirection(sortDirection);
         validateSortField(field);
 
-        long totalElements = paymentReadRepository.count(status, search, sourceAccountId);
+        long totalElements = paymentReadRepository.count(status, reversed, search, sourceAccountId);
 
         if (totalElements > maxRows) {
             throw new PaymentException(
@@ -112,6 +113,7 @@ public class PaymentCsvExportService {
      */
     public void streamExport(
             PaymentStatus status,
+            Boolean reversed,
             String search,
             String sourceAccountId,
             String sortField,
@@ -125,7 +127,7 @@ public class PaymentCsvExportService {
         Sort sort = Sort.by(Sort.Direction.fromString(direction), field);
         Pageable firstPage = PageRequest.of(0, batchSize, sort);
 
-        Page<Payment> firstResult = paymentReadRepository.search(status, search, sourceAccountId, firstPage);
+        Page<Payment> firstResult = paymentReadRepository.search(status, reversed, search, sourceAccountId, firstPage);
 
         writer.write(String.join(",", HEADER));
         writer.write("\n");
@@ -134,7 +136,7 @@ public class PaymentCsvExportService {
         int totalPages = firstResult.getTotalPages();
         for (int page = 1; page < totalPages; page++) {
             Pageable pageable = PageRequest.of(page, batchSize, sort);
-            Page<Payment> result = paymentReadRepository.search(status, search, sourceAccountId, pageable);
+            Page<Payment> result = paymentReadRepository.search(status, reversed, search, sourceAccountId, pageable);
             writeRows(writer, result.getContent());
         }
 

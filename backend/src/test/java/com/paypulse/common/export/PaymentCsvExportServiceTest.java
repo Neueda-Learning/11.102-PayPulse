@@ -52,7 +52,7 @@ class PaymentCsvExportServiceTest {
         PaymentCsvExportService service = newService();
 
         assertThatThrownBy(() ->
-                service.validateExportRequest(null, null, null, "someInternalColumn", "asc")
+                service.validateExportRequest(null, null, null, null, "someInternalColumn", "asc")
         ).isInstanceOf(PaymentException.class)
          .hasMessageContaining("Unsupported sort field");
     }
@@ -61,9 +61,9 @@ class PaymentCsvExportServiceTest {
     void validateExportRequest_withinCap_returnsResolvedSort() {
         PaymentCsvExportService service = newService();
         Page<Payment> page = new PageImpl<>(List.of(samplePayment()));
-        when(paymentReadRepository.count(any(), any(), any())).thenReturn(1L);
+        when(paymentReadRepository.count(any(), any(), any(), any())).thenReturn(1L);
 
-        String[] resolved = service.validateExportRequest(null, null, null, null, null);
+        String[] resolved = service.validateExportRequest(null, null, null, null, null, null);
 
         assertThat(resolved).containsExactly("createdAt", "desc");
     }
@@ -74,10 +74,10 @@ class PaymentCsvExportServiceTest {
         when(env.getProperty(eq("paypulse.export.batch-size"), eq(Integer.class), any())).thenReturn(500);
         PaymentCsvExportService service = new PaymentCsvExportService(paymentReadRepository, env);
 
-        when(paymentReadRepository.count(any(), any(), any())).thenReturn(2L);
+        when(paymentReadRepository.count(any(), any(), any(), any())).thenReturn(2L);
 
         assertThatThrownBy(() ->
-                service.validateExportRequest(PaymentStatus.COMPLETED, null, null, null, null)
+                service.validateExportRequest(PaymentStatus.COMPLETED, null, null, null, null, null)
         ).isInstanceOf(PaymentException.class)
          .hasMessageContaining("exceeds the export limit");
     }
@@ -86,10 +86,10 @@ class PaymentCsvExportServiceTest {
     void streamExport_writesHeaderAndEscapedRows() throws Exception {
         PaymentCsvExportService service = newService();
         Page<Payment> page = new PageImpl<>(List.of(samplePayment()));
-        when(paymentReadRepository.search(any(), any(), any(), any(Pageable.class))).thenReturn(page);
+        when(paymentReadRepository.search(any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
 
         StringWriter writer = new StringWriter();
-        service.streamExport(null, null, null, "createdAt", "desc", writer);
+        service.streamExport(null, null, null, null, "createdAt", "desc", writer);
 
         String csv = writer.toString();
         assertThat(csv).startsWith("id,sourceAccountId,destinationAccount,amount,currency,status,errorCode,createdAt,updatedAt\n");
