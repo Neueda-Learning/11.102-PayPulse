@@ -32,9 +32,24 @@
   </div>
 
   <div class="card">
-    <h2>Payments — Last 24 Hours (Trend)</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <h2 id="trendTitle">Payments — Last 24 Hours (Trend)</h2>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <label for="trendWindow" style="font-size:12px;font-weight:700;color:#374151;">Window</label>
+        <select id="trendWindow" aria-label="Trend window">
+          <option value="24">Last 24 hours</option>
+          <option value="48">Last 48 hours</option>
+          <option value="168">Last 7 days</option>
+        </select>
+        <label for="trendView" style="font-size:12px;font-weight:700;color:#374151;">View</label>
+        <select id="trendView" aria-label="Trend view mode">
+          <option value="status">Status Counts</option>
+          <option value="currency">Volume by Currency</option>
+        </select>
+      </div>
+    </div>
     <div id="trendBars" class="bars"></div>
-    <div style="display:flex;gap:14px;margin-top:8px;font-size:11px;color:#6b7280;">
+    <div id="trendLegend" style="display:flex;gap:14px;margin-top:8px;font-size:11px;color:#6b7280;">
       <span>🟢 Completed</span><span>🔴 Failed</span>
     </div>
   </div>
@@ -42,7 +57,7 @@
   <div class="card">
     <h2>Top Failure Reasons</h2>
     <table class="table">
-      <thead><tr><th>Error Code</th><th>Count (last 24h)</th></tr></thead>
+      <thead><tr><th>Error Code</th><th id="failureWindowLabel">Count (last 24h)</th></tr></thead>
       <tbody id="failureTable"></tbody>
     </table>
   </div>
@@ -50,12 +65,17 @@
 
 <script src="js/api.js"></script>
 <script>
+let currentTrendHours = 24;
+let currentTrendView = 'status';
+let latestTrend = null;
+
 async function loadDashboard() {
   try {
     const [summary, trend] = await Promise.all([
       Analytics.summary(),
-      Analytics.trend(24)
+      Analytics.trend(currentTrendHours)
     ]);
+    latestTrend = trend;
 
     document.getElementById('subhead').textContent =
       'Live data from the backend — refreshes every 30s.';
@@ -75,26 +95,14 @@ async function loadDashboard() {
       kpiCard('INR Volume', formatMoney(vol.INR || 0, 'INR'), '', 'sum of INR payments') +
       kpiCard('USD Volume', formatMoney(vol.USD || 0, 'USD'), '', 'sum of USD payments');
 
-    // Trend bars
-    const buckets = (trend.buckets || []).slice(-12);
-    const maxVal = Math.max(1, ...buckets.map(b => b.created));
-    document.getElementById('trendBars').innerHTML = buckets.map(b => {
-      const cH = Math.round((b.completed / maxVal) * 100);
-      const fH = Math.round((b.failed / maxVal) * 100);
-      const label = new Date(b.periodStart).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-      return `<div class="bar-col">
-        <div class="bar completed" style="height:${cH}%" title="${b.completed} completed"></div>
-        <div class="bar failed"    style="height:${fH}%" title="${b.failed} failed"></div>
-        <div class="bar-label">${label}</div>
-      </div>`;
-    }).join('');
+    renderTrend();
 
     // Top failure reasons
     const reasons = summary.topFailureReasons || {};
     const tbody = document.getElementById('failureTable');
     const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
     if (entries.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="2" class="empty-state">No failures in the last 24h 🎉</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="2" class="empty-state">No failures in this window 🎉</td></tr>';
     } else {
       tbody.innerHTML = entries.map(([code, count]) =>
         `<tr><td><code>${code}</code></td><td>${count}</td></tr>`
@@ -108,6 +116,62 @@ async function loadDashboard() {
   }
 }
 
+// ── Trend rendering (feature #13, deepened — status counts OR per-currency volume) ──
+function renderTrend() {
+  if (!latestTrend) return;
+  const windowLabel = currentTrendHours === 24 ? '24 hours' : currentTrendHours === 48 ? '48 hours' : '7 days';
+  document.getElementById('trendTitle').textContent = `Payments — Last ${windowLabel} (Trend)`;
+  document.getElementById('failureWindowLabel').textContent = `Count (last ${windowLabel})`;
+
+  // Show at most 24 bars regardless of window, so a 7-day view stays readable
+  // (bucket every Nth hour rather than rendering 168 tiny bars).
+  const allBuckets = latestTrend.buckets || [];
+  const step = Math.max(1, Math.ceil(allBuckets.length / 24));
+  const buckets = allBuckets.filter((_, i) => i % step === 0);
+
+  const barsEl = document.getElementById('trendBars');
+  const legendEl = document.getElementById('trendLegend');
+
+  if (currentTrendView === 'currency') {
+    legendEl.innerHTML = '<span>🔵 INR</span><span>🟠 USD</span>';
+    const maxVal = Math.max(1, ...buckets.map(b => {
+      const v = b.volumeByCurrency || {};
+      return Number(v.INR || 0) + Number(v.USD || 0);
+    }));
+    barsEl.innerHTML = buckets.map(b => {
+      const v = b.volumeByCurrency || {};
+      const inr = Number(v.INR || 0), usd = Number(v.USD || 0);
+      const inrH = Math.round((inr / maxVal) * 100);
+      const usdH = Math.round((usd / maxVal) * 100);
+      const label = formatBucketLabel(b.periodStart);
+      return `<div class="bar-col">
+        <div class="bar" style="height:${inrH}%;background:#3b82f6;" title="₹${inr.toFixed(2)} INR"></div>
+        <div class="bar" style="height:${usdH}%;background:#f97316;" title="$${usd.toFixed(2)} USD"></div>
+        <div class="bar-label">${label}</div>
+      </div>`;
+    }).join('');
+  } else {
+    legendEl.innerHTML = '<span>🟢 Completed</span><span>🔴 Failed</span>';
+    const maxVal = Math.max(1, ...buckets.map(b => b.created));
+    barsEl.innerHTML = buckets.map(b => {
+      const cH = Math.round((b.completed / maxVal) * 100);
+      const fH = Math.round((b.failed / maxVal) * 100);
+      const label = formatBucketLabel(b.periodStart);
+      return `<div class="bar-col">
+        <div class="bar completed" style="height:${cH}%" title="${b.completed} completed"></div>
+        <div class="bar failed"    style="height:${fH}%" title="${b.failed} failed"></div>
+        <div class="bar-label">${label}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function formatBucketLabel(periodStart) {
+  return currentTrendHours > 48
+    ? new Date(periodStart).toLocaleDateString([], { month: 'short', day: '2-digit' })
+    : new Date(periodStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 function kpiCard(label, value, colorClass, sub) {
   return `<div class="kpi-card ${colorClass}">
     <div class="label">${label}</div>
@@ -115,6 +179,16 @@ function kpiCard(label, value, colorClass, sub) {
     ${sub ? `<div class="sub">${sub}</div>` : ''}
   </div>`;
 }
+
+document.getElementById('trendWindow').addEventListener('change', (e) => {
+  currentTrendHours = parseInt(e.target.value, 10);
+  loadDashboard();
+});
+
+document.getElementById('trendView').addEventListener('change', (e) => {
+  currentTrendView = e.target.value;
+  renderTrend();
+});
 
 loadDashboard();
 setInterval(loadDashboard, 30000); // auto-refresh every 30s

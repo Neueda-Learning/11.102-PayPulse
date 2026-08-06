@@ -17,7 +17,7 @@ class AnalyticsServiceTest {
 
     private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
     private final PaymentStatusHistoryRepository historyRepository = mock(PaymentStatusHistoryRepository.class);
-    private final AnalyticsService service = new AnalyticsService(paymentRepository, historyRepository);
+    private final AnalyticsService service = new AnalyticsService(paymentRepository, historyRepository, 168);
 
     @Test
     void getSummary_zeroPayments_returnsZeroedRatesNoDivideByZero() {
@@ -58,9 +58,22 @@ class AnalyticsServiceTest {
     void getTrend_returnsOneBucketPerHour() {
         when(paymentRepository.countByCreatedAtBetween(any(), any())).thenReturn(1L);
         when(paymentRepository.countByStatusAndCreatedAtBetween(any(), any(), any())).thenReturn(0L);
+        when(paymentRepository.sumAmountByCurrency(any(), any())).thenReturn(Collections.emptyList());
 
         var result = service.getTrend(6);
 
         assertThat(result.getBuckets()).hasSize(6);
+    }
+
+    @Test
+    void getTrend_hoursExceedsMax_throwsValidationError() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.getTrend(200))
+                .isInstanceOf(com.paypulse.payment.service.PaymentException.class);
+    }
+
+    @Test
+    void getTrend_zeroOrNegativeHours_throwsValidationError() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.getTrend(0))
+                .isInstanceOf(com.paypulse.payment.service.PaymentException.class);
     }
 }

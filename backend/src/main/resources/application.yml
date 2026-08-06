@@ -137,6 +137,14 @@ paypulse:
   cors:
     allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:63342"
 
+  export:
+    max-rows: 50000   # feature #14 (CSV export) — reject filters exceeding this with EXPORT_TOO_LARGE
+    batch-size: 500   # rows fetched per DB round-trip while streaming (bounded memory)
+
+  analytics:
+    trend:
+      max-hours: 168  # feature #13 (trend view) — cap the window to 7 days to bound query cost
+
   notification:
     email:
       from-address: ${MAIL_FROM_ADDRESS:noreply@paypulse.io}

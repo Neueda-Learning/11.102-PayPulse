@@ -137,8 +137,8 @@
 - [ ] **M2 — Create Payment frontend cross-check:** audit `frontend/js/api.js`/`create-payment.html` against `04-SRS.md`/`11-API-DESIGN.md`; fix the known `API_BASE` hardcoding issue (MEM-028) as the first task.
 - [ ] **M2 — Payment Cancellation (#18):** new `CANCELLED` terminal status + `CancelledState`, `POST /payments/{id}/cancel` (legal only from `CREATED`).
 - [ ] **M2 — Payment Reversal (#19):** `POST /payments/{id}/reverse` (legal only from `COMPLETED`), creates a linked, direction-swapped payment; `reversed` flag + `reversal_payment_id`/`reversal_of_payment_id` columns.
-- [ ] **M3 — Analytics/Trend View (#13), deepened:** richer trend chart (configurable window, per-currency breakdown) beyond the existing MVP bar chart.
-- [ ] **M3 — CSV Export (#14):** `GET /payments/export`, streamed (not buffered), same filters as `GET /payments`, row-count cap (`EXPORT_TOO_LARGE`).
+- [x] **M3 — Analytics/Trend View (#13), deepened:** ✅ Implemented 06 Aug — configurable window (24h/48h/7d) + per-currency volume breakdown per bucket, capped via `paypulse.analytics.trend.max-hours`. See MEM-035.
+- [x] **M3 — CSV Export (#14):** ✅ Implemented 06 Aug — `GET /payments/export`, batch-streamed, same filters as `GET /payments`, row-count cap (`EXPORT_TOO_LARGE`), two-phase validate-then-stream to avoid corrupting committed response headers. See MEM-035.
 - [ ] **M4 — Copy Payment ID / Deep Linking (#17):** copy-to-clipboard affordance; formalize `payment-details.html?id=` and `payments.html?status=` as documented stable deep-link contracts.
 - [ ] **M4 — Multi-Currency Conversion (#20), display-only:** `GET /fx/rate`, static config-driven `FxRateService`, frontend "≈ other currency" display hint (no real conversion/settlement).
 - [ ] **Gate:** All 4 verticals reviewed + merged + `openapi.yaml`/docs updated → V2 demo-ready before the 06 Aug presentation.
