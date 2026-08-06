@@ -105,7 +105,6 @@ async function copyPaymentId(event, id) {
 let currentPage = 0;
 let totalPages = 0;
 let accountMap = {};
-
 let currentSort = 'createdAt';
 let currentDir = 'desc';
 
@@ -121,28 +120,7 @@ function setSort(field) {
 }
 
 function updateSortIndicators() {
-  ['amount','status','createdAt'].forEach(f => {
-    const el = document.getElementById('sort-' + f);
-    if (el) el.textContent = currentSort === f ? (currentDir === 'asc' ? '▲' : '▼') : '';
-  });
-}
-
-let currentSort = 'createdAt';
-let currentDir = 'desc';
-
-function setSort(field) {
-  if (currentSort === field) {
-    currentDir = currentDir === 'asc' ? 'desc' : 'asc';
-  } else {
-    currentSort = field;
-    currentDir = 'desc';
-  }
-  updateSortIndicators();
-  loadPayments(0);
-}
-
-function updateSortIndicators() {
-    const data = await Payments.list({ status, search, page, size: 20, sort: `${currentSort},${currentDir}` });
+  ['amount', 'status', 'createdAt'].forEach(f => {
     const el = document.getElementById('sort-' + f);
     if (el) el.textContent = currentSort === f ? (currentDir === 'asc' ? '▲' : '▼') : '';
   });
@@ -154,12 +132,7 @@ async function loadAccountMap() {
     accs.forEach(a => { accountMap[a.id] = `${a.label} (${a.accountNumber})`; });
   } catch (_) {}
 }
-        <td>
-          <code style="font-size:11px;">${p.id}</code>
-          <span class="inline-actions">
-            <button type="button" class="btn ghost copy-btn" onclick="copyPaymentId(event, '${p.id}')">Copy</button>
-          </span>
-        </td>
+
 async function loadPayments(page = 0) {
   const tbody = document.getElementById('paymentsBody');
   tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><span class="spinner"></span> Loading...</td></tr>';
@@ -180,7 +153,12 @@ async function loadPayments(page = 0) {
 
     tbody.innerHTML = data.content.map(p => `
       <tr class="clickable" onclick="window.location.href='payment-details.html?id=${encodeURIComponent(p.id)}'">
-        <td><code style="font-size:11px;">${p.id}</code></td>
+        <td>
+          <code style="font-size:11px;">${p.id}</code>
+          <span class="inline-actions">
+            <button type="button" class="btn ghost copy-btn" onclick="copyPaymentId(event, '${p.id}')">Copy</button>
+          </span>
+        </td>
         <td>${accountMap[p.sourceAccountId] || p.sourceAccountId}</td>
         <td>${p.destinationAccount}</td>
         <td>${formatMoney(p.amount, p.currency)}</td>
