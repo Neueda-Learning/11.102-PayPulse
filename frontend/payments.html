@@ -169,7 +169,7 @@ async function loadPayments(page = 0) {
             ? `<span class="subtle-meta">Payout: ${formatMoney(p.convertedAmount, p.targetCurrency)}</span>`
             : ''}
         </td>
-        <td>${badgeHtml(p.status)}</td>
+        <td>${badgeHtml(p.status, p.reversed)}</td>
         <td>${formatDateTime(p.createdAt)}</td>
       </tr>
     `).join('');

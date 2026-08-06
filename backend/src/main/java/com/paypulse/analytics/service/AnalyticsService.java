@@ -85,18 +85,31 @@ public class AnalyticsService {
         // multi-day) requested from/to window — that would make even a
         // healthy system look like it has ~0 throughput once the window
         // spans more than a few minutes (e.g. 10 payments / 1440 minutes
-        // rounds to 0.00). Per FR-12.1 this is a "trailing window" metric:
-        // it always looks at the most recent `throughputWindowMinutes`
-        // (default 5) up to `to`, clamped to the requested range if that
-        // range is itself shorter.
-        Duration requestedWindow = Duration.between(from, to);
-        Duration throughputWindow = requestedWindow.compareTo(Duration.ofMinutes(throughputWindowMinutes)) < 0
-                ? requestedWindow
-                : Duration.ofMinutes(throughputWindowMinutes);
-        Instant throughputFrom = to.minus(throughputWindow);
-        long trailingCount = paymentRepository.countByCreatedAtBetween(throughputFrom, to);
-        double throughputMinutes = Math.max(1.0, throughputWindow.toSeconds() / 60.0);
-        double throughput = trailingCount / throughputMinutes;
+        // rounds to 0.00). Per FR-12.1 this is a "trailing window" metric.
+        //
+        // It's anchored to the most recent payment activity actually
+        // present in the window (not blindly to `to`/Instant.now()) —
+        // otherwise, for a batch of historical/seeded data whose
+        // createdAt timestamps are hours/days in the past relative to
+        // wall-clock "now", a naive "last N minutes before now" slice
+        // would always be empty and throughput would permanently read
+        // 0 even though the data clearly shows real processing activity.
+        Instant lastActivity = paymentRepository.maxCreatedAtBetween(from, to);
+        double throughput = 0.0;
+        if (lastActivity != null) {
+            Instant anchor = lastActivity.isAfter(to) ? to : lastActivity;
+            Duration requestedWindow = Duration.between(from, anchor);
+            Duration throughputWindow = requestedWindow.compareTo(Duration.ofMinutes(throughputWindowMinutes)) < 0
+                    ? requestedWindow
+                    : Duration.ofMinutes(throughputWindowMinutes);
+            Instant throughputFrom = anchor.minus(throughputWindow);
+            if (throughputFrom.isBefore(from)) {
+                throughputFrom = from;
+            }
+            long trailingCount = paymentRepository.countByCreatedAtBetween(throughputFrom, anchor);
+            double throughputMinutes = Math.max(1.0, throughputWindow.toSeconds() / 60.0);
+            throughput = trailingCount / throughputMinutes;
+        }
 
         Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>();
 
