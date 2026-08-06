@@ -8,7 +8,7 @@ info:
     multiple accounts (INR/USD); a KPI/analytics dashboard (with live SSE
     updates) and API rate limiting are provided per the 31-Jul-2026
     customer meeting. V2 (05-Aug-2026) adds payment cancellation/reversal,
-    CSV export, notifications, and a display-only FX rate lookup.
+    CSV export, notifications, and hardcoded INR↔USD cross-currency payout support.
   version: "2.0.0"
 servers:
   - url: http://localhost:8080/api/v1

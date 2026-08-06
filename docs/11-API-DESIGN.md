@@ -264,8 +264,8 @@ No request body. Behave exactly like the corresponding automatic step (§5), but
 | Error Code | HTTP Status | Triggered by |
 |---|---|---|
 | VALIDATION_FAILED | 400 | Generic field-level validation |
-| INVALID_ACCOUNT | 400 | Unknown/inactive `sourceAccountId`, bad `destinationAccount` format, or source==destination |
-| ACCOUNT_NOT_FOUND | 404 | `GET /accounts/{id}` with unknown ID *(new)* |
+| INVALID_ACCOUNT | 400 | Inactive `sourceAccountId`, bad `destinationAccount` format, or source==destination |
+| ACCOUNT_NOT_FOUND | 404 | `GET /accounts/{id}` with unknown ID, or `POST /payments` with an unknown `sourceAccountId` *(new)* |
 | INVALID_CURRENCY | 400 | Source or target currency not `INR`/`USD`, or source/debit `currency` ≠ source account's currency |
 | INVALID_AMOUNT | 400 | Amount <= 0, > max, or wrong decimal precision |
 | DUPLICATE_PAYMENT | *(reserved, not used by default — see MEM-006)* | Would apply only if strict-reject mode chosen instead of 200+existing |

@@ -92,6 +92,10 @@ const Payments = {
   }
 };
 
+const Fx = {
+  getRate: (from, to) => apiFetch(`/fx/rate?${new URLSearchParams({ from, to }).toString()}`)
+};
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 const Analytics = {
@@ -108,8 +112,13 @@ const Analytics = {
 // ── Utility helpers ───────────────────────────────────────────────────────────
 
 function formatMoney(amount, currency) {
-  const symbol = currency === 'INR' ? '₹' : '$';
-  return symbol + Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const symbol = currency === 'INR' ? '₹' : currency === 'USD' ? '$' : '';
+  const formatted = Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return symbol ? symbol + formatted : `${formatted} ${currency || ''}`.trim();
+}
+
+function formatRate(rate, from, to) {
+  return `1 ${from} = ${Number(rate).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })} ${to}`;
 }
 
 function formatDateTime(iso) {

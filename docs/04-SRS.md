@@ -27,7 +27,7 @@ Define the functional and non-functional requirements for the **Payments Process
 - **FR-0.4** Only `ACTIVE` accounts may be used as a payment source; an `INACTIVE` account selected as source is rejected with `INVALID_ACCOUNT`.
 
 ### FR-1 — Create Payment
-- **FR-1.1** Client can submit a new payment with: `sourceAccountId` (UUID, **must reference an existing, `ACTIVE` `Account`** — FR-0), `destinationAccount` (free-text, format-validated, external party), `amount`, `currency` (must equal the source account's currency — see FR-9), optional `reference/description`, and an optional `idempotencyKey` (delivered as an `Idempotency-Key` HTTP header per MEM-013, not a body field).
+- **FR-1.1** Client can submit a new payment with: `sourceAccountId` (UUID, **must reference an existing, `ACTIVE` `Account`** — FR-0), `destinationAccount` (free-text, format-validated, external party), `amount`, source/debit `currency` (must equal the source account's currency — see FR-9), optional `targetCurrency` for cross-currency payout (same or different from source `currency`, per FR-17), optional `reference/description`, and an optional `idempotencyKey` (delivered as an `Idempotency-Key` HTTP header per MEM-013, not a body field).
 - **FR-1.2** On creation, payment status is set to `CREATED` and a status-history record is written.
 - **FR-1.3** If an `idempotencyKey` is supplied and a payment with that key already exists, the system **returns the existing payment** (HTTP `200`, per MEM-006) rather than creating a duplicate.
 - **FR-1.4** Request is validated per FR-9 (Validation Rules) **before** persisting as `CREATED`...
@@ -93,7 +93,8 @@ Define the functional and non-functional requirements for the **Payments Process
 - Amount: `> 0`, `<= 1,000,000`, max 2 decimal places.
 - Source account: required, must be a `sourceAccountId` referencing an **existing, `ACTIVE`** `Account` record (FR-0) — unknown/inactive ID → `INVALID_ACCOUNT`.
 - Destination account: required, must differ from the resolved source account's `accountNumber`, must match a defined format (regex, e.g. alphanumeric 8–20 chars) — this remains **format-only** validation (it's an external party's account, not one we manage — see MEM-017).
-- Currency: must be one of **`INR`, `USD`** (customer-confirmed, MEM-018) **and must equal the selected source account's currency** — mismatch → `INVALID_CURRENCY`.
+- Currency: source/debit `currency` must be one of **`INR`, `USD`** (customer-confirmed, MEM-018) **and must equal the selected source account's currency** — mismatch → `INVALID_CURRENCY`.
+- Target currency: `targetCurrency` must be one of **`INR`, `USD`**. It may equal or differ from source `currency`; if different, the backend applies the configured hardcoded INR↔USD rate (FR-17).
 - Idempotency key: optional, if provided must be unique per payment.
 
 ### FR-10 — Status Transition Rules (state machine — Appendix C)
@@ -213,7 +214,7 @@ Any other transition attempt (including from a terminal state `COMPLETED`/`FAILE
 - **A-3:** "Sent to destination system" and "processing/confirmation" are **simulated** — e.g. an internal service call with an artificial delay and a configurable success/failure rate — no real payment gateway integration (explicit in brief).
 - **A-4:** Validation (`CREATED→VALIDATED`) happens synchronously right after creation in the core build, not via an external queue — keeps Sprint 1 scope small; can evolve into async processing (Appendix E-adjacent) later. Resilience4j Circuit Breaker/Retry (MEM-021) wraps the simulated send/complete steps so this remains safe under load.
 - **A-5:** Idempotency key, if omitted by the client, means no duplicate protection is requested for that call — each such request creates a new payment. (We recommend the frontend always generates one, but the API doesn't mandate it.) **The key is scoped to a single client submission attempt (generated fresh per attempt, client-side), never derived from payment field values — see FR-1.1a for full rationale and the scenario table below.**
-- **A-6:** ~~Currency support list is small and hardcoded (USD, EUR, GBP)~~ **Superseded by MEM-018 (customer-confirmed 31 Jul 2026): exactly `INR` and `USD`**, each `Account` denominated in one; no conversion between them.
+- **A-6:** ~~Currency support list is small and hardcoded (USD, EUR, GBP)~~ **Superseded by MEM-018 (customer-confirmed 31 Jul 2026): exactly `INR` and `USD`**, each `Account` denominated in one. In V2, payments may optionally convert between them using a configured hardcoded INR↔USD rate (FR-17).
 - **A-7:** MySQL is used per team's VM/tooling (MEM-003); schema managed via Flyway migrations, inspected/administered via MySQL Workbench.
 - **A-8 (new):** Rate limiting (MEM-020) is enforced in-application via a Redis-backed bucket store (Bucket4j + bucket4j-redis) implemented from Sprint 1 for distributed correctness across horizontally-scaled instances  — demoed by inspecting live bucket keys in Redis; an infra-level gateway limiter remains a noted production evolution if needed.
 - **A-9 (new):** KPI/analytics endpoints (MEM-019) compute aggregates on-demand from existing tables — no separate metrics-store/time-series DB is introduced, appropriate for this data volume.
@@ -231,7 +232,7 @@ Any other transition attempt (including from a terminal state `COMPLETED`/`FAILE
 
 ## 8. Out of Scope
 
-See `01-CONTEXT.md` §4 — restated here for completeness: full login/auth system, real payment gateway integration, batch payments, scheduling/recurring payments, notifications, currency conversion/FX rates between INR and USD, payment reversal/cancellation, full pessimistic concurrency control. `Account` entity, KPI dashboard, basic analytics, and rate limiting are now **in scope** (see §9 revision note below), superseding their earlier "out of scope" listing.
+See `01-CONTEXT.md` §4 — restated here for completeness: full login/auth system, real payment gateway integration, batch payments, scheduling/recurring payments, and full pessimistic concurrency control. `Account` entity, KPI dashboard, basic analytics, rate limiting, payment cancellation/reversal, and hardcoded INR↔USD conversion are now **in scope** (see §9 revision note below and V2 §12), superseding their earlier "out of scope" listing.
 
 ## 9. Revision Note — Post-Customer-Meeting (31 Jul 2026)
 
@@ -250,6 +251,7 @@ This SRS was revised after the team's first customer meeting. Summary of every c
 - [ ] Submitting the same idempotency key twice does **not** create a duplicate row; returns the original payment.
 - [ ] Invalid amount/currency/account submission is rejected with correct `errorCode` + `400` (incl. unknown/inactive `sourceAccountId` → `INVALID_ACCOUNT`, currency ≠ source account currency → `INVALID_CURRENCY`).
 - [ ] A newly created payment automatically progresses to `VALIDATED` (or `FAILED` with reason) without manual client intervention.
+- [ ] A cross-currency payment (`currency != targetCurrency`) returns persisted `targetCurrency`, `convertedAmount`, and `fxRate`, and `GET /fx/rate` returns the same configured rate used for creation.
 - [ ] A `VALIDATED` payment can be progressed to `SENT` then `COMPLETED` (or `FAILED` at either stage), each transition recorded in history.
 - [ ] `GET /payments/{id}` returns current state; `GET /payments/{id}/history` returns full ordered audit trail.
 - [ ] Attempting an illegal transition (e.g. force `COMPLETED → CREATED` if such an endpoint existed) is rejected with `INVALID_STATUS_TRANSITION`.

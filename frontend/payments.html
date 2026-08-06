@@ -33,6 +33,7 @@
       <option value="SENT">SENT</option>
       <option value="COMPLETED">COMPLETED</option>
       <option value="FAILED">FAILED</option>
+      <option value="CANCELLED">CANCELLED</option>
     </select>
     <input type="search" id="searchBox" placeholder="Search by ID or reference..."
            aria-label="Search payments"/>
@@ -106,6 +107,7 @@ async function copyPaymentId(event, id) {
 let currentPage = 0;
 let totalPages = 0;
 let accountMap = {};
+
 let currentSort = 'createdAt';
 let currentDir = 'desc';
 
@@ -162,7 +164,12 @@ async function loadPayments(page = 0) {
         </td>
         <td>${accountMap[p.sourceAccountId] || p.sourceAccountId}</td>
         <td>${p.destinationAccount}</td>
-        <td>${formatMoney(p.amount, p.currency)}</td>
+        <td>
+          ${formatMoney(p.amount, p.currency)}
+          ${p.targetCurrency && p.targetCurrency !== p.currency && p.convertedAmount != null
+            ? `<span class="subtle-meta">Payout: ${formatMoney(p.convertedAmount, p.targetCurrency)}</span>`
+            : ''}
+        </td>
         <td>${badgeHtml(p.status)}</td>
         <td>${formatDateTime(p.createdAt)}</td>
       </tr>
