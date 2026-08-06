@@ -247,6 +247,9 @@ class StatusTransitionEngineTest {
                 .destinationAccount(destinationAccount)
                 .amount(new BigDecimal("100.00"))
                 .currency("INR")
+                .targetCurrency("INR")
+                .convertedAmount(new BigDecimal("100.00"))
+                .fxRate(BigDecimal.ONE)
                 .status(status)
                 .version(0L)
                 .build();

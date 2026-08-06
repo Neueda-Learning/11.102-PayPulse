@@ -147,6 +147,9 @@ class CancellationReversalIntegrationTest {
                 .destinationAccount("ACC9009009")
                 .amount(new BigDecimal("50.00"))
                 .currency("INR")
+                .targetCurrency("INR")
+                .convertedAmount(new BigDecimal("50.00"))
+                .fxRate(BigDecimal.ONE)
                 .status(PaymentStatus.CREATED)
                 .version(0L)
                 .build();
@@ -158,6 +161,7 @@ class CancellationReversalIntegrationTest {
                 .sourceAccountId(INR_ACCOUNT_ID)
                 .amount(new BigDecimal("100.00"))
                 .currency("INR")
+                .targetCurrency("INR")
                 .destinationAccount("ACC2000002")
                 .reference("Integration test payment")
                 .forceFailureStage("NONE")

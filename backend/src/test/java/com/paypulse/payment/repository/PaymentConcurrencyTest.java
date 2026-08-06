@@ -40,6 +40,9 @@ class PaymentConcurrencyTest {
                 .destinationAccount("ACC9999999")
                 .amount(new BigDecimal("100.00"))
                 .currency("INR")
+                .targetCurrency("INR")
+                .convertedAmount(new BigDecimal("100.00"))
+                .fxRate(BigDecimal.ONE)
                 .status(PaymentStatus.CREATED)
                 .version(0L)
                 .build();

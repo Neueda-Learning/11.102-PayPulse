@@ -81,6 +81,7 @@ class AccountValidatorTest {
                 .sourceAccountId("b2c3d4e5-1111-4a11-8a11-111111111111")
                 .amount(new BigDecimal("100.00"))
                 .currency(currency)
+                .targetCurrency(currency)
                 .destinationAccount(destination)
                 .build();
     }

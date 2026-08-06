@@ -1,6 +1,8 @@
 package com.paypulse.payment.service;
 
 import com.paypulse.common.idempotency.IdempotencyService;
+import com.paypulse.fx.dto.FxRateResponse;
+import com.paypulse.fx.service.FxRateService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.PaymentMapper;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
@@ -53,15 +55,22 @@ class PaymentServiceTest {
     @Mock
     private StatusTransitionEngine statusTransitionEngine;
 
+    @Mock
+    private FxRateService fxRateService;
+
     private PaymentService paymentService;
 
     @BeforeEach
     void setup() {
         paymentService = new PaymentService(
                 paymentRepository, idempotencyService, paymentMapper, validationChain,
-                statusTransitionEngine, new Random(42));
+                statusTransitionEngine, new Random(42), fxRateService);
         ReflectionTestUtils.setField(paymentService, "createFailureAccount", "FAILCREATE01");
         ReflectionTestUtils.setField(paymentService, "randomFailureRate", 0.0d);
+        when(fxRateService.getRate("INR", "INR")).thenReturn(FxRateResponse.builder()
+                .from("INR").to("INR").rate(BigDecimal.ONE).build());
+        when(fxRateService.getRate("INR", "USD")).thenReturn(FxRateResponse.builder()
+                .from("INR").to("USD").rate(new BigDecimal("0.012")).build());
     }
 
     @Test
@@ -72,6 +81,7 @@ class PaymentServiceTest {
                 .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
                 .amount(new BigDecimal("250.00"))
                 .currency("INR")
+                .targetCurrency("INR")
                 .destinationAccount("FAILCREATE01")
                 .reference("chaos-test")
                 .build();
@@ -93,6 +103,7 @@ class PaymentServiceTest {
                 .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
                 .amount(new BigDecimal("250.00"))
                 .currency("INR")
+                .targetCurrency("INR")
                 .destinationAccount("ACC2000002")
                 .forceFailureStage("CREATE")
                 .build();
@@ -121,6 +132,7 @@ class PaymentServiceTest {
                 .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
                 .amount(new BigDecimal("250.00"))
                 .currency("INR")
+                .targetCurrency("INR")
                 .destinationAccount("ACC2000002")
                 .forceFailureStage("SEND")
                 .build();
@@ -231,6 +243,32 @@ class PaymentServiceTest {
         assertThat(persisted.getErrorMessage()).isNull();
         assertThat(persisted.getId()).isNotNull();
         assertThat(persisted.getIdempotencyKey()).isEqualTo("attempt-2"); // trimmed
+        assertThat(persisted.getTargetCurrency()).isEqualTo("INR");
+        assertThat(persisted.getConvertedAmount()).isEqualByComparingTo("250.00");
+        assertThat(persisted.getFxRate()).isEqualByComparingTo("1");
+    }
+
+    @Test
+    void createPayment_whenCrossCurrency_persistsConvertedAmountAndFxRate() {
+        Payment mappedEntity = new Payment();
+        Payment saved = payment(PaymentStatus.CREATED);
+
+        when(idempotencyService.findExisting(any())).thenReturn(Optional.empty());
+        when(paymentMapper.toEntity(any(CreatePaymentRequest.class))).thenReturn(mappedEntity);
+        when(paymentRepository.save(any(Payment.class))).thenReturn(saved);
+        when(statusTransitionEngine.runAutomaticLifecycle(saved)).thenReturn(saved);
+        when(paymentMapper.toResponse(saved)).thenReturn(PaymentResponse.builder().build());
+
+        CreatePaymentRequest request = validRequest();
+        request.setTargetCurrency("USD");
+
+        paymentService.createPayment("fx-attempt", request);
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getTargetCurrency()).isEqualTo("USD");
+        assertThat(captor.getValue().getFxRate()).isEqualByComparingTo("0.012");
+        assertThat(captor.getValue().getConvertedAmount()).isEqualByComparingTo("3.00");
     }
 
     @Test
@@ -256,6 +294,7 @@ class PaymentServiceTest {
                 .sourceAccountId(ACTIVE_INR_ACCOUNT_ID)
                 .amount(new BigDecimal("250.00"))
                 .currency("INR")
+                .targetCurrency("INR")
                 .destinationAccount("ACC2000002")
                 .reference("Invoice #4471")
                 .build();
@@ -268,6 +307,9 @@ class PaymentServiceTest {
                 .destinationAccount("ACC2000002")
                 .amount(new BigDecimal("250.00"))
                 .currency("INR")
+                .targetCurrency("INR")
+                .convertedAmount(new BigDecimal("250.00"))
+                .fxRate(BigDecimal.ONE)
                 .status(status)
                 .version(0L)
                 .build();

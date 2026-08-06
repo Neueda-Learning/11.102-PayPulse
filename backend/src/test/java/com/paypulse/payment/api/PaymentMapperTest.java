@@ -24,6 +24,7 @@ class PaymentMapperTest {
                 .sourceAccountId("b2c3d4e5-1111-4a11-8a11-111111111111")
                 .amount(new BigDecimal("250.00"))
                 .currency("INR")
+                .targetCurrency("USD")
                 .destinationAccount("ACC2000002")
                 .reference("Invoice #4471")
                 .build();
@@ -33,6 +34,7 @@ class PaymentMapperTest {
         assertThat(payment.getSourceAccountId()).isEqualTo(request.getSourceAccountId());
         assertThat(payment.getAmount()).isEqualByComparingTo(request.getAmount());
         assertThat(payment.getCurrency()).isEqualTo(request.getCurrency());
+        assertThat(payment.getTargetCurrency()).isEqualTo(request.getTargetCurrency());
         assertThat(payment.getDestinationAccount()).isEqualTo(request.getDestinationAccount());
         assertThat(payment.getReference()).isEqualTo(request.getReference());
         assertThat(payment.getId()).isNull();
@@ -48,6 +50,9 @@ class PaymentMapperTest {
                 .sourceAccountId("b2c3d4e5-1111-4a11-8a11-111111111111")
                 .amount(new BigDecimal("999.99"))
                 .currency("USD")
+                .targetCurrency("INR")
+                .convertedAmount(new BigDecimal("83296.17"))
+                .fxRate(new BigDecimal("83.33"))
                 .destinationAccount("ACC8889990")
                 .reference("Payroll")
                 .status(PaymentStatus.COMPLETED)
@@ -63,6 +68,9 @@ class PaymentMapperTest {
         assertThat(response.getSourceAccountId()).isEqualTo(payment.getSourceAccountId());
         assertThat(response.getAmount()).isEqualByComparingTo(payment.getAmount());
         assertThat(response.getCurrency()).isEqualTo(payment.getCurrency());
+        assertThat(response.getTargetCurrency()).isEqualTo(payment.getTargetCurrency());
+        assertThat(response.getConvertedAmount()).isEqualByComparingTo(payment.getConvertedAmount());
+        assertThat(response.getFxRate()).isEqualByComparingTo(payment.getFxRate());
         assertThat(response.getDestinationAccount()).isEqualTo(payment.getDestinationAccount());
         assertThat(response.getReference()).isEqualTo(payment.getReference());
         assertThat(response.getStatus()).isEqualTo(payment.getStatus());
