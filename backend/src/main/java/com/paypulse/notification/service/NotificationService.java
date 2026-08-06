@@ -121,6 +121,25 @@ public class NotificationService {
         return sendAsync(recipientEmail, recipientName, event, paymentId, variables);
     }
 
+    /**
+     * Notify the user that their (CREATED, not-yet-processed) payment was cancelled.
+     */
+    public CompletableFuture<EmailResult> notifyPaymentCancelled(
+            String recipientEmail, String recipientName, UUID paymentId, Map<String, Object> variables
+    ) {
+        return sendAsync(recipientEmail, recipientName, NotificationEvent.PAYMENT_CANCELLED, paymentId, variables);
+    }
+
+    /**
+     * Notify the user that a previously COMPLETED payment has been reversed
+     * (a new offsetting payment was created against the original).
+     */
+    public CompletableFuture<EmailResult> notifyPaymentReversed(
+            String recipientEmail, String recipientName, UUID paymentId, Map<String, Object> variables
+    ) {
+        return sendAsync(recipientEmail, recipientName, NotificationEvent.PAYMENT_REVERSED, paymentId, variables);
+    }
+
     // ── Internal ──────────────────────────────────────────────────────────────
 
     private CompletableFuture<EmailResult> sendAsync(

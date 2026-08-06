@@ -1,0 +1,82 @@
+<!-- backend/src/main/resources/templates/email/payment-cancelled.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Payment Cancelled</title></head>
+<body>
+
+<th:block th:replace="~{email/base-layout :: layout(
+    'Payment Cancelled – PayPulse',
+    ~{::main-content}
+)}">
+
+    <div th:fragment="main-content">
+
+        <div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;
+                padding:20px 24px;margin-bottom:28px;text-align:center;">
+            <div style="font-size:36px;margin-bottom:8px;">🚫</div>
+            <div style="font-size:18px;font-weight:700;color:#374151;">
+                Payment Cancelled
+            </div>
+            <div style="font-size:13px;color:#6b7280;margin-top:4px;">
+                This payment was cancelled before processing began. No funds were moved.
+            </div>
+        </div>
+
+        <p class="greeting">Your payment has been cancelled</p>
+
+        <p class="lead">
+            Hi <strong th:text="${recipientName}">Valued Customer</strong>,<br/>
+            As requested, we've cancelled the payment below. It will not be processed further.
+        </p>
+
+        <div class="detail-card">
+            <div class="card-title">Cancelled Transaction Details</div>
+
+            <div class="detail-row">
+                <span class="detail-label">Payment ID</span>
+                <span class="detail-value" th:text="${paymentId}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Reference</span>
+                <span class="detail-value" th:text="${reference}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Amount</span>
+                <span class="detail-value"
+                      th:text="${currency} + ' ' + ${amount}">INR 0.00</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">From Account</span>
+                <span class="detail-value" th:text="${sourceAccount}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">To Account</span>
+                <span class="detail-value" th:text="${destinationAccount}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+          <span class="status-badge status-failed">Cancelled</span>
+        </span>
+            </div>
+        </div>
+
+        <div class="cta-block">
+            <a class="btn btn-primary"
+               th:href="${baseUrl} + '/create-payment.html'">
+                Start a New Payment
+            </a>
+        </div>
+
+        <div class="divider"></div>
+        <p style="font-size:13px;color:#718096;line-height:1.7;">
+            If you didn't request this cancellation, please contact us immediately at
+            <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}">support@paypulse.io</a>.
+        </p>
+
+    </div>
+
+</th:block>
+</body>
+</html>
+

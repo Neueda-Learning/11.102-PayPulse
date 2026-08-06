@@ -1,0 +1,87 @@
+<!-- backend/src/main/resources/templates/email/payment-reversed.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Payment Reversed</title></head>
+<body>
+
+<th:block th:replace="~{email/base-layout :: layout(
+    'Payment Reversed – PayPulse',
+    ~{::main-content}
+)}">
+
+    <div th:fragment="main-content">
+
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;
+                padding:20px 24px;margin-bottom:28px;text-align:center;">
+            <div style="font-size:36px;margin-bottom:8px;">↩️</div>
+            <div style="font-size:18px;font-weight:700;color:#1e40af;">
+                Payment Reversed
+            </div>
+            <div style="font-size:13px;color:#1d4ed8;margin-top:4px;">
+                An offsetting payment has been created to reverse this transaction.
+            </div>
+        </div>
+
+        <p class="greeting">Your completed payment has been reversed</p>
+
+        <p class="lead">
+            Hi <strong th:text="${recipientName}">Valued Customer</strong>,<br/>
+            The payment below has been reversed. A new offsetting payment
+            (<strong th:text="${reversalPaymentId}">—</strong>) has been created to return the funds.
+        </p>
+
+        <div class="detail-card">
+            <div class="card-title">Original Transaction Details</div>
+
+            <div class="detail-row">
+                <span class="detail-label">Payment ID</span>
+                <span class="detail-value" th:text="${paymentId}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Reference</span>
+                <span class="detail-value" th:text="${reference}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Amount</span>
+                <span class="detail-value"
+                      th:text="${currency} + ' ' + ${amount}">INR 0.00</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">From Account</span>
+                <span class="detail-value" th:text="${sourceAccount}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">To Account</span>
+                <span class="detail-value" th:text="${destinationAccount}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Reversal Payment ID</span>
+                <span class="detail-value" th:text="${reversalPaymentId}">—</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+          <span class="status-badge status-success">Reversed</span>
+        </span>
+            </div>
+        </div>
+
+        <div class="cta-block">
+            <a class="btn btn-primary"
+               th:href="${baseUrl} + '/payment-details.html?id=' + ${reversalPaymentId}">
+                Track Reversal Payment
+            </a>
+        </div>
+
+        <div class="divider"></div>
+        <p style="font-size:13px;color:#718096;line-height:1.7;">
+            If you didn't request this reversal, please contact us immediately at
+            <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}">support@paypulse.io</a>.
+        </p>
+
+    </div>
+
+</th:block>
+</body>
+</html>
+

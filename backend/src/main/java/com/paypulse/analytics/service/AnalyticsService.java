@@ -120,12 +120,19 @@ public class AnalyticsService {
                     bucketEnd
             );
 
+            long cancelled = paymentRepository.countByStatusAndCreatedAtBetween(
+                    PaymentStatus.CANCELLED,
+                    bucketStart,
+                    bucketEnd
+            );
+
             buckets.add(
                     TrendResponse.Bucket.builder()
                             .periodStart(bucketStart)
                             .created(created)
                             .completed(completed)
                             .failed(failed)
+                            .cancelled(cancelled)
                             .build()
             );
         }

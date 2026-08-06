@@ -9,6 +9,8 @@ public class KpiSummaryResponse {
     private long totalPayments;
     private double successRatePct;
     private double failureRatePct;
+    private double cancelledRatePct;
+    private long cancelledCount;
     private double avgProcessingTimeSeconds;
     private double throughputPerMinute;
     private Map<String, BigDecimal> volumeByCurrency;

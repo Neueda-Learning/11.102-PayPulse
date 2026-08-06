@@ -14,5 +14,6 @@ public class TrendResponse {
         private long created;
         private long completed;
         private long failed;
+        private long cancelled;
     }
 }
