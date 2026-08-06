@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 /**
  * Shared controller file per team protocol.
@@ -76,11 +77,13 @@ public class PaymentController {
     @GetMapping(value = "/export", produces = "text/csv")
     @Operation(summary = "Stream the current filtered payment list as CSV (V2, feature #14)")
     public void export(
-            @RequestParam(required = false) PaymentStatus status,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sourceAccountId,
             @RequestParam(defaultValue = "createdAt,desc") String sort,
             HttpServletResponse response) throws IOException {
+
+        StatusFilter statusFilter = resolveStatusFilter(status);
 
         String[] s = sort.split(",");
         String rawField = s[0];
@@ -89,7 +92,8 @@ public class PaymentController {
         // Validate (sort allow-list + row-count cap) BEFORE writing any response
         // headers — an EXPORT_TOO_LARGE/VALIDATION_FAILED rejection must still be
         // a clean JSON ApiError, not a corrupted "text/csv" response.
-        String[] resolved = csvExportService.validateExportRequest(status, search, sourceAccountId, rawField, rawDirection);
+        String[] resolved = csvExportService.validateExportRequest(
+                statusFilter.status(), statusFilter.reversed(), search, sourceAccountId, rawField, rawDirection);
 
         response.setContentType("text/csv");
         response.setCharacterEncoding("UTF-8");
@@ -98,7 +102,8 @@ public class PaymentController {
                 "attachment; filename=\"payments-export-" + System.currentTimeMillis() + ".csv\""
         );
 
-        csvExportService.streamExport(status, search, sourceAccountId, resolved[0], resolved[1], response.getWriter());
+        csvExportService.streamExport(
+                statusFilter.status(), statusFilter.reversed(), search, sourceAccountId, resolved[0], resolved[1], response.getWriter());
     }
 
     // ── M4 ──────────────────────────────────────────────────────────
@@ -115,12 +120,14 @@ public class PaymentController {
     @GetMapping
     @Operation(summary = "List/search/filter payments")
     public ResponseEntity<Page<PaymentResponse>> list(
-            @RequestParam(required = false) PaymentStatus status,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sourceAccountId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
+
+        StatusFilter statusFilter = resolveStatusFilter(status);
 
         size = Math.min(size, 100);
         String[] s = sort.split(",");
@@ -134,9 +141,37 @@ public class PaymentController {
         Sort sortObj = Sort.by(Sort.Direction.fromString(s.length > 1 ? s[1] : "desc"), field);
         Pageable pageable = PageRequest.of(page, size, sortObj);
 
-        Page<Payment> result = paymentReadRepository.search(status, search, sourceAccountId, pageable);
+        Page<Payment> result = paymentReadRepository.search(
+                statusFilter.status(), statusFilter.reversed(), search, sourceAccountId, pageable);
         return ResponseEntity.ok(result.map(paymentMapper::toResponse));
     }
+
+    private StatusFilter resolveStatusFilter(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank()) {
+            return new StatusFilter(null, null);
+        }
+
+        String normalized = rawStatus.trim().toUpperCase();
+        if ("REVERSED".equals(normalized)) {
+            return new StatusFilter(PaymentStatus.COMPLETED, Boolean.TRUE);
+        }
+        if ("COMPLETED".equals(normalized)) {
+            return new StatusFilter(PaymentStatus.COMPLETED, Boolean.FALSE);
+        }
+
+        try {
+            return new StatusFilter(PaymentStatus.valueOf(normalized), null);
+        } catch (IllegalArgumentException ex) {
+            String allowed = String.join(", ",
+                    Arrays.stream(PaymentStatus.values()).map(Enum::name).toList()) + ", REVERSED";
+            throw new com.paypulse.payment.service.PaymentException(
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.VALIDATION_FAILED,
+                    "Invalid status filter '" + rawStatus + "'. Allowed: " + allowed);
+        }
+    }
+
+    private record StatusFilter(PaymentStatus status, Boolean reversed) {}
 
     // ── M2 ──────────────────────────────────────────────────────────
     @GetMapping("/{id}/history")

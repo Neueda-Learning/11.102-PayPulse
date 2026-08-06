@@ -7,8 +7,8 @@ import org.springframework.data.domain.Pageable;
 
 public interface PaymentReadRepository {
 
-    Page<Payment> search(PaymentStatus status, String search, String sourceAccountId, Pageable pageable);
+    Page<Payment> search(PaymentStatus status, Boolean reversed, String search, String sourceAccountId, Pageable pageable);
 
-    long count(PaymentStatus status, String search, String sourceAccountId);
+    long count(PaymentStatus status, Boolean reversed, String search, String sourceAccountId);
 }
 
