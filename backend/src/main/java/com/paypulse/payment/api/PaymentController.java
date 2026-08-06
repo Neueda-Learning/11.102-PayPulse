@@ -2,6 +2,7 @@ package com.paypulse.payment.api;
 
 import com.paypulse.common.error.ApiError;
 import com.paypulse.common.error.ErrorCode;
+import com.paypulse.common.export.PaymentCsvExportService;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.api.dto.CreatePaymentRequest;
 import com.paypulse.payment.api.dto.PaymentHistoryResponse;
@@ -17,6 +18,7 @@ import com.paypulse.payment.service.states.InvalidStatusTransitionException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -33,7 +35,7 @@ import java.net.URI;
 import java.util.List;
 /**
  * Shared controller file per team protocol.
- * M3 owns: POST /payments
+ * M3 owns: POST /payments, GET /payments/export (V2, feature #14)
  * M2 owns: GET /payments/{id}/history, POST validate/send/complete
  * M4 owns: GET /payments/{id}, GET /payments
  */
@@ -64,6 +66,35 @@ public class PaymentController {
                 .buildAndExpand(result.payment().getId())
                 .toUri();
         return ResponseEntity.created(location).body(result.payment());
+    }
+
+    // ── M3 (V2, feature #14 — CSV Export) ─────────────────────────────
+    @GetMapping(value = "/export", produces = "text/csv")
+    @Operation(summary = "Stream the current filtered payment list as CSV (V2, feature #14)")
+    public void export(
+            @RequestParam(required = false) PaymentStatus status,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sourceAccountId,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            HttpServletResponse response) throws IOException {
+
+        String[] s = sort.split(",");
+        String rawField = s[0];
+        String rawDirection = s.length > 1 ? s[1] : "desc";
+
+        // Validate (sort allow-list + row-count cap) BEFORE writing any response
+        // headers — an EXPORT_TOO_LARGE/VALIDATION_FAILED rejection must still be
+        // a clean JSON ApiError, not a corrupted "text/csv" response.
+        String[] resolved = csvExportService.validateExportRequest(status, search, sourceAccountId, rawField, rawDirection);
+
+        response.setContentType("text/csv");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader(
+                "Content-Disposition",
+                "attachment; filename=\"payments-export-" + System.currentTimeMillis() + ".csv\""
+        );
+
+        csvExportService.streamExport(status, search, sourceAccountId, resolved[0], resolved[1], response.getWriter());
     }
 
     // ── M4 ──────────────────────────────────────────────────────────

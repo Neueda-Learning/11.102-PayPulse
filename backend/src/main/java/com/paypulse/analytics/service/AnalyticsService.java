@@ -2,9 +2,13 @@ package com.paypulse.analytics.service;
 
 import com.paypulse.analytics.dto.KpiSummaryResponse;
 import com.paypulse.analytics.dto.TrendResponse;
+import com.paypulse.common.error.ErrorCode;
 import com.paypulse.payment.PaymentStatus;
 import com.paypulse.payment.repository.PaymentRepository;
 import com.paypulse.payment.repository.PaymentStatusHistoryRepository;
+import com.paypulse.payment.service.PaymentException;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,11 +24,14 @@ public class AnalyticsService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentStatusHistoryRepository historyRepository;
+    private final int maxTrendHours;
 
     public AnalyticsService(PaymentRepository paymentRepository,
-                            PaymentStatusHistoryRepository historyRepository) {
+                            PaymentStatusHistoryRepository historyRepository,
+                            @Value("${paypulse.analytics.trend.max-hours:168}") int maxTrendHours) {
         this.paymentRepository = paymentRepository;
         this.historyRepository = historyRepository;
+        this.maxTrendHours = maxTrendHours;
     }
 
     public KpiSummaryResponse getSummary(String fromStr, String toStr) {
@@ -94,7 +101,22 @@ public class AnalyticsService {
                 .build();
     }
 
+    /**
+     * V2 (feature #13 deepening): now validates the requested window against a
+     * configurable cap (paypulse.analytics.trend.max-hours, default 7 days) —
+     * defensive bound against an unreasonably large aggregation request — and
+     * enriches each hourly bucket with a per-currency volume breakdown so the
+     * dashboard's trend view can show more than just status counts.
+     */
     public TrendResponse getTrend(int hours) {
+
+        if (hours <= 0 || hours > maxTrendHours) {
+            throw new PaymentException(
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.VALIDATION_FAILED,
+                    "hours must be between 1 and " + maxTrendHours
+            );
+        }
 
         Instant to = Instant.now();
         Instant from = to.minus(hours, ChronoUnit.HOURS);
@@ -120,12 +142,20 @@ public class AnalyticsService {
                     bucketEnd
             );
 
+            Map<String, BigDecimal> volumeByCurrency = new LinkedHashMap<>();
+            if (created > 0) {
+                for (Object[] row : paymentRepository.sumAmountByCurrency(bucketStart, bucketEnd)) {
+                    volumeByCurrency.put((String) row[0], (BigDecimal) row[1]);
+                }
+            }
+
             buckets.add(
                     TrendResponse.Bucket.builder()
                             .periodStart(bucketStart)
                             .created(created)
                             .completed(completed)
                             .failed(failed)
+                            .volumeByCurrency(volumeByCurrency)
                             .build()
             );
         }
